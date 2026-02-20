@@ -14,14 +14,10 @@ import java.util.List;
 import java.util.Map;
 
 @Entity
-@Table(
-        name = "products",
-        schema = "smartpharma",
-        indexes = {
-                @Index(name = "idx_products_pharmacy", columnList = "pharmacy_id"),
-                @Index(name = "idx_products_barcode", columnList = "barcode")
-        }
-)
+@Table(name = "products", schema = "smartpharma", indexes = {
+        @Index(name = "idx_products_pharmacy", columnList = "pharmacy_id"),
+        @Index(name = "idx_products_barcode", columnList = "barcode")
+})
 @Where(clause = "deleted_at IS NULL")
 @Data
 @NoArgsConstructor
@@ -50,19 +46,26 @@ public class Product {
     private String category;
 
     @Column(length = 50)
+    @Builder.Default
     private String unitType = "BOX";
 
     @Column
+    @Builder.Default
     private Integer minStockLevel = 10;
-
+    @Column
+    @Builder.Default
+    private Integer totalStock = 10;
     @Column(name = "is_prescription_required")
+    @Builder.Default
     private Boolean prescriptionRequired = false;
 
     @Column(nullable = false, precision = 10, scale = 2, columnDefinition = "NUMERIC(10,2) DEFAULT 0.00")
-    private BigDecimal sellPrice;
+    @Builder.Default
+    private BigDecimal sellPrice = BigDecimal.ZERO;
 
     @Column(precision = 10, scale = 2, columnDefinition = "NUMERIC(10,2) DEFAULT 0.00")
-    private BigDecimal buyPrice;
+    @Builder.Default
+    private BigDecimal buyPrice = BigDecimal.ZERO;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -84,14 +87,15 @@ public class Product {
     @ToString.Exclude
     private List<DemandPrediction> predictions = new ArrayList<>();
 
+    @Transient
     public Double getTotalStock() {
         if (this.stockBatches == null) {
             return 0.0;
         }
         return stockBatches.stream()
-                .filter(batch -> batch.getQuantityCurrent() > 0)
+                .filter(batch -> batch != null && batch.getQuantityCurrent() != null)
                 .filter(batch -> batch.getStatus() == StockBatch.BatchStatus.ACTIVE)
-                .mapToDouble(StockBatch::getQuantityCurrent)
+                .mapToDouble(batch -> batch.getQuantityCurrent().doubleValue())
                 .sum();
     }
 }

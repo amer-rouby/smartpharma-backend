@@ -4,24 +4,33 @@ import com.smartpharma.dto.request.ProductRequest;
 import com.smartpharma.dto.response.ProductResponse;
 import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.Product;
+import com.smartpharma.entity.StockBatch;
 import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.ProductRepository;
+import com.smartpharma.repository.StockBatchRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductService {
 
     private final ProductRepository productRepository;
     private final PharmacyRepository pharmacyRepository;
+    private final StockBatchRepository stockBatchRepository;  // ✅ ✅ ✅ إضافة الـ Repository ✅ ✅ ✅
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getAllProducts(Long pharmacyId) {
+        log.debug("Fetching products for pharmacyId: {}", pharmacyId);
+
         return productRepository.findActiveProductsByPharmacy(pharmacyId)
                 .stream()
                 .map(this::mapToResponse)
@@ -29,7 +38,16 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    public Long getProductsCount(Long pharmacyId) {
+        log.debug("Counting products for pharmacyId: {}", pharmacyId);
+
+        return productRepository.countByPharmacyId(pharmacyId);
+    }
+
+    @Transactional(readOnly = true)
     public ProductResponse getProduct(Long id, Long pharmacyId) {
+        log.debug("Fetching product {} for pharmacyId: {}", id, pharmacyId);
+
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -42,12 +60,15 @@ public class ProductService {
 
     @Transactional
     public ProductResponse createProduct(ProductRequest request, Long pharmacyId) {
+        log.info("Creating product '{}' for pharmacyId: {}", request.getName(), pharmacyId);
+
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
 
-        if (request.getBarcode() != null &&
-                productRepository.existsByPharmacyIdAndBarcode(pharmacyId, request.getBarcode())) {
-            throw new RuntimeException("Barcode already exists");
+        if (request.getBarcode() != null && !request.getBarcode().trim().isEmpty()) {
+            if (productRepository.existsByPharmacyIdAndBarcode(pharmacyId, request.getBarcode().trim())) {
+                throw new RuntimeException("Barcode already exists for this pharmacy");
+            }
         }
 
         Product product = Product.builder()
@@ -65,11 +86,34 @@ public class ProductService {
                 .build();
 
         productRepository.save(product);
+
+        // ✅ ✅ ✅ إنشاء StockBatch تلقائي لو فيه مخزون أولي ✅ ✅ ✅
+        if (request.getInitialStock() != null && request.getInitialStock() > 0) {
+            StockBatch batch = StockBatch.builder()
+                    .product(product)
+                    .pharmacy(pharmacy)
+                    .batchNumber("BATCH-" + product.getId() + "-" + System.currentTimeMillis())
+                    .quantityInitial(request.getInitialStock())
+                    .quantityCurrent(request.getInitialStock())
+                    .expiryDate(LocalDate.now().plusMonths(24))
+                    .buyPrice(request.getBuyPrice() != null ? request.getBuyPrice() : request.getSellPrice())
+                    .sellPrice(request.getSellPrice())
+                    .location("رف-1")
+                    .status(StockBatch.BatchStatus.ACTIVE)
+                    .build();
+
+            stockBatchRepository.save(batch);  // ✅ ✅ ✅ استخدام الـ Repository ✅ ✅ ✅
+            log.info("Stock batch created for product {}: quantity = {}", product.getId(), request.getInitialStock());
+        }
+
+        log.info("Product created with ID: {}", product.getId());
         return mapToResponse(product);
     }
 
     @Transactional
     public ProductResponse updateProduct(Long id, ProductRequest request, Long pharmacyId) {
+        log.info("Updating product {} for pharmacyId: {}", id, pharmacyId);
+
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -89,11 +133,15 @@ public class ProductService {
         product.setExtraAttributes(request.getExtraAttributes());
 
         productRepository.save(product);
+        log.info("Product updated with ID: {}", product.getId());
+
         return mapToResponse(product);
     }
 
     @Transactional
     public void deleteProduct(Long id, Long pharmacyId) {
+        log.info("Soft deleting product {} for pharmacyId: {}", id, pharmacyId);
+
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -103,10 +151,13 @@ public class ProductService {
 
         product.setDeletedAt(java.time.LocalDateTime.now());
         productRepository.save(product);
+        log.info("Product soft-deleted with ID: {}", id);
     }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> searchProducts(Long pharmacyId, String query) {
+        log.debug("Searching products for pharmacyId: {}, query: '{}'", pharmacyId, query);
+
         return productRepository.findByPharmacyIdAndNameContainingIgnoreCase(pharmacyId, query)
                 .stream()
                 .map(this::mapToResponse)
@@ -115,6 +166,8 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getLowStockProducts(Long pharmacyId) {
+        log.debug("Fetching low stock products for pharmacyId: {}", pharmacyId);
+
         return productRepository.findLowStockProducts(pharmacyId)
                 .stream()
                 .map(this::mapToResponse)

@@ -20,7 +20,7 @@ import java.time.LocalDate;
 
 @Configuration
 @RequiredArgsConstructor
-@Profile("dev") // يعمل فقط في بيئة التطوير
+@Profile("dev")
 public class DataInitializer {
 
     private final PharmacyRepository pharmacyRepository;
@@ -32,9 +32,10 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner initTestData() {
         return args -> {
-            // التحقق من وجود بيانات مسبقاً
-            if (pharmacyRepository.count() > 0) {
-                System.out.println("✅ Data already exists, skipping initialization...");
+            // ✅ التحقق من وجود الصيدلية بالترخيص أو الإيميل (مش مجرد count)
+            if (pharmacyRepository.findByLicenseNumber("PH-2024-001").isPresent() ||
+                    pharmacyRepository.findByEmail("test@smartpharma.eg").isPresent()) {
+                System.out.println("✅ Test data already exists, skipping initialization...");
                 return;
             }
 
@@ -106,6 +107,8 @@ public class DataInitializer {
                         .unitType(prodData[4])
                         .minStockLevel(10)
                         .prescriptionRequired(prodData[3].contains("مضادات") || prodData[3].contains("قلب"))
+                        .sellPrice(new BigDecimal("25.00"))
+                        .buyPrice(new BigDecimal("15.00"))
                         .build();
 
                 productRepository.save(product);

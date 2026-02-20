@@ -6,15 +6,22 @@ import com.smartpharma.dto.response.ProductResponse;
 import com.smartpharma.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+/**
+ * Controller for managing products within the SmartPharma system.
+ */
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
+@Slf4j
 @CrossOrigin(origins = "http://localhost:4200")
 public class ProductController {
 
@@ -28,9 +35,31 @@ public class ProductController {
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts(
             @RequestParam Long pharmacyId) {
 
+        log.info("GET /api/products - pharmacyId: {}", pharmacyId);
+
         List<ProductResponse> products = productService.getAllProducts(pharmacyId);
         return ResponseEntity.ok(
                 ApiResponse.success(products, "Products retrieved successfully")
+        );
+    }
+
+    /**
+     * ✅ إضافة endpoint لحساب عدد المنتجات ✅
+     */
+    @GetMapping("/count")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
+    public ResponseEntity<ApiResponse<Map<String, Long>>> getProductsCount(
+            @RequestParam Long pharmacyId) {
+
+        log.info("GET /api/products/count - pharmacyId: {}", pharmacyId);
+
+        Long count = productService.getProductsCount(pharmacyId);
+
+        Map<String, Long> response = new HashMap<>();
+        response.put("count", count);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(response, "Products count retrieved successfully")
         );
     }
 
@@ -42,6 +71,8 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> getProduct(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+
+        log.info("GET /api/products/{} - pharmacyId: {}", id, pharmacyId);
 
         ProductResponse product = productService.getProduct(id, pharmacyId);
         return ResponseEntity.ok(
@@ -57,6 +88,9 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             @Valid @RequestBody ProductRequest request,
             @RequestParam Long pharmacyId) {
+
+        log.info("POST /api/products - pharmacyId: {}, productName: {}",
+                pharmacyId, request.getName());
 
         ProductResponse product = productService.createProduct(request, pharmacyId);
         return ResponseEntity.ok(
@@ -74,6 +108,8 @@ public class ProductController {
             @Valid @RequestBody ProductRequest request,
             @RequestParam Long pharmacyId) {
 
+        log.info("PUT /api/products/{} - pharmacyId: {}", id, pharmacyId);
+
         ProductResponse product = productService.updateProduct(id, request, pharmacyId);
         return ResponseEntity.ok(
                 ApiResponse.success(product, "Product updated successfully")
@@ -81,13 +117,15 @@ public class ProductController {
     }
 
     /**
-     * Delete a product by ID from a specific pharmacy.
+     * Delete a product by ID from a specific pharmacy (soft delete).
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+
+        log.info("DELETE /api/products/{} - pharmacyId: {}", id, pharmacyId);
 
         productService.deleteProduct(id, pharmacyId);
         return ResponseEntity.ok(
@@ -104,6 +142,8 @@ public class ProductController {
             @RequestParam Long pharmacyId,
             @RequestParam String query) {
 
+        log.info("GET /api/products/search - pharmacyId: {}, query: '{}'", pharmacyId, query);
+
         List<ProductResponse> products = productService.searchProducts(pharmacyId, query);
         return ResponseEntity.ok(
                 ApiResponse.success(products, "Search completed successfully")
@@ -117,6 +157,8 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStockProducts(
             @RequestParam Long pharmacyId) {
+
+        log.info("GET /api/products/low-stock - pharmacyId: {}", pharmacyId);
 
         List<ProductResponse> products = productService.getLowStockProducts(pharmacyId);
         return ResponseEntity.ok(
