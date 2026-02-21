@@ -42,10 +42,7 @@ public class ProductController {
                 ApiResponse.success(products, "Products retrieved successfully")
         );
     }
-
-    /**
-     * ✅ إضافة endpoint لحساب عدد المنتجات ✅
-     */
+    
     @GetMapping("/count")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<Map<String, Long>>> getProductsCount(

@@ -1,6 +1,5 @@
-package com.smartpharma.service;
+package com.smartpharma.service.impl;
 
-import com.smartpharma.entity.User;
 import com.smartpharma.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;

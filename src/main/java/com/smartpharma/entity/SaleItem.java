@@ -6,10 +6,7 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "sale_items", schema = "smartpharma", indexes = {
-        @Index(name = "idx_sale_item_transaction", columnList = "transaction_id"),
-        @Index(name = "idx_sale_item_product", columnList = "product_id")
-})
+@Table(name = "sale_items", schema = "smartpharma")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -28,6 +25,12 @@ public class SaleItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    // ✅ ✅ ✅ اجعل batch_id اختياري ✅ ✅ ✅
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")  // ← احذف nullable = false لو موجود
+    @ToString.Exclude
+    private StockBatch batch;
 
     @Column(nullable = false)
     private Integer quantity;

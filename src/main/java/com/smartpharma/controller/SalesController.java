@@ -2,8 +2,7 @@ package com.smartpharma.controller;
 
 import com.smartpharma.dto.request.SaleRequest;
 import com.smartpharma.dto.response.ApiResponse;
-import com.smartpharma.dto.response.SaleTransactionResponse;
-import com.smartpharma.entity.SaleTransaction;
+import com.smartpharma.dto.response.SaleTransactionDTO;
 import com.smartpharma.service.SaleTransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,58 +29,57 @@ public class SalesController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
-    public ResponseEntity<ApiResponse<Page<SaleTransaction>>> getAllSales(
-            @RequestParam Long pharmacyId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+    public ResponseEntity<ApiResponse<Page<SaleTransactionDTO>>> getAllSales(
+                                                                               @RequestParam Long pharmacyId,
+                                                                               @RequestParam(defaultValue = "0") int page,
+                                                                               @RequestParam(defaultValue = "10") int size) {
 
         log.info("GET /api/sales - pharmacyId: {}, page: {}, size: {}", pharmacyId, page, size);
 
-        Page<SaleTransaction> sales = saleTransactionService.getAllSales(pharmacyId, page, size);
+        Page<SaleTransactionDTO> sales = saleTransactionService.getAllSales(pharmacyId, page, size);  // ✅ بيرجع DTOs
         return ResponseEntity.ok(ApiResponse.success(sales, "Sales retrieved successfully"));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
-    public ResponseEntity<ApiResponse<SaleTransaction>> getSale(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<SaleTransactionDTO>> getSale(
+                                                                     @PathVariable Long id,
+                                                                     @RequestParam Long pharmacyId) {
 
         log.info("GET /api/sales/{} - pharmacyId: {}", id, pharmacyId);
 
-        SaleTransaction sale = saleTransactionService.getSaleById(id, pharmacyId);
+        SaleTransactionDTO sale = saleTransactionService.getSaleById(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(sale, "Sale retrieved successfully"));
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
-    public ResponseEntity<ApiResponse<SaleTransactionResponse>> createSale(
-            @Valid @RequestBody SaleRequest request,
-            @RequestParam Long pharmacyId,
-            Authentication authentication) {
+    public ResponseEntity<ApiResponse<SaleTransactionDTO>> createSale(
+                                                                        @Valid @RequestBody SaleRequest request,
+                                                                        @RequestParam Long pharmacyId,
+                                                                        Authentication authentication) {
 
         log.info("POST /api/sales - pharmacyId: {}, items: {}", pharmacyId, request.getItems().size());
 
         Long currentUserId = null;
         if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.User) {
-            // Optional: extract user ID if needed for audit
-            currentUserId = 1L; // Placeholder - implement proper user ID extraction
+            currentUserId = 1L;
         }
 
-        SaleTransactionResponse response = saleTransactionService.createSale(request, currentUserId);
+        SaleTransactionDTO response = saleTransactionService.createSale(request, currentUserId);
         return ResponseEntity.ok(ApiResponse.success(response, "Sale created successfully"));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
-    public ResponseEntity<ApiResponse<SaleTransactionResponse>> updateSale(
-            @PathVariable Long id,
-            @Valid @RequestBody SaleRequest request,
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<SaleTransactionDTO>> updateSale(
+                                                                        @PathVariable Long id,
+                                                                        @Valid @RequestBody SaleRequest request,
+                                                                        @RequestParam Long pharmacyId) {
 
         log.info("PUT /api/sales/{} - pharmacyId: {}", id, pharmacyId);
 
-        SaleTransactionResponse response = saleTransactionService.updateSale(id, request, pharmacyId);
+        SaleTransactionDTO response = saleTransactionService.updateSale(id, request, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(response, "Sale updated successfully"));
     }
 
@@ -123,10 +121,10 @@ public class SalesController {
 
     @GetMapping("/range")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
-    public ResponseEntity<ApiResponse<Page<SaleTransaction>>> getSalesByDateRange(
-            @RequestParam Long pharmacyId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+    public ResponseEntity<ApiResponse<Page<SaleTransactionDTO>>> getSalesByDateRange(
+                                                                                       @RequestParam Long pharmacyId,
+                                                                                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                                                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         return ResponseEntity.ok(ApiResponse.success(
                 saleTransactionService.getSalesByDateRange(pharmacyId, startDate, endDate),
@@ -135,9 +133,9 @@ public class SalesController {
 
     @GetMapping("/search")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
-    public ResponseEntity<ApiResponse<Page<SaleTransaction>>> searchSales(
-            @RequestParam Long pharmacyId,
-            @RequestParam String query) {
+    public ResponseEntity<ApiResponse<Page<SaleTransactionDTO>>> searchSales(
+                                                                               @RequestParam Long pharmacyId,
+                                                                               @RequestParam String query) {
 
         return ResponseEntity.ok(ApiResponse.success(
                 saleTransactionService.searchSales(pharmacyId, query),
@@ -146,9 +144,9 @@ public class SalesController {
 
     @GetMapping("/recent")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
-    public ResponseEntity<ApiResponse<List<SaleTransactionResponse>>> getRecentSales(
-            @RequestParam Long pharmacyId,
-            @RequestParam(defaultValue = "10") int limit) {
+    public ResponseEntity<ApiResponse<List<SaleTransactionDTO>>> getRecentSales(
+                                                                                  @RequestParam Long pharmacyId,
+                                                                                  @RequestParam(defaultValue = "10") int limit) {
 
         return ResponseEntity.ok(ApiResponse.success(
                 saleTransactionService.getRecentSales(pharmacyId, limit),
