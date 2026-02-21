@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import javax.sql.DataSource;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -18,6 +18,11 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     List<StockBatch> findByProductIdAndStatus(Long productId, BatchStatus status);
 
     List<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status);
+
+    // ✅ ✅ ✅ إضافة method للبحث بـ ACTIVE status فقط ✅ ✅ ✅
+    default List<StockBatch> findByProductIdAndStatusActive(Long productId) {
+        return findByProductIdAndStatus(productId, BatchStatus.ACTIVE);
+    }
 
     @Query("""
         SELECT sb FROM StockBatch sb 
@@ -39,4 +44,22 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
 
     @Lock(jakarta.persistence.LockModeType.OPTIMISTIC)
     StockBatch findByIdAndStatus(Long id, BatchStatus status);
+
+    // ✅ ✅ ✅ إضافة method لحساب إجمالي المخزون ✅ ✅ ✅
+    @Query("""
+        SELECT COALESCE(SUM(sb.quantityCurrent), 0) 
+        FROM StockBatch sb 
+        WHERE sb.product.id = :productId 
+        AND sb.status = 'ACTIVE'
+    """)
+    Long sumQuantityByProductId(@Param("productId") Long productId);
+
+    // ✅ ✅ ✅ إضافة method لتحديث المخزون ✅ ✅ ✅
+    @Query("""
+        UPDATE StockBatch sb 
+        SET sb.quantityCurrent = sb.quantityCurrent - :deduct 
+        WHERE sb.id = :batchId 
+        AND sb.quantityCurrent >= :deduct
+    """)
+    int deductQuantity(@Param("batchId") Long batchId, @Param("deduct") Integer deduct);
 }

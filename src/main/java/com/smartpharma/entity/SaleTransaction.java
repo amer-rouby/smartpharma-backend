@@ -44,10 +44,12 @@ public class SaleTransaction {
     private BigDecimal totalAmount;
 
     @Column(precision = 10, scale = 2)
+    @Builder.Default
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
+    @Builder.Default
     private PaymentMethod paymentMethod = PaymentMethod.CASH;
 
     @Column(length = 20)
@@ -60,7 +62,6 @@ public class SaleTransaction {
     @Column(updatable = false)
     private LocalDateTime transactionDate;
 
-    // ✅ ✅ ✅ مهم جداً: mappedBy = "transaction" مش "sale" ✅ ✅ ✅
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
     @Builder.Default
@@ -75,13 +76,17 @@ public class SaleTransaction {
         item.setTransaction(this);
     }
 
-    public void calculateTotal() {
+    public void removeItem(SaleItem item) {
+        items.remove(item);
+        item.setTransaction(null);
+    }
+
+    public void calculateTotals() {
         this.subtotal = items.stream()
                 .map(SaleItem::getTotalPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        this.totalAmount = this.subtotal.subtract(
-                this.discountAmount != null ? this.discountAmount : BigDecimal.ZERO
-        );
+        BigDecimal discount = this.discountAmount != null ? this.discountAmount : BigDecimal.ZERO;
+        this.totalAmount = this.subtotal.subtract(discount).max(BigDecimal.ZERO);
     }
 }

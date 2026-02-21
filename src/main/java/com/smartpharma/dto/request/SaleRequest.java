@@ -1,7 +1,11 @@
 package com.smartpharma.dto.request;
 
-import jakarta.validation.constraints.*;
-import lombok.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -23,20 +27,4 @@ public class SaleRequest {
 
     @DecimalMin(value = "0", message = "Discount cannot be negative")
     private BigDecimal discountAmount = BigDecimal.ZERO;
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class SaleItemRequest {
-        @NotNull
-        private Long productId;
-
-        @NotNull
-        @Min(1)
-        private Integer quantity;
-
-        @NotNull
-        @DecimalMin(value = "0.01")
-        private BigDecimal unitPrice;
-    }
 }

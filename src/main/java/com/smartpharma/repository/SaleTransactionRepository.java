@@ -65,7 +65,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     @Query("""
         SELECT COUNT(st) FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
-        AND FUNCTION('DATE', st.transactionDate) = :date
+        AND CAST(st.transactionDate AS date) = :date
         AND st.deletedAt IS NULL
     """)
     Long countByPharmacyIdAndDate(@Param("pharmacyId") Long pharmacyId, @Param("date") LocalDate date);
@@ -87,7 +87,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     @Query("""
         SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
-        AND FUNCTION('DATE', st.transactionDate) = :date
+        AND CAST(st.transactionDate AS date) = :date
         AND st.deletedAt IS NULL
     """)
     BigDecimal sumTotalAmountByPharmacyIdAndDate(@Param("pharmacyId") Long pharmacyId, @Param("date") LocalDate date);

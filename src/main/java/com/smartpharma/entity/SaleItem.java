@@ -20,9 +20,9 @@ public class SaleItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ✅ ✅ ✅ مهم جداً: اسم الحقل "transaction" مش "sale" ✅ ✅ ✅
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id", nullable = false)
+    @ToString.Exclude
     private SaleTransaction transaction;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -37,4 +37,12 @@ public class SaleItem {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;
+
+    @PrePersist
+    @PreUpdate
+    public void calculateTotalPrice() {
+        if (quantity != null && unitPrice != null) {
+            this.totalPrice = unitPrice.multiply(BigDecimal.valueOf(quantity));
+        }
+    }
 }
