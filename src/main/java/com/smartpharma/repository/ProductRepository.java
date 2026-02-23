@@ -14,6 +14,10 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
+    // ================================
+    // ✅ Basic Queries
+    // ================================
+
     @Query("SELECT p FROM Product p WHERE p.pharmacy.id = :pharmacyId AND p.deletedAt IS NULL")
     List<Product> findByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 
@@ -83,9 +87,59 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT COUNT(p) FROM Product p WHERE p.pharmacy.id = :pharmacyId AND p.deletedAt IS NULL")
     Long countByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 
+    // ✅ Category is String field (not entity)
     @Query("SELECT p FROM Product p WHERE p.pharmacy.id = :pharmacyId AND p.category = :category AND p.deletedAt IS NULL")
     List<Product> findByPharmacyIdAndCategory(@Param("pharmacyId") Long pharmacyId, @Param("category") String category);
 
     @Query("SELECT p FROM Product p WHERE p.pharmacy.id = :pharmacyId AND p.category = :category AND p.deletedAt IS NULL")
     Page<Product> findByPharmacyIdAndCategory(@Param("pharmacyId") Long pharmacyId, @Param("category") String category, Pageable pageable);
+
+    // ================================
+    // ✅ Report Queries (Fixed: category is String)
+    // ================================
+
+    @Query("""
+        SELECT p.id, p.name, p.category, 
+               COALESCE(SUM(sb.quantityCurrent), 0),
+               p.minStockLevel, p.sellPrice,
+               COALESCE(SUM(sb.quantityCurrent * p.sellPrice), 0)
+        FROM Product p
+        LEFT JOIN StockBatch sb ON p.id = sb.product.id AND sb.status = 'ACTIVE'
+        WHERE p.pharmacy.id = :pharmacyId
+        GROUP BY p.id, p.name, p.category, p.minStockLevel, p.sellPrice
+    """)
+    List<Object[]> getStockWithCategories(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT COUNT(p) FROM Product p
+        WHERE p.pharmacy.id = :pharmacyId
+        AND p.deletedAt IS NULL
+        AND p.totalStock <= p.minStockLevel
+    """)
+    Long countLowStockProducts(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT COUNT(p) FROM Product p
+        WHERE p.pharmacy.id = :pharmacyId
+        AND p.deletedAt IS NULL
+        AND p.totalStock = 0
+    """)
+    Long countOutOfStockProducts(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT p.category, COUNT(p)
+        FROM Product p
+        WHERE p.pharmacy.id = :pharmacyId
+        AND p.deletedAt IS NULL
+        GROUP BY p.category
+    """)
+    List<Object[]> countProductsByCategory(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT COALESCE(SUM(sb.quantityCurrent * p.sellPrice), 0)
+        FROM Product p
+        LEFT JOIN StockBatch sb ON p.id = sb.product.id AND sb.status = 'ACTIVE'
+        WHERE p.pharmacy.id = :pharmacyId
+    """)
+    Long getTotalProductsValue(@Param("pharmacyId") Long pharmacyId);
 }

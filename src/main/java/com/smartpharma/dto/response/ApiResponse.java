@@ -1,34 +1,29 @@
 package com.smartpharma.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Standard API response wrapper for consistent response format.
- * @param <T> The type of data in the response
- */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
-
     private boolean success;
     private String message;
     private T data;
-    private Integer statusCode;
+    private int statusCode;
 
-    /**
-     * Create a successful response.
-     * @param data The response data
-     * @param message Success message
-     * @param <T> The data type
-     * @return ApiResponse with success=true
-     */
+    public static <T> ApiResponse<T> success(T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .message("Operation completed successfully")
+                .data(data)
+                .statusCode(200)
+                .build();
+    }
+
     public static <T> ApiResponse<T> success(T data, String message) {
         return ApiResponse.<T>builder()
                 .success(true)
@@ -38,28 +33,21 @@ public class ApiResponse<T> {
                 .build();
     }
 
-    /**
-     * Create an error response.
-     * @param message Error message
-     * @param code HTTP status code
-     * @param <T> The data type (usually Void for errors)
-     * @return ApiResponse with success=false
-     */
-    public static <T> ApiResponse<T> error(String message, Integer code) {
+    public static <T> ApiResponse<T> error(String message) {
         return ApiResponse.<T>builder()
                 .success(false)
                 .message(message)
-                .statusCode(code)
+                .data(null)
+                .statusCode(500)
                 .build();
     }
 
-    /**
-     * Create an error response with default 500 status.
-     * @param message Error message
-     * @param <T> The data type
-     * @return ApiResponse with success=false and statusCode=500
-     */
-    public static <T> ApiResponse<T> error(String message) {
-        return error(message, 500);
+    public static <T> ApiResponse<T> error(String message, int statusCode) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .data(null)
+                .statusCode(statusCode)
+                .build();
     }
 }

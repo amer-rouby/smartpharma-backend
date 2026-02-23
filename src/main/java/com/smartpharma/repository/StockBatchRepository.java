@@ -15,11 +15,14 @@ import java.util.List;
 @Repository
 public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
 
+    // ================================
+    // ✅ Basic Queries
+    // ================================
+
     List<StockBatch> findByProductIdAndStatus(Long productId, BatchStatus status);
 
     List<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status);
 
-    // ✅ ✅ ✅ إضافة method للبحث بـ ACTIVE status فقط ✅ ✅ ✅
     default List<StockBatch> findByProductIdAndStatusActive(Long productId) {
         return findByProductIdAndStatus(productId, BatchStatus.ACTIVE);
     }
@@ -45,7 +48,6 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     @Lock(jakarta.persistence.LockModeType.OPTIMISTIC)
     StockBatch findByIdAndStatus(Long id, BatchStatus status);
 
-    // ✅ ✅ ✅ إضافة method لحساب إجمالي المخزون ✅ ✅ ✅
     @Query("""
         SELECT COALESCE(SUM(sb.quantityCurrent), 0) 
         FROM StockBatch sb 
@@ -54,7 +56,6 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     """)
     Long sumQuantityByProductId(@Param("productId") Long productId);
 
-    // ✅ ✅ ✅ إضافة method لتحديث المخزون ✅ ✅ ✅
     @Query("""
         UPDATE StockBatch sb 
         SET sb.quantityCurrent = sb.quantityCurrent - :deduct 
@@ -62,4 +63,102 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
         AND sb.quantityCurrent >= :deduct
     """)
     int deductQuantity(@Param("batchId") Long batchId, @Param("deduct") Integer deduct);
+
+    @Query("""
+        SELECT COUNT(sb) FROM StockBatch sb
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        AND sb.expiryDate BETWEEN CURRENT_DATE AND :expiryDate
+    """)
+    Long countExpiringBatches(@Param("pharmacyId") Long pharmacyId, @Param("expiryDate") LocalDate expiryDate);
+
+    @Query("""
+        SELECT COUNT(sb) FROM StockBatch sb
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        AND sb.expiryDate < CURRENT_DATE
+    """)
+    Long countExpiredBatches(@Param("pharmacyId") Long pharmacyId);
+
+    // ================================
+    // ✅ Report Queries (Fixed: PostgreSQL compatible)
+    // ================================
+
+    @Query("""
+        SELECT COALESCE(SUM(sb.quantityCurrent * p.sellPrice), 0)
+        FROM StockBatch sb
+        JOIN Product p ON sb.product.id = p.id
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+    """)
+    BigDecimal getTotalStockValue(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT p.category, COUNT(DISTINCT p.id), COALESCE(SUM(sb.quantityCurrent * p.sellPrice), 0)
+        FROM StockBatch sb
+        JOIN Product p ON sb.product.id = p.id
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        GROUP BY p.category
+    """)
+    List<Object[]> getStockByCategory(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT p.id, p.name, sb.batchNumber, SUM(sb.quantityCurrent), p.minStockLevel, sb.expiryDate
+        FROM StockBatch sb
+        JOIN Product p ON sb.product.id = p.id
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        GROUP BY p.id, p.name, sb.batchNumber, p.minStockLevel, sb.expiryDate
+        HAVING SUM(sb.quantityCurrent) <= p.minStockLevel
+        ORDER BY SUM(sb.quantityCurrent) ASC
+    """)
+    List<Object[]> getLowStockProducts(@Param("pharmacyId") Long pharmacyId);
+
+    // ✅ FIXED: PostgreSQL compatible - use simple subtraction for days
+    @Query("""
+        SELECT p.id, p.name, sb.batchNumber, sb.expiryDate, SUM(sb.quantityCurrent)
+        FROM StockBatch sb
+        JOIN Product p ON sb.product.id = p.id
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        AND sb.expiryDate >= CURRENT_DATE
+        AND sb.expiryDate <= :expiryDate
+        GROUP BY p.id, p.name, sb.batchNumber, sb.expiryDate
+        ORDER BY sb.expiryDate ASC
+    """)
+    List<Object[]> getExpiringProducts(@Param("pharmacyId") Long pharmacyId,
+                                       @Param("expiryDate") LocalDate expiryDate);
+
+    @Query("""
+        SELECT COALESCE(SUM(sb.quantityCurrent), 0)
+        FROM StockBatch sb
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+    """)
+    Long getTotalStockItemsCount(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT COUNT(DISTINCT p.id)
+        FROM StockBatch sb
+        JOIN Product p ON sb.product.id = p.id
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        GROUP BY p.id, p.minStockLevel
+        HAVING SUM(sb.quantityCurrent) <= p.minStockLevel
+    """)
+    Long countLowStockItems(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT p.id, p.name, sb.batchNumber, sb.expiryDate, sb.quantityCurrent
+        FROM StockBatch sb
+        JOIN Product p ON sb.product.id = p.id
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        AND sb.expiryDate >= :startDate
+        AND sb.expiryDate <= :endDate
+    """)
+    List<Object[]> getExpiringBatches(@Param("pharmacyId") Long pharmacyId,
+                                      @Param("startDate") LocalDate startDate,
+                                      @Param("endDate") LocalDate endDate);
 }

@@ -17,12 +17,19 @@ import java.util.Optional;
 @Repository
 public interface SaleTransactionRepository extends JpaRepository<SaleTransaction, Long> {
 
+    // ================================
+    // ✅ Basic Queries
+    // ================================
+
     Page<SaleTransaction> findByPharmacyId(Long pharmacyId, Pageable pageable);
 
     @Query("SELECT st FROM SaleTransaction st WHERE st.id = :id AND st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
     Optional<SaleTransaction> findByIdAndPharmacyId(@Param("id") Long id, @Param("pharmacyId") Long pharmacyId);
 
-    List<SaleTransaction> findByPharmacyIdAndTransactionDateBetween(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate);
+    List<SaleTransaction> findByPharmacyIdAndTransactionDateBetween(
+            Long pharmacyId,
+            LocalDateTime startDate,
+            LocalDateTime endDate);
 
     @Query("""
         SELECT st FROM SaleTransaction st
@@ -32,10 +39,11 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         AND st.deletedAt IS NULL
         ORDER BY st.transactionDate DESC
     """)
-    Page<SaleTransaction> findByPharmacyIdAndDateRange(@Param("pharmacyId") Long pharmacyId,
-                                                       @Param("startDate") LocalDateTime startDate,
-                                                       @Param("endDate") LocalDateTime endDate,
-                                                       Pageable pageable);
+    Page<SaleTransaction> findByPharmacyIdAndDateRange(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable);
 
     @Query("""
         SELECT st FROM SaleTransaction st
@@ -44,9 +52,14 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         AND st.deletedAt IS NULL
         ORDER BY st.transactionDate DESC
     """)
-    Page<SaleTransaction> searchSales(@Param("pharmacyId") Long pharmacyId,
-                                      @Param("query") String query,
-                                      Pageable pageable);
+    Page<SaleTransaction> searchSales(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("query") String query,
+            Pageable pageable);
+
+    // ================================
+    // ✅ Count Queries
+    // ================================
 
     @Query("SELECT COUNT(st) FROM SaleTransaction st WHERE st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
     Long countByPharmacyId(@Param("pharmacyId") Long pharmacyId);
@@ -58,9 +71,10 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         AND st.transactionDate <= :endDate
         AND st.deletedAt IS NULL
     """)
-    Long countByPharmacyIdAndDateRange(@Param("pharmacyId") Long pharmacyId,
-                                       @Param("startDate") LocalDateTime startDate,
-                                       @Param("endDate") LocalDateTime endDate);
+    Long countByPharmacyIdAndDateRange(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 
     @Query("""
         SELECT COUNT(st) FROM SaleTransaction st
@@ -68,7 +82,13 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         AND CAST(st.transactionDate AS date) = :date
         AND st.deletedAt IS NULL
     """)
-    Long countByPharmacyIdAndDate(@Param("pharmacyId") Long pharmacyId, @Param("date") LocalDate date);
+    Long countByPharmacyIdAndDate(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("date") LocalDate date);
+
+    // ================================
+    // ✅ Sum/Revenue Queries
+    // ================================
 
     @Query("SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st WHERE st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
     BigDecimal sumTotalAmountByPharmacyId(@Param("pharmacyId") Long pharmacyId);
@@ -80,9 +100,10 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         AND st.transactionDate <= :endDate
         AND st.deletedAt IS NULL
     """)
-    BigDecimal sumTotalAmountByPharmacyIdAndDateRange(@Param("pharmacyId") Long pharmacyId,
-                                                      @Param("startDate") LocalDateTime startDate,
-                                                      @Param("endDate") LocalDateTime endDate);
+    BigDecimal sumTotalAmountByPharmacyIdAndDateRange(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 
     @Query("""
         SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st
@@ -90,7 +111,13 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         AND CAST(st.transactionDate AS date) = :date
         AND st.deletedAt IS NULL
     """)
-    BigDecimal sumTotalAmountByPharmacyIdAndDate(@Param("pharmacyId") Long pharmacyId, @Param("date") LocalDate date);
+    BigDecimal sumTotalAmountByPharmacyIdAndDate(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("date") LocalDate date);
+
+    // ================================
+    // ✅ List Queries
+    // ================================
 
     @Query("""
         SELECT st FROM SaleTransaction st
@@ -98,5 +125,103 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         AND st.deletedAt IS NULL
         ORDER BY st.transactionDate DESC
     """)
-    List<SaleTransaction> findTop10ByPharmacyIdOrderByTransactionDateDesc(@Param("pharmacyId") Long pharmacyId);
+    List<SaleTransaction> findTop10ByPharmacyIdOrderByTransactionDateDesc(
+            @Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT st FROM SaleTransaction st
+        WHERE st.pharmacy.id = :pharmacyId
+        AND st.deletedAt IS NULL
+        ORDER BY st.transactionDate DESC
+    """)
+    List<SaleTransaction> findRecentSalesByPharmacyId(
+            @Param("pharmacyId") Long pharmacyId,
+            Pageable pageable);
+
+    // ================================
+    // ✅ Report Methods
+    // ================================
+
+    @Query("""
+        SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st
+        WHERE st.pharmacy.id = :pharmacyId
+        AND st.transactionDate >= :startDate
+        AND st.transactionDate <= :endDate
+        AND st.deletedAt IS NULL
+    """)
+    BigDecimal getTotalRevenue(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+        SELECT COUNT(st) FROM SaleTransaction st
+        WHERE st.pharmacy.id = :pharmacyId
+        AND st.transactionDate >= :startDate
+        AND st.transactionDate <= :endDate
+        AND st.deletedAt IS NULL
+    """)
+    Long getTotalOrders(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    // ✅ ✅ ✅ THIS RETURNS Enum, NOT String - Handle in Service ✅ ✅ ✅
+    @Query("""
+        SELECT st.paymentMethod, COALESCE(SUM(st.totalAmount), 0)
+        FROM SaleTransaction st
+        WHERE st.pharmacy.id = :pharmacyId
+        AND st.transactionDate >= :startDate
+        AND st.transactionDate <= :endDate
+        AND st.deletedAt IS NULL
+        GROUP BY st.paymentMethod
+    """)
+    List<Object[]> getRevenueByPaymentMethod(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+        SELECT si.product.id, si.product.name, SUM(si.quantity), SUM(si.totalPrice)
+        FROM SaleItem si
+        JOIN SaleTransaction st ON si.transaction.id = st.id
+        WHERE st.pharmacy.id = :pharmacyId
+        AND st.transactionDate >= :startDate
+        AND st.transactionDate <= :endDate
+        AND st.deletedAt IS NULL
+        GROUP BY si.product.id, si.product.name
+        ORDER BY SUM(si.quantity) DESC
+    """)
+    List<Object[]> getTopProducts(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable);
+
+    @Query("""
+        SELECT CAST(st.transactionDate AS date), COALESCE(SUM(st.totalAmount), 0), COUNT(st)
+        FROM SaleTransaction st
+        WHERE st.pharmacy.id = :pharmacyId
+        AND st.transactionDate >= :startDate
+        AND st.transactionDate <= :endDate
+        AND st.deletedAt IS NULL
+        GROUP BY CAST(st.transactionDate AS date)
+        ORDER BY CAST(st.transactionDate AS date)
+    """)
+    List<Object[]> getDailySales(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+        SELECT si.product.id, si.product.name, SUM(si.quantity), SUM(si.totalPrice)
+        FROM SaleItem si
+        WHERE si.transaction.pharmacy.id = :pharmacyId
+        AND si.transaction.deletedAt IS NULL
+        GROUP BY si.product.id, si.product.name
+        ORDER BY SUM(si.quantity) DESC
+    """)
+    List<Object[]> findTopSellingProducts(
+            @Param("pharmacyId") Long pharmacyId,
+            Pageable pageable);
 }

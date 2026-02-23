@@ -1,8 +1,10 @@
+// src/main/java/com/smartpharma/service/DashboardService.java
+
 package com.smartpharma.service;
 
-import java.util.Map;
+import com.smartpharma.dto.response.DashboardResponse;
 
 public interface DashboardService {
 
-    Map<String, Object> getDashboardStats(Long pharmacyId);
+    DashboardResponse getDashboardStats(Long pharmacyId);
 }
