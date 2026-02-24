@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -87,7 +88,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT COUNT(p) FROM Product p WHERE p.pharmacy.id = :pharmacyId AND p.deletedAt IS NULL")
     Long countByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 
-    // ✅ Category is String field (not entity)
     @Query("SELECT p FROM Product p WHERE p.pharmacy.id = :pharmacyId AND p.category = :category AND p.deletedAt IS NULL")
     List<Product> findByPharmacyIdAndCategory(@Param("pharmacyId") Long pharmacyId, @Param("category") String category);
 
@@ -95,7 +95,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Page<Product> findByPharmacyIdAndCategory(@Param("pharmacyId") Long pharmacyId, @Param("category") String category, Pageable pageable);
 
     // ================================
-    // ✅ Report Queries (Fixed: category is String)
+    // ✅ Report Queries
     // ================================
 
     @Query("""

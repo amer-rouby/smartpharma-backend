@@ -28,8 +28,17 @@ public class JwtService {
     @Value("${jwt.refresh-expiration}")
     private long refreshExpiration;
 
+    // ================================
+    // ✅ Extract methods
+    // ================================
+
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    // ✅ FIXED: Added extractUserId method
+    public Long extractUserId(String token) {
+        return extractClaim(token, claims -> claims.get("userId", Long.class));
     }
 
     public Long extractPharmacyId(String token) {
@@ -41,9 +50,19 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
+    // ================================
+    // ✅ Generate methods - FIXED to include userId
+    // ================================
+
     public String generateToken(UserDetails userDetails, Long pharmacyId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("pharmacyId", pharmacyId);
+
+        // ✅ FIXED: Add userId if userDetails is our custom User entity
+        if (userDetails instanceof User user) {
+            claims.put("userId", user.getId());  // ← أهم سطر!
+        }
+
         return buildToken(claims, userDetails, jwtExpiration);
     }
 
@@ -60,6 +79,10 @@ public class JwtService {
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
+
+    // ================================
+    // ✅ Validation methods
+    // ================================
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);

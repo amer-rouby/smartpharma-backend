@@ -45,6 +45,16 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     """)
     List<StockBatch> findExpiringBatches(@Param("pharmacyId") Long pharmacyId, @Param("expiryDate") LocalDate expiryDate);
 
+    // ✅ FIXED: Added missing method to find expired batches (return List<StockBatch>)
+    @Query("""
+        SELECT sb FROM StockBatch sb 
+        WHERE sb.pharmacy.id = :pharmacyId 
+        AND sb.status = 'ACTIVE' 
+        AND sb.expiryDate < :expiryDate
+        ORDER BY sb.expiryDate ASC
+    """)
+    List<StockBatch> findExpiredBatches(@Param("pharmacyId") Long pharmacyId, @Param("expiryDate") LocalDate expiryDate);
+
     @Lock(jakarta.persistence.LockModeType.OPTIMISTIC)
     StockBatch findByIdAndStatus(Long id, BatchStatus status);
 
@@ -81,7 +91,7 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     Long countExpiredBatches(@Param("pharmacyId") Long pharmacyId);
 
     // ================================
-    // ✅ Report Queries (Fixed: PostgreSQL compatible)
+    // ✅ Report Queries (PostgreSQL compatible)
     // ================================
 
     @Query("""
@@ -115,7 +125,6 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     """)
     List<Object[]> getLowStockProducts(@Param("pharmacyId") Long pharmacyId);
 
-    // ✅ FIXED: PostgreSQL compatible - use simple subtraction for days
     @Query("""
         SELECT p.id, p.name, sb.batchNumber, sb.expiryDate, SUM(sb.quantityCurrent)
         FROM StockBatch sb
@@ -158,7 +167,7 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
         AND sb.expiryDate >= :startDate
         AND sb.expiryDate <= :endDate
     """)
-    List<Object[]> getExpiringBatches(@Param("pharmacyId") Long pharmacyId,
-                                      @Param("startDate") LocalDate startDate,
-                                      @Param("endDate") LocalDate endDate);
+    List<Object[]> getExpiringBatchesInRange(@Param("pharmacyId") Long pharmacyId,
+                                             @Param("startDate") LocalDate startDate,
+                                             @Param("endDate") LocalDate endDate);
 }
