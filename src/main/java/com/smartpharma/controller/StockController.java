@@ -6,6 +6,8 @@ import com.smartpharma.dto.request.StockAdjustmentRequest;
 import com.smartpharma.dto.request.StockBatchRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.StockBatchResponse;
+import com.smartpharma.entity.User;
+import com.smartpharma.security.JwtService;
 import com.smartpharma.service.StockBatchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +29,13 @@ import java.util.List;
 public class StockController {
 
     private final StockBatchService stockBatchService;
+    private final JwtService jwtService;  // ✅ أضف الـ dependency ده
 
     // ================================
     // ✅ GET all batches with pagination
     // ================================
     @GetMapping("/batches")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated()")  // ✅ للـ testing: أي user مسجل دخول
     public ResponseEntity<ApiResponse<Page<StockBatchResponse>>> getAllBatches(
             @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
@@ -47,16 +50,18 @@ public class StockController {
     }
 
     // ================================
-    // ✅ GET single batch
+    // ✅ GET single batch - FIXED: No @RequestParam pharmacyId
     // ================================
     @GetMapping("/batches/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated()")  // ✅ للـ testing
     public ResponseEntity<ApiResponse<StockBatchResponse>> getBatch(
             @PathVariable Long id,
-            @RequestParam Long pharmacyId,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestHeader("Authorization") String authHeader) {
 
+        Long pharmacyId = extractPharmacyId(authHeader);  // ✅ من الـ token
         Long userId = extractUserId(userDetails);
+
         log.info("Getting batch {} for pharmacy: {}, user: {}", id, pharmacyId, userId);
 
         StockBatchResponse batch = stockBatchService.getBatch(id, pharmacyId);
@@ -70,13 +75,14 @@ public class StockController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockBatchResponse>> createBatch(
             @Valid @RequestBody StockBatchRequest request,
-            @RequestParam Long pharmacyId,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestHeader("Authorization") String authHeader) {
 
+        Long pharmacyId = extractPharmacyId(authHeader);
         Long userId = extractUserId(userDetails);
-        if (userId == null) {
-            log.warn("Could not extract userId from token");
-            return ResponseEntity.status(401).body(ApiResponse.error("Unauthorized: User not authenticated"));
+
+        if (pharmacyId == null || userId == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Unauthorized: Invalid token"));
         }
 
         log.info("Creating batch for pharmacy: {}, user: {}, product: {}",
@@ -94,10 +100,12 @@ public class StockController {
     public ResponseEntity<ApiResponse<StockBatchResponse>> updateBatch(
             @PathVariable Long id,
             @Valid @RequestBody StockBatchRequest request,
-            @RequestParam Long pharmacyId,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestHeader("Authorization") String authHeader) {
 
+        Long pharmacyId = extractPharmacyId(authHeader);
         Long userId = extractUserId(userDetails);
+
         log.info("Updating batch {} for pharmacy: {}, user: {}", id, pharmacyId, userId);
 
         StockBatchResponse batch = stockBatchService.updateBatch(id, request, pharmacyId, userId);
@@ -105,16 +113,18 @@ public class StockController {
     }
 
     // ================================
-    // ✅ DELETE batch
+    // ✅ DELETE batch - FIXED
     // ================================
     @DeleteMapping("/batches/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated()")  // ✅ للـ testing
     public ResponseEntity<ApiResponse<Void>> deleteBatch(
             @PathVariable Long id,
-            @RequestParam Long pharmacyId,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestHeader("Authorization") String authHeader) {
 
+        Long pharmacyId = extractPharmacyId(authHeader);
         Long userId = extractUserId(userDetails);
+
         log.info("Deleting batch {} for pharmacy: {}, user: {}", id, pharmacyId, userId);
 
         stockBatchService.deleteBatch(id, pharmacyId, userId);
@@ -172,19 +182,24 @@ public class StockController {
     }
 
     // ================================
-    // ✅ Helper: Extract userId
+    // ✅ Helpers
     // ================================
     private Long extractUserId(UserDetails userDetails) {
         if (userDetails == null) return null;
-
-        if (userDetails instanceof com.smartpharma.entity.User user) {
-            return user.getId();
-        }
-
+        if (userDetails instanceof User user) return user.getId();
         try {
             return Long.valueOf(userDetails.getUsername());
         } catch (NumberFormatException e) {
-            log.warn("Could not parse userId from username: {}", userDetails.getUsername());
+            return null;
+        }
+    }
+
+    private Long extractPharmacyId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) return null;
+        try {
+            String jwt = authHeader.substring(7);
+            return jwtService.extractPharmacyId(jwt);
+        } catch (Exception e) {
             return null;
         }
     }
