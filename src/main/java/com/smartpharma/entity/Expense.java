@@ -25,8 +25,9 @@ public class Expense extends BaseEntity {
     @JoinColumn(name = "pharmacy_id", nullable = false)
     private Pharmacy pharmacy;
 
+    // ✅ FIXED: Use VARCHAR instead of ENUM
     @Enumerated(EnumType.STRING)
-    @Column(name = "category", nullable = false, columnDefinition = "expense_category_enum")
+    @Column(name = "category", nullable = false, length = 50)
     private ExpenseCategory category;
 
     @Column(name = "title", nullable = false, length = 200)
