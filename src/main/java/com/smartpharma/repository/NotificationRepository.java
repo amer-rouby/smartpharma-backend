@@ -20,9 +20,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // ✅ Basic Queries
     // ================================
 
-    Page<Notification> findByPharmacyIdAndRecipientId(Long pharmacyId, Long userId, Pageable pageable);
-
-    // ✅ FIXED: Added OrderBy for consistent unread notifications list
+    @Query("SELECT n FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND n.recipient.id = :userId ORDER BY n.createdAt DESC")
+    Page<Notification> findByPharmacyIdAndRecipientId(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("userId") Long userId,
+            Pageable pageable);
     List<Notification> findByPharmacyIdAndRecipientIdAndReadFalseOrderByCreatedAtDesc(
             Long pharmacyId, Long userId);
 
@@ -36,7 +38,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             Pageable pageable);
 
     // ================================
-    // ✅ Check for duplicate notifications (مهم لمنع التكرار)
+    // ✅ Check for duplicate notifications
     // ================================
 
     @Query("""
@@ -54,7 +56,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     );
 
     // ================================
-    // ✅ Bulk Operations
+    // ✅ Bulk Operations - FIXED: استخدم recipient مش user
     // ================================
 
     @Modifying

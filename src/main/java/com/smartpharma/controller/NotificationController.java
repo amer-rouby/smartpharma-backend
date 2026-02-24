@@ -3,7 +3,7 @@ package com.smartpharma.controller;
 import com.smartpharma.dto.request.NotificationRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.NotificationResponse;
-import com.smartpharma.security.JwtService;  // ✅ أضف الـ import ده
+import com.smartpharma.security.JwtService;
 import com.smartpharma.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +14,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
@@ -23,14 +25,14 @@ import org.springframework.web.bind.annotation.*;
 public class NotificationController {
 
     private final NotificationService notificationService;
-    private final JwtService jwtService;  // ✅ أضف الـ dependency ده
+    private final JwtService jwtService;
 
-    // ✅ Helper method: استخرج userId من الـ token مش من الـ username
+    // ✅ Helper: استخراج userId من الـ token
     private Long extractUserIdFromToken(@RequestHeader("Authorization") String authHeader) {
         try {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String jwt = authHeader.substring(7);
-                Long userId = jwtService.extractUserId(jwt);  // ← ده اللي هيفلحنا!
+                Long userId = jwtService.extractUserId(jwt);
                 if (userId != null) {
                     return userId;
                 }
@@ -62,7 +64,7 @@ public class NotificationController {
     }
 
     // ================================
-    // ✅ GET /api/notifications/unread-count  ← اللي أنت بتجربه
+    // ✅ GET /api/notifications/unread-count
     // ================================
     @GetMapping("/unread-count")
     public ResponseEntity<ApiResponse<Long>> getUnreadCount(
@@ -80,10 +82,10 @@ public class NotificationController {
     }
 
     // ================================
-    // ✅ GET /api/notifications/unread  ← اللي أنت بتجربه كمان
+    // ✅ GET /api/notifications/unread
     // ================================
     @GetMapping("/unread")
-    public ResponseEntity<ApiResponse<java.util.List<NotificationResponse>>> getUnreadNotifications(
+    public ResponseEntity<ApiResponse<List<NotificationResponse>>> getUnreadNotifications(
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
@@ -93,12 +95,12 @@ public class NotificationController {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }
 
-        var notifications = notificationService.getUnreadNotifications(pharmacyId, userId);
+        List<NotificationResponse> notifications = notificationService.getUnreadNotifications(pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(notifications));
     }
 
     // ================================
-    // ✅ PUT /api/notifications/{id}/read
+    // ✅ PUT /api/notifications/{id}/read  ← FIXED: Added missing method
     // ================================
     @PutMapping("/{id}/read")
     public ResponseEntity<ApiResponse<NotificationResponse>> markAsRead(
@@ -116,12 +118,64 @@ public class NotificationController {
     }
 
     // ================================
+    // ✅ PUT /api/notifications/read-all  ← FIXED: Added missing method (دي اللي كنت ناقصاها!)
+    // ================================
+// ✅ FIXED: استخدم @PostMapping عشان يتطابق مع الـ Frontend
+    @PostMapping("/read-all")  // ← ← ← ده التعديل المهم!
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Integer>> markAllAsRead(
+            @RequestParam Long pharmacyId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestHeader("Authorization") String authHeader) {
+
+        Long userId = extractUserIdFromToken(authHeader);
+        if (userId == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
+        }
+
+        int count = notificationService.markAllAsRead(pharmacyId, userId);
+        return ResponseEntity.ok(ApiResponse.success(count, "All notifications marked as read"));
+    }
+
+    // ================================
+    // ✅ DELETE /api/notifications/{id}
+    // ================================
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteNotification(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestHeader("Authorization") String authHeader) {
+
+        Long userId = extractUserIdFromToken(authHeader);
+        if (userId == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
+        }
+
+        notificationService.deleteNotification(id, userId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Notification deleted"));
+    }
+
+    // ================================
     // ✅ POST /api/notifications/check-alerts
     // ================================
     @PostMapping("/check-alerts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")  // ✅ فقط admins و managers يقدروا يشغلوا الـ alerts
     public ResponseEntity<ApiResponse<Void>> checkAndCreateAlerts(@RequestParam Long pharmacyId) {
         notificationService.checkAndCreateLowStockAlerts(pharmacyId);
         notificationService.checkAndCreateExpiryAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Alerts checked successfully"));
+    }
+
+    // ================================
+    // ✅ POST /api/notifications (لإنشاء notification يدوي - للـ admins فقط)
+    // ================================
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<NotificationResponse>> createNotification(
+            @RequestBody NotificationRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        NotificationResponse notification = notificationService.createNotification(request);
+        return ResponseEntity.ok(ApiResponse.success(notification, "Notification created"));
     }
 }

@@ -63,6 +63,13 @@ public class NotificationServiceImpl implements NotificationService {
         return mapToResponse(notificationRepository.save(notification));
     }
 
+    // ✅ FIXED: Added missing method implementation
+    @Override
+    @Transactional
+    public int markAllAsRead(Long pharmacyId, Long userId) {
+        return notificationRepository.markAllAsReadByUser(pharmacyId, userId);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public Page<NotificationResponse> getUserNotifications(Long pharmacyId, Long userId, int page, int size) {
@@ -71,7 +78,6 @@ public class NotificationServiceImpl implements NotificationService {
                 .map(this::mapToResponse);
     }
 
-    // ✅ FIXED: Added missing method implementation
     @Override
     @Transactional(readOnly = true)
     public List<NotificationResponse> getUnreadNotifications(Long pharmacyId, Long userId) {
@@ -86,6 +92,19 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional(readOnly = true)
     public Long getUnreadCount(Long pharmacyId, Long userId) {
         return notificationRepository.countUnreadByUser(pharmacyId, userId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteNotification(Long notificationId, Long userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+
+        if (notification.getRecipient() != null && !notification.getRecipient().getId().equals(userId)) {
+            throw new RuntimeException("Not authorized");
+        }
+
+        notificationRepository.delete(notification);
     }
 
     @Override
@@ -120,7 +139,6 @@ public class NotificationServiceImpl implements NotificationService {
         LocalDate warningDate = LocalDate.now().plusDays(30);
         LocalDate expiredDate = LocalDate.now();
 
-        // تنبيهات المنتجات اللي هتخلص خلال 30 يوم
         List<StockBatch> expiringSoon = stockBatchRepository.findExpiringBatches(pharmacyId, warningDate);
         for (StockBatch batch : expiringSoon) {
             boolean alreadyNotified = notificationRepository
@@ -143,7 +161,6 @@ public class NotificationServiceImpl implements NotificationService {
             }
         }
 
-        // تنبيهات المنتجات اللي خلصت صلاحيتها
         List<StockBatch> expired = stockBatchRepository.findByPharmacyIdAndStatus(pharmacyId, StockBatch.BatchStatus.ACTIVE)
                 .stream()
                 .filter(sb -> sb.getExpiryDate() != null && sb.getExpiryDate().isBefore(expiredDate))
