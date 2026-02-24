@@ -1,5 +1,3 @@
-// src/main/java/com/smartpharma/entity/StockBatch.java
-
 package com.smartpharma.entity;
 
 import jakarta.persistence.*;
@@ -10,7 +8,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.math.BigDecimal;  // ✅ مهم جداً لـ buyPrice و sellPrice
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -51,13 +49,15 @@ public class StockBatch {
     @Column(name = "expiry_date", nullable = false)
     private LocalDate expiryDate;
 
-    // ✅ FIXED: Added productionDate field
+    // ✅ FIXED: Removed nullable=false (now optional)
     @Column(name = "production_date")
     private LocalDate productionDate;
 
+    // ✅ FIXED: Removed nullable=false (now optional)
     @Column(name = "buy_price", precision = 10, scale = 2)
     private BigDecimal buyPrice;
 
+    // ✅ FIXED: Removed nullable=false (now optional)
     @Column(name = "sell_price", precision = 10, scale = 2)
     private BigDecimal sellPrice;
 
@@ -94,10 +94,7 @@ public class StockBatch {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ================================
     // ✅ Helper methods
-    // ================================
-
     public boolean isExpired() {
         return expiryDate != null && expiryDate.isBefore(LocalDate.now());
     }
@@ -107,10 +104,6 @@ public class StockBatch {
         return expiryDate.isAfter(LocalDate.now()) &&
                 expiryDate.isBefore(LocalDate.now().plusDays(days));
     }
-
-    // ================================
-    // ✅ Batch Status Enum
-    // ================================
 
     public enum BatchStatus {
         ACTIVE,

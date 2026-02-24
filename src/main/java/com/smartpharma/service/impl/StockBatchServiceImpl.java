@@ -15,9 +15,13 @@ import com.smartpharma.repository.StockBatchRepository;
 import com.smartpharma.service.StockBatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,22 +35,16 @@ public class StockBatchServiceImpl implements StockBatchService {
     private final ProductRepository productRepository;
     private final PharmacyRepository pharmacyRepository;
 
-    // ================================
-    // ✅ GET all batches
-    // ================================
     @Override
     @Transactional(readOnly = true)
-    public List<StockBatchResponse> getAllBatches(Long pharmacyId) {
-        log.debug("Fetching all active batches for pharmacy: {}", pharmacyId);
-        return stockBatchRepository.findByPharmacyIdAndStatus(pharmacyId, StockBatch.BatchStatus.ACTIVE)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    public Page<StockBatchResponse> getAllBatches(Long pharmacyId, int page, int size) {
+        log.debug("Fetching batches for pharmacy: {}, page: {}, size: {}", pharmacyId, page, size);
+
+        Pageable pageable = PageRequest.of(page, size);
+        return stockBatchRepository.findByPharmacyIdAndStatus(pharmacyId, StockBatch.BatchStatus.ACTIVE, pageable)
+                .map(this::mapToResponse);
     }
 
-    // ================================
-    // ✅ GET single batch
-    // ================================
     @Override
     @Transactional(readOnly = true)
     public StockBatchResponse getBatch(Long id, Long pharmacyId) {
@@ -62,9 +60,6 @@ public class StockBatchServiceImpl implements StockBatchService {
         return mapToResponse(batch);
     }
 
-    // ================================
-    // ✅ POST create new batch
-    // ================================
     @Override
     @Transactional
     public StockBatchResponse createBatch(StockBatchRequest request, Long pharmacyId, Long userId) {
@@ -85,6 +80,26 @@ public class StockBatchServiceImpl implements StockBatchService {
             throw new RuntimeException("Product does not belong to this pharmacy");
         }
 
+        // ✅ FIXED: Get prices from request OR fallback to product prices OR use 0
+        BigDecimal buyPrice = request.getBuyPrice();
+        if (buyPrice == null) {
+            buyPrice = product.getBuyPrice();
+            if (buyPrice == null) {
+                buyPrice = BigDecimal.ZERO; // ✅ Default to 0 if both are null
+            }
+            log.info("Using buyPrice: {}", buyPrice);
+        }
+
+        BigDecimal sellPrice = request.getSellPrice();
+        if (sellPrice == null) {
+            sellPrice = product.getSellPrice();
+            if (sellPrice == null) {
+                sellPrice = BigDecimal.ZERO; // ✅ Default to 0 if both are null
+            }
+            log.info("Using sellPrice: {}", sellPrice);
+        }
+
+        // ✅ Build and save the batch
         StockBatch batch = StockBatch.builder()
                 .product(product)
                 .pharmacy(pharmacy)
@@ -93,8 +108,8 @@ public class StockBatchServiceImpl implements StockBatchService {
                 .quantityInitial(request.getQuantityInitial())
                 .expiryDate(request.getExpiryDate())
                 .productionDate(request.getProductionDate())
-                .buyPrice(request.getBuyPrice())
-                .sellPrice(request.getSellPrice())
+                .buyPrice(buyPrice)  // ✅ Never null now
+                .sellPrice(sellPrice)  // ✅ Never null now
                 .location(request.getLocation())
                 .shelf(request.getShelf())
                 .warehouse(request.getWarehouse())
@@ -109,9 +124,6 @@ public class StockBatchServiceImpl implements StockBatchService {
         return mapToResponse(saved);
     }
 
-    // ================================
-    // ✅ PUT update batch
-    // ================================
     @Override
     @Transactional
     public StockBatchResponse updateBatch(Long id, StockBatchRequest request, Long pharmacyId, Long userId) {
@@ -133,8 +145,15 @@ public class StockBatchServiceImpl implements StockBatchService {
         batch.setQuantityInitial(request.getQuantityInitial());
         batch.setExpiryDate(request.getExpiryDate());
         batch.setProductionDate(request.getProductionDate());
-        batch.setBuyPrice(request.getBuyPrice());
-        batch.setSellPrice(request.getSellPrice());
+
+        // ✅ FIXED: Only update prices if provided
+        if (request.getBuyPrice() != null) {
+            batch.setBuyPrice(request.getBuyPrice());
+        }
+        if (request.getSellPrice() != null) {
+            batch.setSellPrice(request.getSellPrice());
+        }
+
         batch.setLocation(request.getLocation());
         batch.setShelf(request.getShelf());
         batch.setWarehouse(request.getWarehouse());
@@ -147,9 +166,6 @@ public class StockBatchServiceImpl implements StockBatchService {
         return mapToResponse(updated);
     }
 
-    // ================================
-    // ✅ DELETE batch (soft delete)
-    // ================================
     @Override
     @Transactional
     public void deleteBatch(Long id, Long pharmacyId, Long userId) {
@@ -174,9 +190,6 @@ public class StockBatchServiceImpl implements StockBatchService {
         log.info("Batch marked as discarded: id={}", id);
     }
 
-    // ================================
-    // ✅ GET expiring batches
-    // ================================
     @Override
     @Transactional(readOnly = true)
     public List<StockBatchResponse> getExpiringBatches(Long pharmacyId, int days) {
@@ -189,9 +202,6 @@ public class StockBatchServiceImpl implements StockBatchService {
                 .collect(Collectors.toList());
     }
 
-    // ================================
-    // ✅ GET expired batches
-    // ================================
     @Override
     @Transactional(readOnly = true)
     public List<StockBatchResponse> getExpiredBatches(Long pharmacyId) {
@@ -204,13 +214,10 @@ public class StockBatchServiceImpl implements StockBatchService {
                 .collect(Collectors.toList());
     }
 
-    // ================================
-    // ✅ POST adjust stock - FIXED: Added pharmacyId parameter
-    // ================================
     @Override
     @Transactional
-    public StockBatchResponse adjustStock(Long batchId, StockAdjustmentRequest request, Long pharmacyId, Long userId) {
-        log.info("Adjusting stock for batch: {}, pharmacy: {}, user: {}", batchId, pharmacyId, userId);
+    public StockBatchResponse adjustStock(Long batchId, StockAdjustmentRequest request, Long userId) {
+        log.info("Adjusting stock for batch: {}, user: {}", batchId, userId);
 
         if (userId == null) {
             throw new RuntimeException("Unauthorized: User ID is required");
@@ -219,12 +226,6 @@ public class StockBatchServiceImpl implements StockBatchService {
         StockBatch batch = stockBatchRepository.findById(batchId)
                 .orElseThrow(() -> new RuntimeException("Batch not found with id: " + batchId));
 
-        // ✅ Validate pharmacy ownership
-        if (!batch.getPharmacy().getId().equals(pharmacyId)) {
-            throw new RuntimeException("Access denied: Batch does not belong to this pharmacy");
-        }
-
-        // Adjust quantity
         int newQuantity = batch.getQuantityCurrent() + request.getQuantity();
         if (newQuantity < 0) {
             throw new RuntimeException("Insufficient stock for adjustment");
@@ -232,7 +233,6 @@ public class StockBatchServiceImpl implements StockBatchService {
 
         batch.setQuantityCurrent(newQuantity);
 
-        // Append reason to notes
         if (request.getReason() != null) {
             String currentNotes = batch.getNotes() != null ? batch.getNotes() : "";
             batch.setNotes(currentNotes + "\n[Adjustment] " + request.getReason());

@@ -1,7 +1,11 @@
+// src/main/java/com/smartpharma/repository/StockBatchRepository.java
+
 package com.smartpharma.repository;
 
 import com.smartpharma.entity.StockBatch;
 import com.smartpharma.entity.StockBatch.BatchStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,12 +20,16 @@ import java.util.List;
 public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
 
     // ================================
-    // ✅ Basic Queries
+    // ✅ Pagination Query (for getAllBatches)
     // ================================
+    Page<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status, Pageable pageable);
+
+    // ================================
+    // ✅ Non-Pagination Queries (for reports, alerts, etc.)
+    // ================================
+    List<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status);
 
     List<StockBatch> findByProductIdAndStatus(Long productId, BatchStatus status);
-
-    List<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status);
 
     default List<StockBatch> findByProductIdAndStatusActive(Long productId) {
         return findByProductIdAndStatus(productId, BatchStatus.ACTIVE);
@@ -45,7 +53,6 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     """)
     List<StockBatch> findExpiringBatches(@Param("pharmacyId") Long pharmacyId, @Param("expiryDate") LocalDate expiryDate);
 
-    // ✅ FIXED: Added missing method to find expired batches (return List<StockBatch>)
     @Query("""
         SELECT sb FROM StockBatch sb 
         WHERE sb.pharmacy.id = :pharmacyId 
@@ -91,7 +98,7 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     Long countExpiredBatches(@Param("pharmacyId") Long pharmacyId);
 
     // ================================
-    // ✅ Report Queries (PostgreSQL compatible)
+    // ✅ Report Queries
     // ================================
 
     @Query("""
