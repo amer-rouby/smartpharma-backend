@@ -2,6 +2,8 @@ package com.smartpharma.service.impl;
 
 import com.smartpharma.dto.request.ReportRequest;
 import com.smartpharma.dto.response.*;
+import com.smartpharma.entity.ExpenseCategory;
+import com.smartpharma.repository.ExpenseRepository;
 import com.smartpharma.repository.ProductRepository;
 import com.smartpharma.repository.SaleTransactionRepository;
 import com.smartpharma.repository.StockBatchRepository;
@@ -24,6 +26,7 @@ public class ReportServiceImpl implements ReportService {
     private final SaleTransactionRepository saleRepository;
     private final ProductRepository productRepository;
     private final StockBatchRepository stockBatchRepository;
+    private final ExpenseRepository expenseRepository;
 
     // ✅ Helper Methods: Convert LocalDate to LocalDateTime
     private LocalDateTime toStartOfDay(LocalDate date) {
@@ -178,23 +181,101 @@ public class ReportServiceImpl implements ReportService {
         LocalDate endDate = request.getEndDate();
         Long pharmacyId = request.getPharmacyId();
 
+        // ✅ CONVERT to LocalDateTime for Repository queries
         LocalDateTime startDateTime = toStartOfDay(startDate);
         LocalDateTime endDateTime = toEndOfDay(endDate);
 
+        // ✅ Revenue from sales
         BigDecimal totalRevenue = saleRepository.getTotalRevenue(pharmacyId, startDateTime, endDateTime);
-        BigDecimal totalExpenses = BigDecimal.ZERO;
-        BigDecimal netProfit = totalRevenue != null ? totalRevenue.subtract(totalExpenses) : BigDecimal.ZERO;
-        BigDecimal profitMargin = totalRevenue != null && totalRevenue.compareTo(BigDecimal.ZERO) > 0 ?
+
+        // ✅ Expenses from Expense module
+        BigDecimal totalExpenses = expenseRepository.getTotalExpensesByDateRange(
+                pharmacyId, startDateTime, endDateTime);
+
+        // ✅ Calculate profit
+        BigDecimal netProfit = totalRevenue.subtract(totalExpenses);
+        BigDecimal profitMargin = totalRevenue.compareTo(BigDecimal.ZERO) > 0 ?
                 netProfit.multiply(BigDecimal.valueOf(100)).divide(totalRevenue, 2, BigDecimal.ROUND_HALF_UP) :
                 BigDecimal.ZERO;
 
+        // ✅ Monthly/Daily data for charts (combine sales + expenses)
+        List<Object[]> dailySalesData = saleRepository.getDailySales(pharmacyId, startDateTime, endDateTime);
+        List<Object[]> dailyExpensesData = expenseRepository.getDailyExpenses(pharmacyId, startDateTime, endDateTime);
+
+        // ✅ Merge sales and expenses by date - FIXED: Rebuild DTO instead of mutating
+        Map<String, FinancialReportResponse.MonthlyFinancialDTO> monthlyMap = new LinkedHashMap<>();
+
+        // Add sales data first
+        if (dailySalesData != null) {
+            for (Object[] row : dailySalesData) {
+                String date = row[0] != null ? row[0].toString() : "";
+                BigDecimal revenue = (BigDecimal) row[1];
+                BigDecimal revenueValue = revenue != null ? revenue : BigDecimal.ZERO;
+
+                monthlyMap.put(date, FinancialReportResponse.MonthlyFinancialDTO.builder()
+                        .month(date)
+                        .revenue(revenueValue)
+                        .expenses(BigDecimal.ZERO)
+                        .profit(revenueValue)  // ✅ profit = revenue initially (no expenses yet)
+                        .build());
+            }
+        }
+
+        // Merge expenses data - FIXED: Rebuild DTO instead of using setters
+        if (dailyExpensesData != null) {
+            for (Object[] row : dailyExpensesData) {
+                String date = row[0] != null ? row[0].toString() : "";
+                BigDecimal expenses = (BigDecimal) row[1];
+                BigDecimal expensesValue = expenses != null ? expenses : BigDecimal.ZERO;
+
+                if (monthlyMap.containsKey(date)) {
+                    // ✅ Rebuild the DTO with merged values (because @Builder creates immutable objects)
+                    FinancialReportResponse.MonthlyFinancialDTO existing = monthlyMap.get(date);
+                    BigDecimal revenue = existing.getRevenue() != null ? existing.getRevenue() : BigDecimal.ZERO;
+
+                    monthlyMap.put(date, FinancialReportResponse.MonthlyFinancialDTO.builder()
+                            .month(date)
+                            .revenue(revenue)
+                            .expenses(expensesValue)
+                            .profit(revenue.subtract(expensesValue))  // ✅ Correct profit calculation
+                            .build());
+                } else {
+                    // Expenses only, no sales for this date
+                    monthlyMap.put(date, FinancialReportResponse.MonthlyFinancialDTO.builder()
+                            .month(date)
+                            .revenue(BigDecimal.ZERO)
+                            .expenses(expensesValue)
+                            .profit(BigDecimal.ZERO.subtract(expensesValue))  // ✅ Negative profit
+                            .build());
+                }
+            }
+        }
+
+        List<FinancialReportResponse.MonthlyFinancialDTO> monthlyData = new ArrayList<>(monthlyMap.values());
+
+        // ✅ Expenses by category
+        List<Object[]> categoryData = expenseRepository.getExpensesByCategory(
+                pharmacyId, startDateTime, endDateTime);
+
+        List<FinancialReportResponse.CategoryExpenseDTO> expensesByCategory = categoryData.stream()
+                .filter(Objects::nonNull)
+                .map(row -> {
+                    ExpenseCategory category = (ExpenseCategory) row[0];
+                    BigDecimal amount = (BigDecimal) row[1];
+                    return FinancialReportResponse.CategoryExpenseDTO.builder()
+                            .category(category != null ? category.getArabicName() : "أخرى")
+                            .amount(amount != null ? amount : BigDecimal.ZERO)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
         return FinancialReportResponse.builder()
-                .totalRevenue(totalRevenue)
-                .totalExpenses(totalExpenses)
-                .netProfit(netProfit)
-                .profitMargin(profitMargin)
-                .monthlyData(new ArrayList<>())
-                .expensesByCategory(new ArrayList<>())
+                .totalRevenue(totalRevenue != null ? totalRevenue : BigDecimal.ZERO)
+                .totalExpenses(totalExpenses != null ? totalExpenses : BigDecimal.ZERO)
+                .netProfit(netProfit != null ? netProfit : BigDecimal.ZERO)
+                .profitMargin(profitMargin != null ? profitMargin : BigDecimal.ZERO)
+                .monthlyData(monthlyData)
+                .expensesByCategory(expensesByCategory)
                 .build();
     }
 

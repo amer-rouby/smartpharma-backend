@@ -26,7 +26,6 @@ public class SaleItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    // ✅ ✅ ✅ اجعل batch_id اختياري ✅ ✅ ✅
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "batch_id")  // ← احذف nullable = false لو موجود
     @ToString.Exclude
