@@ -1,3 +1,5 @@
+// src/main/java/com/smartpharma/entity/User.java
+
 package com.smartpharma.entity;
 
 import jakarta.persistence.*;
@@ -54,10 +56,17 @@ public class User implements UserDetails {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    // ================================
+    // ✅ FIXED: Spring Security methods - IMPORTANT for @PreAuthorize
+    // ================================
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(
-                new SimpleGrantedAuthority("ROLE_" + this.role.name())
+        // ✅ مهم جداً: Spring Security بيلف على ROLE_ prefix
+        // لو مفيش ROLE_ prefix، الـ @PreAuthorize("hasRole('ADMIN')") مش هيشغل
+        String roleName = (role != null) ? role.name() : "PHARMACIST";
+        return Collections.singletonList(
+                new SimpleGrantedAuthority("ROLE_" + roleName)  // ← ROLE_ADMIN, ROLE_PHARMACIST, etc.
         );
     }
 
@@ -68,7 +77,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return isActive;
+        return isActive != null && isActive;
     }
 
     @Override
@@ -78,11 +87,17 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isActive;
+        return isActive != null && isActive;
     }
+
+    // ================================
+    // ✅ User Roles Enum
+    // ================================
 
     public enum UserRole {
-        ADMIN, PHARMACIST, VIEWER, MANAGER
+        ADMIN,
+        PHARMACIST,
+        MANAGER,
+        VIEWER
     }
-
 }

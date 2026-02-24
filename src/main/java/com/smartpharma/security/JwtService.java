@@ -1,3 +1,5 @@
+// src/main/java/com/smartpharma/security/JwtService.java
+
 package com.smartpharma.security;
 
 import com.smartpharma.entity.User;
@@ -36,7 +38,6 @@ public class JwtService {
         return extractClaim(token, Claims::getSubject);
     }
 
-    // ✅ FIXED: Added extractUserId method
     public Long extractUserId(String token) {
         return extractClaim(token, claims -> claims.get("userId", Long.class));
     }
@@ -45,22 +46,29 @@ public class JwtService {
         return extractClaim(token, claims -> claims.get("pharmacyId", Long.class));
     }
 
+    public String extractRole(String token) {
+        return extractClaim(token, claims -> claims.get("role", String.class));
+    }
+
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
 
     // ================================
-    // ✅ Generate methods - FIXED to include userId
+    // ✅ Generate methods - FIXED to include role claim
     // ================================
 
     public String generateToken(UserDetails userDetails, Long pharmacyId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("pharmacyId", pharmacyId);
 
-        // ✅ FIXED: Add userId if userDetails is our custom User entity
+        // ✅ FIXED: Add userId and role claims if userDetails is our custom User entity
         if (userDetails instanceof User user) {
-            claims.put("userId", user.getId());  // ← أهم سطر!
+            claims.put("userId", user.getId());
+            if (user.getRole() != null) {
+                claims.put("role", user.getRole().name());  // ← مهم جداً للـ @PreAuthorize
+            }
         }
 
         return buildToken(claims, userDetails, jwtExpiration);
