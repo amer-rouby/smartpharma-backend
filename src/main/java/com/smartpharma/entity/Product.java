@@ -52,9 +52,7 @@ public class Product {
     @Column
     @Builder.Default
     private Integer minStockLevel = 10;
-    @Column
-    @Builder.Default
-    private Integer totalStock = 10;
+
     @Column(name = "is_prescription_required")
     @Builder.Default
     private Boolean prescriptionRequired = false;
@@ -87,15 +85,36 @@ public class Product {
     @ToString.Exclude
     private List<DemandPrediction> predictions = new ArrayList<>();
 
+    /**
+     * ✅ يحسب إجمالي المخزون من الدفعات النشطة فقط (ليس مخزناً في الداتابيز)
+     */
     @Transient
-    public Double getTotalStock() {
+    public Integer getTotalStock() {
         if (this.stockBatches == null) {
-            return 0.0;
+            return 0;
         }
         return stockBatches.stream()
                 .filter(batch -> batch != null && batch.getQuantityCurrent() != null)
                 .filter(batch -> batch.getStatus() == StockBatch.BatchStatus.ACTIVE)
-                .mapToDouble(batch -> batch.getQuantityCurrent().doubleValue())
+                .mapToInt(StockBatch::getQuantityCurrent)
                 .sum();
+    }
+
+    /**
+     * ✅ يتحقق إذا كان المنتج منخفض المخزون
+     */
+    @Transient
+    public boolean isLowStock() {
+        Integer total = getTotalStock();
+        return total != null && total <= minStockLevel;
+    }
+
+    /**
+     * ✅ يتحقق إذا كان المنتج نفد منه المخزون
+     */
+    @Transient
+    public boolean isOutOfStock() {
+        Integer total = getTotalStock();
+        return total != null && total == 0;
     }
 }

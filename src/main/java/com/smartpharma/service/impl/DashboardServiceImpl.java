@@ -1,5 +1,3 @@
-// src/main/java/com/smartpharma/service/impl/DashboardServiceImpl.java
-
 package com.smartpharma.service.impl;
 
 import com.smartpharma.dto.response.DashboardResponse;
@@ -35,14 +33,13 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     @Transactional(readOnly = true)
-    public DashboardResponse getDashboardStats(Long pharmacyId) {  // ✅ ترجع DashboardResponse
+    public DashboardResponse getDashboardStats(Long pharmacyId) {
         log.info("Fetching dashboard stats for pharmacyId: {}", pharmacyId);
 
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
 
-        // ✅ إحصائيات المبيعات اليوم
         BigDecimal todayRevenue = saleTransactionRepository
                 .sumTotalAmountByPharmacyIdAndDateRange(pharmacyId, startOfDay, endOfDay);
 
@@ -53,21 +50,17 @@ public class DashboardServiceImpl implements DashboardService {
                 ? todayRevenue.divide(BigDecimal.valueOf(todayOrders), 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        // ✅ إحصائيات المخزون
         Long totalProducts = productRepository.countByPharmacyId(pharmacyId);
         Long lowStockProducts = productRepository.countLowStockProducts(pharmacyId);
         Long outOfStockProducts = productRepository.countOutOfStockProducts(pharmacyId);
         BigDecimal inventoryValue = calculateInventoryValue(pharmacyId);
 
-        // ✅ إحصائيات التنبيهات
         LocalDate expiryThreshold = LocalDate.now().plusDays(30);
         Long expiringBatches = stockBatchRepository.countExpiringBatches(pharmacyId, expiryThreshold);
         Long expiredBatches = stockBatchRepository.countExpiredBatches(pharmacyId);
-
-        // ✅ Top Products
+        
         List<DashboardResponse.TopProductDTO> topProducts = getTopProducts(pharmacyId, 5);
 
-        // ✅ Recent Sales
         List<DashboardResponse.RecentSaleDTO> recentSales = getRecentSales(pharmacyId, 5);
 
         return DashboardResponse.builder()
@@ -84,10 +77,6 @@ public class DashboardServiceImpl implements DashboardService {
                 .recentSales(recentSales)
                 .build();
     }
-
-    // ==========================================
-    // 🔧 Helper Methods
-    // ==========================================
 
     private BigDecimal calculateInventoryValue(Long pharmacyId) {
         List<Product> products = productRepository.findByPharmacyId(pharmacyId);
