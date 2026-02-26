@@ -1,73 +1,77 @@
-// src/main/java/com/smartpharma/entity/User.java
-
 package com.smartpharma.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
 @Entity
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"pharmacy_id", "username"})
-})
+@Table(name = "users", schema = "smartpharma")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pharmacy_id", nullable = false)
-    private Pharmacy pharmacy;
-
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false)
     private String password;
 
-    @Column(length = 255)
+    @Column(nullable = false, length = 100)
     private String fullName;
+
+    @Column(unique = true, length = 50)
+    private String email;
 
     @Column(length = 20)
     private String phone;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 50)
+    @Column(nullable = false)
+    @Builder.Default
     private UserRole role = UserRole.PHARMACIST;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pharmacy_id", nullable = false)
+    private Pharmacy pharmacy;
+
+    @Column(nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
     @CreationTimestamp
-    @Column(updatable = false)
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // ================================
-    // ✅ FIXED: Spring Security methods - IMPORTANT for @PreAuthorize
-    // ================================
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // ✅ مهم جداً: Spring Security بيلف على ROLE_ prefix
-        // لو مفيش ROLE_ prefix، الـ @PreAuthorize("hasRole('ADMIN')") مش هيشغل
-        String roleName = (role != null) ? role.name() : "PHARMACIST";
-        return Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_" + roleName)  // ← ROLE_ADMIN, ROLE_PHARMACIST, etc.
-        );
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 
     @Override
@@ -77,7 +81,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return isActive != null && isActive;
+        return true;
     }
 
     @Override
@@ -87,12 +91,8 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isActive != null && isActive;
+        return isActive;
     }
-
-    // ================================
-    // ✅ User Roles Enum
-    // ================================
 
     public enum UserRole {
         ADMIN,
