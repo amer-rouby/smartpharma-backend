@@ -16,31 +16,39 @@ import java.util.List;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-    // ================================
-    // ✅ Basic Queries
-    // ================================
-
-    @Query("SELECT n FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND n.recipient.id = :userId ORDER BY n.createdAt DESC")
+    // ✅ تعديل: جلب إشعارات المستخدم + الإشعارات العامة (حيث recipient_id IS NULL)
+    @Query("""
+        SELECT n FROM Notification n 
+        WHERE n.pharmacy.id = :pharmacyId 
+        AND (n.recipient.id = :userId OR n.recipient.id IS NULL) 
+        ORDER BY n.createdAt DESC
+    """)
     Page<Notification> findByPharmacyIdAndRecipientId(
             @Param("pharmacyId") Long pharmacyId,
             @Param("userId") Long userId,
             Pageable pageable);
-    List<Notification> findByPharmacyIdAndRecipientIdAndReadFalseOrderByCreatedAtDesc(
-            Long pharmacyId, Long userId);
 
-    @Query("SELECT COUNT(n) FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND n.recipient.id = :userId AND n.read = false")
+    // ✅ تعديل للرسائل غير المقروءة
+    @Query("""
+        SELECT n FROM Notification n 
+        WHERE n.pharmacy.id = :pharmacyId 
+        AND (n.recipient.id = :userId OR n.recipient.id IS NULL) 
+        AND n.read = false 
+        ORDER BY n.createdAt DESC
+    """)
+    List<Notification> findByPharmacyIdAndRecipientIdAndReadFalseOrderByCreatedAtDesc(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("userId") Long userId);
+
+    @Query("SELECT COUNT(n) FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND (n.recipient.id = :userId OR n.recipient.id IS NULL) AND n.read = false")
     Long countUnreadByUser(@Param("pharmacyId") Long pharmacyId, @Param("userId") Long userId);
 
-    @Query("SELECT n FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND n.type = :type ORDER BY n.createdAt DESC")
-    List<Notification> findByType(
-            @Param("pharmacyId") Long pharmacyId,
-            @Param("type") Notification.NotificationType type,
-            Pageable pageable);
+    @Modifying
+    @Transactional
+    @Query("UPDATE Notification n SET n.read = true, n.readAt = CURRENT_TIMESTAMP WHERE n.pharmacy.id = :pharmacyId AND (n.recipient.id = :userId OR n.recipient.id IS NULL) AND n.read = false")
+    int markAllAsReadByUser(@Param("pharmacyId") Long pharmacyId, @Param("userId") Long userId);
 
-    // ================================
-    // ✅ Check for duplicate notifications
-    // ================================
-
+    // بقية الميثودز تظل كما هي...
     @Query("""
         SELECT COUNT(n) > 0 FROM Notification n
         WHERE n.relatedEntityType = :relatedEntityType
@@ -54,49 +62,4 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("type") Notification.NotificationType type,
             @Param("createdAt") LocalDateTime createdAt
     );
-
-    // ================================
-    // ✅ Bulk Operations - FIXED: استخدم recipient مش user
-    // ================================
-
-    @Modifying
-    @Transactional
-    @Query("UPDATE Notification n SET n.read = true, n.readAt = CURRENT_TIMESTAMP WHERE n.pharmacy.id = :pharmacyId AND n.recipient.id = :userId AND n.read = false")
-    int markAllAsReadByUser(@Param("pharmacyId") Long pharmacyId, @Param("userId") Long userId);
-
-    @Modifying
-    @Transactional
-    @Query("DELETE FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND n.createdAt < :cutoffDate")
-    void deleteOldNotifications(@Param("pharmacyId") Long pharmacyId, @Param("cutoffDate") LocalDateTime cutoffDate);
-
-    // ================================
-    // ✅ Stats & Reports
-    // ================================
-
-    @Query("SELECT n.type, COUNT(n) FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND n.createdAt >= :startDate GROUP BY n.type")
-    List<Object[]> countByTypeAndDateRange(
-            @Param("pharmacyId") Long pharmacyId,
-            @Param("startDate") LocalDateTime startDate);
-
-    @Query("SELECT COUNT(n) FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND n.type = :type AND n.read = false")
-    Long countUnreadByType(
-            @Param("pharmacyId") Long pharmacyId,
-            @Param("type") Notification.NotificationType type);
-
-    // ================================
-    // ✅ Additional Helper Methods
-    // ================================
-
-    @Query("SELECT COUNT(n) FROM Notification n WHERE n.pharmacy.id = :pharmacyId AND n.read = false")
-    Long countUnreadByPharmacy(@Param("pharmacyId") Long pharmacyId);
-
-    @Query("""
-        SELECT n FROM Notification n
-        WHERE n.pharmacy.id = :pharmacyId
-        AND n.read = false
-        ORDER BY n.priority DESC, n.createdAt DESC
-    """)
-    List<Notification> findUnreadByPharmacy(
-            @Param("pharmacyId") Long pharmacyId,
-            Pageable pageable);
 }
