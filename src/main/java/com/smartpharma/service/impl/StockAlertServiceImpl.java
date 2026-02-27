@@ -1,5 +1,4 @@
 package com.smartpharma.service.impl;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartpharma.dto.response.AlertStatsResponse;
 import com.smartpharma.dto.response.StockAlertResponse;
@@ -20,7 +19,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -32,7 +30,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class StockAlertServiceImpl implements StockAlertService {
-
     private final StockAlertRepository alertRepository;
     private final StockBatchRepository batchRepository;
     private final ProductRepository productRepository;
@@ -89,15 +86,12 @@ public class StockAlertServiceImpl implements StockAlertService {
     public void markAsRead(Long alertId, Long pharmacyId, Long userId) {
         StockAlert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new RuntimeException("Alert not found"));
-
         if (!alert.getPharmacy().getId().equals(pharmacyId)) {
             throw new RuntimeException("Access denied");
         }
-
         alert.setStatus("READ");
         alert.setReadAt(LocalDateTime.now());
         alertRepository.save(alert);
-
         log.info("Alert {} marked as read by user {}", alertId, userId);
     }
 
@@ -107,12 +101,10 @@ public class StockAlertServiceImpl implements StockAlertService {
         List<StockAlert> alerts = alertRepository.findByPharmacyIdAndStatusAndCreatedAtAfter(
                 pharmacyId, "UNREAD", LocalDateTime.now().minusDays(30)
         );
-
         alerts.forEach(alert -> {
             alert.setStatus("READ");
             alert.setReadAt(LocalDateTime.now());
         });
-
         alertRepository.saveAll(alerts);
         log.info("All alerts marked as read for pharmacy {} by user {}", pharmacyId, userId);
     }
@@ -122,16 +114,13 @@ public class StockAlertServiceImpl implements StockAlertService {
     public void resolveAlert(Long alertId, Long pharmacyId, Long userId) {
         StockAlert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new RuntimeException("Alert not found"));
-
         if (!alert.getPharmacy().getId().equals(pharmacyId)) {
             throw new RuntimeException("Access denied");
         }
-
         alert.setStatus("RESOLVED");
         alert.setResolvedAt(LocalDateTime.now());
         alert.setResolvedBy(User.builder().id(userId).build());
         alertRepository.save(alert);
-
         log.info("Alert {} resolved by user {}", alertId, userId);
     }
 
@@ -140,34 +129,24 @@ public class StockAlertServiceImpl implements StockAlertService {
     public void deleteAlert(Long alertId, Long pharmacyId) {
         StockAlert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new RuntimeException("Alert not found"));
-
         if (!alert.getPharmacy().getId().equals(pharmacyId)) {
             throw new RuntimeException("Access denied");
         }
-
         alertRepository.delete(alert);
         log.info("Alert {} deleted for pharmacy {}", alertId, pharmacyId);
     }
 
     @Override
     @Transactional
-    public StockAlertResponse createAlert(Long pharmacyId,
-                                          Long productId,
-                                          Long batchId,
-                                          StockAlert.AlertType type,
-                                          String title,
-                                          String message,
-                                          String severity) {
+    public StockAlertResponse createAlert(Long pharmacyId, Long productId, Long batchId,
+                                          StockAlert.AlertType type, String title, String message, String severity) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
-
         Product product = productId != null ? productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found")) : null;
-
         StockBatch batch = batchId != null ? batchRepository.findById(batchId)
                 .orElseThrow(() -> new RuntimeException("Batch not found")) : null;
 
-        // Check if similar alert already exists (avoid duplicates)
         boolean exists = alertRepository.findByPharmacyIdAndStatus(pharmacyId, "UNREAD", PageRequest.of(0, 100))
                 .stream()
                 .anyMatch(a -> a.getAlertType() == type &&
@@ -190,11 +169,10 @@ public class StockAlertServiceImpl implements StockAlertService {
                 .status("UNREAD")
                 .build();
 
-        // Add metadata
         Map<String, Object> metadata = new HashMap<>();
         if (product != null) {
             metadata.put("productName", product.getName());
-            metadata.put("productCode", product.getCode());
+            if (product.getBarcode() != null) metadata.put("productCode", product.getBarcode());
         }
         if (batch != null) {
             metadata.put("batchNumber", batch.getBatchNumber());
@@ -212,66 +190,71 @@ public class StockAlertServiceImpl implements StockAlertService {
 
         StockAlert saved = alertRepository.save(alert);
         log.info("Alert created: type={}, product={}, message={}", type, productId, title);
-
         return StockAlertResponse.fromEntity(saved);
     }
 
     @Override
     @Transactional
     public void generateLowStockAlerts(Long pharmacyId) {
+        log.info("Generating low stock alerts for pharmacy: {}", pharmacyId);
         List<Product> products = productRepository.findByPharmacyId(pharmacyId);
+        int createdCount = 0;
 
         for (Product product : products) {
             Long totalStock = batchRepository.sumQuantityByProductId(product.getId());
-
             if (totalStock <= product.getMinStockLevel()) {
                 String title = totalStock == 0 ? "نفاد المخزون" : "مخزون منخفض";
                 String message = String.format("المنتج '%s' - المخزون الحالي: %d (الحد الأدنى: %d)",
                         product.getName(), totalStock, product.getMinStockLevel());
-
                 StockAlert.AlertType type = totalStock == 0 ?
                         StockAlert.AlertType.OUT_OF_STOCK : StockAlert.AlertType.LOW_STOCK;
 
-                createAlert(pharmacyId, product.getId(), null, type, title, message,
+                StockAlertResponse alert = createAlert(pharmacyId, product.getId(), null, type, title, message,
                         totalStock == 0 ? "CRITICAL" : "HIGH");
+                if (alert != null) createdCount++;
             }
         }
+        log.info("Created {} low stock alerts", createdCount);
     }
 
     @Override
     @Transactional
     public void generateExpiryAlerts(Long pharmacyId) {
+        log.info("Generating expiry alerts for pharmacy: {}", pharmacyId);
         LocalDate today = LocalDate.now();
         LocalDate thirtyDaysLater = today.plusDays(30);
+        int expiredCount = 0, expiringCount = 0;
 
         // Expired batches
         List<StockBatch> expiredBatches = batchRepository.findExpiredBatches(pharmacyId, today);
         for (StockBatch batch : expiredBatches) {
-            String title = "منتج منتهي الصلاحية";
-            String message = String.format("المنتج '%s' (دفعة %s) منتهي الصلاحية منذ %d يوم",
-                    batch.getProduct().getName(),
-                    batch.getBatchNumber(),
-                    java.time.temporal.ChronoUnit.DAYS.between(batch.getExpiryDate(), today));
+            if (batch.getStatus() != com.smartpharma.entity.StockBatch.BatchStatus.DISCARDED) {
+                long daysSinceExpiry = java.time.temporal.ChronoUnit.DAYS.between(batch.getExpiryDate(), today);
+                String title = "منتج منتهي الصلاحية";
+                String message = String.format("المنتج '%s' (دفعة %s) منتهي الصلاحية منذ %d يوم",
+                        batch.getProduct().getName(), batch.getBatchNumber(), daysSinceExpiry);
 
-            createAlert(pharmacyId, batch.getProduct().getId(), batch.getId(),
-                    StockAlert.AlertType.EXPIRED, title, message, "CRITICAL");
+                StockAlertResponse alert = createAlert(pharmacyId, batch.getProduct().getId(), batch.getId(),
+                        StockAlert.AlertType.EXPIRED, title, message, "CRITICAL");
+                if (alert != null) expiredCount++;
+            }
         }
 
         // Expiring soon batches
         List<StockBatch> expiringBatches = batchRepository.findExpiringBatches(pharmacyId, thirtyDaysLater);
         for (StockBatch batch : expiringBatches) {
-            long daysUntilExpiry = java.time.temporal.ChronoUnit.DAYS.between(today, batch.getExpiryDate());
+            if (batch.getStatus() == com.smartpharma.entity.StockBatch.BatchStatus.ACTIVE) {
+                long daysUntilExpiry = java.time.temporal.ChronoUnit.DAYS.between(today, batch.getExpiryDate());
+                String title = "ينتهي قريباً";
+                String message = String.format("المنتج '%s' (دفعة %s) ينتهي خلال %d يوم",
+                        batch.getProduct().getName(), batch.getBatchNumber(), daysUntilExpiry);
+                String severity = daysUntilExpiry <= 7 ? "HIGH" : "MEDIUM";
 
-            String title = "ينتهي قريباً";
-            String message = String.format("المنتج '%s' (دفعة %s) ينتهي خلال %d يوم",
-                    batch.getProduct().getName(),
-                    batch.getBatchNumber(),
-                    daysUntilExpiry);
-
-            String severity = daysUntilExpiry <= 7 ? "HIGH" : "MEDIUM";
-
-            createAlert(pharmacyId, batch.getProduct().getId(), batch.getId(),
-                    StockAlert.AlertType.EXPIRING_SOON, title, message, severity);
+                StockAlertResponse alert = createAlert(pharmacyId, batch.getProduct().getId(), batch.getId(),
+                        StockAlert.AlertType.EXPIRING_SOON, title, message, severity);
+                if (alert != null) expiringCount++;
+            }
         }
+        log.info("Created {} expired alerts, {} expiring soon alerts", expiredCount, expiringCount);
     }
 }
