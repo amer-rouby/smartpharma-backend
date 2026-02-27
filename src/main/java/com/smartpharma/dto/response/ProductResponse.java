@@ -26,6 +26,6 @@ public class ProductResponse {
     private BigDecimal sellPrice;
     private BigDecimal buyPrice;
     private Map<String, Object> extraAttributes;
-    private Integer totalStock; // ✅ Integer مش Double عشان يتطابق مع Entity
+    private Integer totalStock;
     private LocalDateTime createdAt;
 }

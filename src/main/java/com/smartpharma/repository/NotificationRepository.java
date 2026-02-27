@@ -16,7 +16,6 @@ import java.util.List;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-    // ✅ تعديل: جلب إشعارات المستخدم + الإشعارات العامة (حيث recipient_id IS NULL)
     @Query("""
         SELECT n FROM Notification n 
         WHERE n.pharmacy.id = :pharmacyId 
@@ -28,7 +27,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("userId") Long userId,
             Pageable pageable);
 
-    // ✅ تعديل للرسائل غير المقروءة
     @Query("""
         SELECT n FROM Notification n 
         WHERE n.pharmacy.id = :pharmacyId 
@@ -48,7 +46,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("UPDATE Notification n SET n.read = true, n.readAt = CURRENT_TIMESTAMP WHERE n.pharmacy.id = :pharmacyId AND (n.recipient.id = :userId OR n.recipient.id IS NULL) AND n.read = false")
     int markAllAsReadByUser(@Param("pharmacyId") Long pharmacyId, @Param("userId") Long userId);
 
-    // بقية الميثودز تظل كما هي...
     @Query("""
         SELECT COUNT(n) > 0 FROM Notification n
         WHERE n.relatedEntityType = :relatedEntityType

@@ -80,7 +80,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
             Product product = productRepository.findById(itemRequest.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found: " + itemRequest.getProductId()));
 
-            // الحصول على Active Batch للمنتج
             StockBatch batch = null;
             List<StockBatch> batches = stockBatchRepository.findByProductIdAndStatusActive(product.getId());
             if (batches != null && !batches.isEmpty()) {
@@ -230,10 +229,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
-
-    // ==========================================
-    // 🔧 Helper Method: Entity → DTO Mapping
-    // ==========================================
 
     private SaleTransactionDTO mapToDTO(SaleTransaction sale) {
         return SaleTransactionDTO.builder()

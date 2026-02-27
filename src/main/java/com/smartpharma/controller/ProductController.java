@@ -27,9 +27,6 @@ public class ProductController {
 
     private final ProductService productService;
 
-    /**
-     * Retrieve all products for a specific pharmacy.
-     */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts(
@@ -60,9 +57,6 @@ public class ProductController {
         );
     }
 
-    /**
-     * Retrieve a single product by its ID within a specific pharmacy.
-     */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<ProductResponse>> getProduct(
@@ -77,9 +71,6 @@ public class ProductController {
         );
     }
 
-    /**
-     * Create a new product for a specific pharmacy.
-     */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
@@ -95,9 +86,6 @@ public class ProductController {
         );
     }
 
-    /**
-     * Update an existing product by ID within a specific pharmacy.
-     */
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
@@ -113,9 +101,6 @@ public class ProductController {
         );
     }
 
-    /**
-     * Delete a product by ID from a specific pharmacy (soft delete).
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
@@ -130,9 +115,6 @@ public class ProductController {
         );
     }
 
-    /**
-     * Search for products within a specific pharmacy using a query string.
-     */
     @GetMapping("/search")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> searchProducts(
@@ -147,9 +129,6 @@ public class ProductController {
         );
     }
 
-    /**
-     * Retrieve products that are low in stock for a specific pharmacy.
-     */
     @GetMapping("/low-stock")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStockProducts(

@@ -20,7 +20,6 @@ public class PharmacySettingsServiceImpl implements PharmacySettingsService {
     private final PharmacySettingsRepository settingsRepository;
     private final PharmacyRepository pharmacyRepository;
 
-    // ✅ تأكد إن الـ method دي موجودة:
     @Override
     @Transactional(readOnly = true)
     public PharmacySettingsResponse getSettings(Long pharmacyId) {

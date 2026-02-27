@@ -27,7 +27,7 @@ public class SaleItem {
     private Product product;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "batch_id")  // ← احذف nullable = false لو موجود
+    @JoinColumn(name = "batch_id")
     @ToString.Exclude
     private StockBatch batch;
 

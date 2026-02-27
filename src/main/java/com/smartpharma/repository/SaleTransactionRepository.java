@@ -17,10 +17,6 @@ import java.util.Optional;
 @Repository
 public interface SaleTransactionRepository extends JpaRepository<SaleTransaction, Long> {
 
-    // ================================
-    // ✅ Basic Queries
-    // ================================
-
     Page<SaleTransaction> findByPharmacyId(Long pharmacyId, Pageable pageable);
 
     @Query("SELECT st FROM SaleTransaction st WHERE st.id = :id AND st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
@@ -57,10 +53,6 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("query") String query,
             Pageable pageable);
 
-    // ================================
-    // ✅ Count Queries
-    // ================================
-
     @Query("SELECT COUNT(st) FROM SaleTransaction st WHERE st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
     Long countByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 
@@ -85,10 +77,6 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     Long countByPharmacyIdAndDate(
             @Param("pharmacyId") Long pharmacyId,
             @Param("date") LocalDate date);
-
-    // ================================
-    // ✅ Sum/Revenue Queries
-    // ================================
 
     @Query("SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st WHERE st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
     BigDecimal sumTotalAmountByPharmacyId(@Param("pharmacyId") Long pharmacyId);
@@ -115,10 +103,6 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("pharmacyId") Long pharmacyId,
             @Param("date") LocalDate date);
 
-    // ================================
-    // ✅ List Queries
-    // ================================
-
     @Query("""
         SELECT st FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
@@ -137,10 +121,6 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     List<SaleTransaction> findRecentSalesByPharmacyId(
             @Param("pharmacyId") Long pharmacyId,
             Pageable pageable);
-
-    // ================================
-    // ✅ Report Methods
-    // ================================
 
     @Query("""
         SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st
@@ -166,7 +146,6 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
-    // ✅ ✅ ✅ THIS RETURNS Enum, NOT String - Handle in Service ✅ ✅ ✅
     @Query("""
         SELECT st.paymentMethod, COALESCE(SUM(st.totalAmount), 0)
         FROM SaleTransaction st

@@ -57,7 +57,6 @@ public class NotificationSettings {
     @Column(name = "quiet_hours_end")
     private String quietHoursEnd;
 
-    // Inventory Notifications
     @Column(name = "notify_low_stock")
     @Builder.Default
     private Boolean notifyLowStock = true;
@@ -74,7 +73,6 @@ public class NotificationSettings {
     @Builder.Default
     private Boolean notifyExpiredProducts = true;
 
-    // Sales Notifications
     @Column(name = "notify_new_sale")
     @Builder.Default
     private Boolean notifyNewSale = false;
@@ -87,7 +85,6 @@ public class NotificationSettings {
     @Builder.Default
     private Boolean notifyRefund = true;
 
-    // Expense Notifications
     @Column(name = "notify_new_expense")
     @Builder.Default
     private Boolean notifyNewExpense = true;
@@ -96,7 +93,6 @@ public class NotificationSettings {
     @Builder.Default
     private Boolean notifyLargeExpense = true;
 
-    // System Notifications
     @Column(name = "notify_system_updates")
     @Builder.Default
     private Boolean notifySystemUpdates = true;

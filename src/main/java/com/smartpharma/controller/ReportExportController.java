@@ -24,14 +24,12 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/reports/export")
 @RequiredArgsConstructor
-//@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
 public class ReportExportController {
 
     private final ReportExportService exportService;
     private final ExpenseService expenseService;
     private final ReportService reportService;
 
-    // ✅ Export Expenses to Excel
     @GetMapping("/expenses/excel")
     public ResponseEntity<byte[]> exportExpensesExcel(
             @RequestParam Long pharmacyId,

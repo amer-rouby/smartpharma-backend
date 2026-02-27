@@ -1,5 +1,3 @@
-// src/main/java/com/smartpharma/service/impl/StockBatchServiceImpl.java
-
 package com.smartpharma.service.impl;
 
 import com.smartpharma.dto.request.StockAdjustmentRequest;
@@ -80,12 +78,11 @@ public class StockBatchServiceImpl implements StockBatchService {
             throw new RuntimeException("Product does not belong to this pharmacy");
         }
 
-        // ✅ FIXED: Get prices from request OR fallback to product prices OR use 0
         BigDecimal buyPrice = request.getBuyPrice();
         if (buyPrice == null) {
             buyPrice = product.getBuyPrice();
             if (buyPrice == null) {
-                buyPrice = BigDecimal.ZERO; // ✅ Default to 0 if both are null
+                buyPrice = BigDecimal.ZERO;
             }
             log.info("Using buyPrice: {}", buyPrice);
         }
@@ -94,12 +91,11 @@ public class StockBatchServiceImpl implements StockBatchService {
         if (sellPrice == null) {
             sellPrice = product.getSellPrice();
             if (sellPrice == null) {
-                sellPrice = BigDecimal.ZERO; // ✅ Default to 0 if both are null
+                sellPrice = BigDecimal.ZERO;
             }
             log.info("Using sellPrice: {}", sellPrice);
         }
 
-        // ✅ Build and save the batch
         StockBatch batch = StockBatch.builder()
                 .product(product)
                 .pharmacy(pharmacy)
@@ -108,8 +104,8 @@ public class StockBatchServiceImpl implements StockBatchService {
                 .quantityInitial(request.getQuantityInitial())
                 .expiryDate(request.getExpiryDate())
                 .productionDate(request.getProductionDate())
-                .buyPrice(buyPrice)  // ✅ Never null now
-                .sellPrice(sellPrice)  // ✅ Never null now
+                .buyPrice(buyPrice)
+                .sellPrice(sellPrice)
                 .location(request.getLocation())
                 .shelf(request.getShelf())
                 .warehouse(request.getWarehouse())
@@ -146,7 +142,6 @@ public class StockBatchServiceImpl implements StockBatchService {
         batch.setExpiryDate(request.getExpiryDate());
         batch.setProductionDate(request.getProductionDate());
 
-        // ✅ FIXED: Only update prices if provided
         if (request.getBuyPrice() != null) {
             batch.setBuyPrice(request.getBuyPrice());
         }
@@ -182,7 +177,6 @@ public class StockBatchServiceImpl implements StockBatchService {
             throw new RuntimeException("Access denied: Batch does not belong to this pharmacy");
         }
 
-        // Soft delete: change status instead of hard delete
         batch.setStatus(StockBatch.BatchStatus.DISCARDED);
         batch.setUpdatedBy(User.builder().id(userId).build());
         stockBatchRepository.save(batch);
@@ -246,9 +240,6 @@ public class StockBatchServiceImpl implements StockBatchService {
         return mapToResponse(updated);
     }
 
-    // ================================
-    // 🔧 Helper: Entity → DTO Mapping
-    // ================================
     private StockBatchResponse mapToResponse(StockBatch batch) {
         return StockBatchResponse.builder()
                 .id(batch.getId())

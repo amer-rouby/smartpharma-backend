@@ -27,7 +27,7 @@ public class StockBatchResponse {
     private Integer quantityInitial;
 
     private LocalDate expiryDate;
-    private LocalDate productionDate;  // ← ← ← تأكد إن ده موجود
+    private LocalDate productionDate;
 
     private BigDecimal buyPrice;
     private BigDecimal sellPrice;

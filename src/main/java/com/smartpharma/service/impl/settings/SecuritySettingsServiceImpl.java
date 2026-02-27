@@ -79,16 +79,13 @@ public class SecuritySettingsServiceImpl implements SecuritySettingsService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Verify old password
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new RuntimeException("Old password is incorrect");
         }
 
-        // Update password
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
-        // Update security settings
         SecuritySettings settings = securitySettingsRepository.findByUserId(userId)
                 .orElseGet(() -> createDefaultSettings(userId));
         settings.setLastPasswordChange(LocalDateTime.now());

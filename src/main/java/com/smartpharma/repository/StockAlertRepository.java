@@ -14,18 +14,10 @@ import java.util.List;
 @Repository
 public interface StockAlertRepository extends JpaRepository<StockAlert, Long> {
 
-    // ================================
-    // ✅ Pagination Queries
-    // ================================
     Page<StockAlert> findByPharmacyId(Long pharmacyId, Pageable pageable);
 
     Page<StockAlert> findByPharmacyIdAndStatus(Long pharmacyId, String status, Pageable pageable);
 
-    // ================================
-    // ✅ Count Queries - FIXED: Added missing methods
-    // ================================
-
-    // ✅ هذا اللي كان ناقص!
     long countByPharmacyId(Long pharmacyId);
 
     @Query("""
@@ -44,9 +36,6 @@ public interface StockAlertRepository extends JpaRepository<StockAlert, Long> {
     Long countActiveAlertsByType(@Param("pharmacyId") Long pharmacyId,
                                  @Param("alertType") StockAlert.AlertType alertType);
 
-    // ================================
-    // ✅ List Queries
-    // ================================
     List<StockAlert> findByPharmacyIdAndStatusAndCreatedAtAfter(
             Long pharmacyId,
             String status,
@@ -61,8 +50,5 @@ public interface StockAlertRepository extends JpaRepository<StockAlert, Long> {
     """)
     List<StockAlert> findActiveAlerts(@Param("pharmacyId") Long pharmacyId);
 
-    // ================================
-    // ✅ Delete Query
-    // ================================
     void deleteByCreatedAtBefore(LocalDateTime date);
 }

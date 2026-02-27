@@ -21,6 +21,6 @@ public class ReportRequest {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate endDate;
 
-    private String reportType;  // DAILY, MONTHLY, YEARLY, CUSTOM
+    private String reportType;
     private String category;
 }

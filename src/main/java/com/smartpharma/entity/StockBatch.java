@@ -49,15 +49,12 @@ public class StockBatch {
     @Column(name = "expiry_date", nullable = false)
     private LocalDate expiryDate;
 
-    // ✅ FIXED: Removed nullable=false (now optional)
     @Column(name = "production_date")
     private LocalDate productionDate;
 
-    // ✅ FIXED: Removed nullable=false (now optional)
     @Column(name = "buy_price", precision = 10, scale = 2)
     private BigDecimal buyPrice;
 
-    // ✅ FIXED: Removed nullable=false (now optional)
     @Column(name = "sell_price", precision = 10, scale = 2)
     private BigDecimal sellPrice;
 
@@ -94,7 +91,6 @@ public class StockBatch {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ✅ Helper methods
     public boolean isExpired() {
         return expiryDate != null && expiryDate.isBefore(LocalDate.now());
     }

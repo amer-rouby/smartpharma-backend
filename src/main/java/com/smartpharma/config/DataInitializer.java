@@ -32,7 +32,6 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner initTestData() {
         return args -> {
-            // ✅ التحقق من وجود الصيدلية بالترخيص أو الإيميل (مش مجرد count)
             if (pharmacyRepository.findByLicenseNumber("PH-2024-001").isPresent() ||
                     pharmacyRepository.findByEmail("test@smartpharma.eg").isPresent()) {
                 System.out.println("✅ Test data already exists, skipping initialization...");
@@ -41,7 +40,6 @@ public class DataInitializer {
 
             System.out.println("🚀 Initializing test data...");
 
-            // 1. إنشاء الصيدلية
             Pharmacy pharmacy = Pharmacy.builder()
                     .name("صيدلية الشفاء النموذجية")
                     .licenseNumber("PH-2024-001")
@@ -55,7 +53,6 @@ public class DataInitializer {
             pharmacyRepository.save(pharmacy);
             System.out.println("✅ Pharmacy created: " + pharmacy.getName());
 
-            // 2. إنشاء مدير النظام (Admin)
             User admin = User.builder()
                     .pharmacy(pharmacy)
                     .username("admin")
@@ -69,7 +66,6 @@ public class DataInitializer {
             userRepository.save(admin);
             System.out.println("✅ Admin user created: admin / admin123");
 
-            // 3. إنشاء صيدلي
             User pharmacist = User.builder()
                     .pharmacy(pharmacy)
                     .username("pharmacist")
@@ -83,7 +79,6 @@ public class DataInitializer {
             userRepository.save(pharmacist);
             System.out.println("✅ Pharmacist user created: pharmacist / pharm123");
 
-            // 4. إنشاء منتجات تجريبية
             String[][] productsData = {
                     {"بنادول إكسترا", "Paracetamol + Caffeine", "1234567890123", "مسكنات", "BOX"},
                     {"أوجمنت 1 جم", "Amoxicillin + Clavulanic Acid", "1234567890124", "مضادات حيوية", "BOX"},
@@ -113,7 +108,6 @@ public class DataInitializer {
 
                 productRepository.save(product);
 
-                // إنشاء دفعة مخزون لكل منتج
                 StockBatch batch = StockBatch.builder()
                         .product(product)
                         .pharmacy(pharmacy)

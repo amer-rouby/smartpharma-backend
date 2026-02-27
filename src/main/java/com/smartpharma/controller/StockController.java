@@ -29,13 +29,10 @@ import java.util.List;
 public class StockController {
 
     private final StockBatchService stockBatchService;
-    private final JwtService jwtService;  // ✅ أضف الـ dependency ده
+    private final JwtService jwtService;
 
-    // ================================
-    // ✅ GET all batches with pagination
-    // ================================
     @GetMapping("/batches")
-    @PreAuthorize("isAuthenticated()")  // ✅ للـ testing: أي user مسجل دخول
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<StockBatchResponse>>> getAllBatches(
             @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
@@ -49,17 +46,14 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(batches));
     }
 
-    // ================================
-    // ✅ GET single batch - FIXED: No @RequestParam pharmacyId
-    // ================================
     @GetMapping("/batches/{id}")
-    @PreAuthorize("isAuthenticated()")  // ✅ للـ testing
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockBatchResponse>> getBatch(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        Long pharmacyId = extractPharmacyId(authHeader);  // ✅ من الـ token
+        Long pharmacyId = extractPharmacyId(authHeader);
         Long userId = extractUserId(userDetails);
 
         log.info("Getting batch {} for pharmacy: {}, user: {}", id, pharmacyId, userId);
@@ -68,9 +62,6 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(batch));
     }
 
-    // ================================
-    // ✅ POST create new batch
-    // ================================
     @PostMapping("/batches")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockBatchResponse>> createBatch(
@@ -92,9 +83,6 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(batch, "Batch created successfully"));
     }
 
-    // ================================
-    // ✅ PUT update batch
-    // ================================
     @PutMapping("/batches/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockBatchResponse>> updateBatch(
@@ -112,11 +100,8 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(batch, "Batch updated successfully"));
     }
 
-    // ================================
-    // ✅ DELETE batch - FIXED
-    // ================================
     @DeleteMapping("/batches/{id}")
-    @PreAuthorize("isAuthenticated()")  // ✅ للـ testing
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteBatch(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -131,9 +116,6 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(null, "Batch deleted successfully"));
     }
 
-    // ================================
-    // ✅ GET expiring batches
-    // ================================
     @GetMapping("/expiring")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<StockBatchResponse>>> getExpiringBatches(
@@ -148,9 +130,6 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(batches));
     }
 
-    // ================================
-    // ✅ GET expired batches
-    // ================================
     @GetMapping("/expired")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<StockBatchResponse>>> getExpiredBatches(
@@ -164,9 +143,6 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(batches));
     }
 
-    // ================================
-    // ✅ POST adjust stock
-    // ================================
     @PostMapping("/batches/{id}/adjust")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockBatchResponse>> adjustStock(
@@ -181,9 +157,6 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(batch, "Stock adjusted successfully"));
     }
 
-    // ================================
-    // ✅ Helpers
-    // ================================
     private Long extractUserId(UserDetails userDetails) {
         if (userDetails == null) return null;
         if (userDetails instanceof User user) return user.getId();

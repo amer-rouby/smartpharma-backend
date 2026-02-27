@@ -23,7 +23,6 @@ public class NotificationRequest {
     private String relatedEntityType;
     private Long relatedEntityId;
 
-    // ✅ Validation helper
     public boolean isValid() {
         return pharmacy != null
                 && title != null && !title.isBlank()

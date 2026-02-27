@@ -18,7 +18,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
-    // ✅ أضف الـ method دي:
     boolean existsByPharmacyIdAndUsername(@Param("pharmacyId") Long pharmacyId, @Param("username") String username);
 
     @Query("SELECT u FROM User u WHERE u.pharmacy.id = :pharmacyId AND u.deletedAt IS NULL ORDER BY u.fullName")

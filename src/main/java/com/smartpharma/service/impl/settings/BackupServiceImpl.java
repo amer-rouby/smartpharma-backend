@@ -33,24 +33,19 @@ public class BackupServiceImpl implements BackupService {
     @Transactional
     public BackupResponse createBackup(BackupRequest request, Long userId) {
         try {
-            // Create backup directory if not exists
             Path backupPath = Paths.get(backupDirectory);
             if (!Files.exists(backupPath)) {
                 Files.createDirectories(backupPath);
             }
 
-            // Generate backup filename
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
             String backupFileName = request.getBackupName() + "_" + timestamp + ".sql";
             Path fullPath = backupPath.resolve(backupFileName);
 
-            // Create backup file (Simulated - in real app, you'd dump database)
             createBackupFile(fullPath, request);
 
-            // Get file size
             long fileSize = Files.size(fullPath);
 
-            // Save backup record
             BackupRecord backup = BackupRecord.builder()
                     .backupName(request.getBackupName())
                     .filePath(fullPath.toString())
@@ -95,7 +90,6 @@ public class BackupServiceImpl implements BackupService {
         BackupRecord backup = backupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Backup not found with id: " + id));
 
-        // Delete physical file
         try {
             Path filePath = Paths.get(backup.getFilePath());
             if (Files.exists(filePath)) {
@@ -119,7 +113,6 @@ public class BackupServiceImpl implements BackupService {
             throw new RuntimeException("Cannot restore backup with status: " + backup.getStatus());
         }
 
-        // Simulate restore process (in real app, you'd restore database)
         backup.setRestoredAt(LocalDateTime.now());
         backupRepository.save(backup);
 
@@ -142,7 +135,6 @@ public class BackupServiceImpl implements BackupService {
     }
 
     private void createBackupFile(Path path, BackupRequest request) throws IOException {
-        // Simulated backup - in production, you'd use pg_dump or mysqldump
         String backupContent = "-- SmartPharma Database Backup\n" +
                 "-- Backup Name: " + request.getBackupName() + "\n" +
                 "-- Type: " + request.getBackupType() + "\n" +

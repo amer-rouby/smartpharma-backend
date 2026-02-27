@@ -28,7 +28,6 @@ public class ReportServiceImpl implements ReportService {
     private final StockBatchRepository stockBatchRepository;
     private final ExpenseRepository expenseRepository;
 
-    // ✅ Helper Methods: Convert LocalDate to LocalDateTime
     private LocalDateTime toStartOfDay(LocalDate date) {
         return date != null ? date.atStartOfDay() : LocalDateTime.now();
     }
@@ -43,11 +42,9 @@ public class ReportServiceImpl implements ReportService {
         LocalDate endDate = request.getEndDate();
         Long pharmacyId = request.getPharmacyId();
 
-        // ✅ CONVERT to LocalDateTime for Repository (DB column is TIMESTAMP)
         LocalDateTime startDateTime = toStartOfDay(startDate);
         LocalDateTime endDateTime = toEndOfDay(endDate);
 
-        // ✅ Repository expects LocalDateTime
         BigDecimal totalRevenue = saleRepository.getTotalRevenue(pharmacyId, startDateTime, endDateTime);
         Long totalOrders = saleRepository.getTotalOrders(pharmacyId, startDateTime, endDateTime);
 
@@ -55,7 +52,6 @@ public class ReportServiceImpl implements ReportService {
                 totalRevenue.divide(BigDecimal.valueOf(totalOrders), 2, BigDecimal.ROUND_HALF_UP) :
                 BigDecimal.ZERO;
 
-        // ✅ FIXED: PaymentMethod is Enum, convert to String properly
         List<Object[]> paymentData = saleRepository.getRevenueByPaymentMethod(
                 pharmacyId, startDateTime, endDateTime);
 
@@ -114,7 +110,6 @@ public class ReportServiceImpl implements ReportService {
         Long expiringSoon = stockBatchRepository.countExpiringBatches(
                 pharmacyId, LocalDate.now().plusDays(30));
 
-        // ✅ Stock by category
         List<Object[]> categoryData = stockBatchRepository.getStockByCategory(pharmacyId);
         List<StockReportResponse.StockByCategoryDTO> stockByCategory = categoryData.stream()
                 .filter(Objects::nonNull)
@@ -125,7 +120,6 @@ public class ReportServiceImpl implements ReportService {
                         .build())
                 .collect(Collectors.toList());
 
-        // ✅ Low stock products - FIXED: Use (Number).intValue() for aggregates
         List<Object[]> lowStockData = stockBatchRepository.getLowStockProducts(pharmacyId);
         List<StockReportResponse.StockItemDTO> lowStockProducts = lowStockData.stream()
                 .filter(Objects::nonNull)
@@ -133,15 +127,12 @@ public class ReportServiceImpl implements ReportService {
                         .productId(row[0] != null ? ((Number) row[0]).longValue() : 0L)
                         .productName((String) row[1])
                         .batchNumber((String) row[2])
-                        // ✅ FIXED: SUM returns Long/BigDecimal, not Integer
                         .currentStock(row[3] != null ? ((Number) row[3]).intValue() : 0)
-                        // ✅ FIXED: minStockLevel might be Long
                         .minStock(row[4] != null ? ((Number) row[4]).intValue() : 0)
                         .expiryDate(row[5] != null ? row[5].toString() : null)
                         .build())
                 .collect(Collectors.toList());
 
-        // ✅ Expiring products - FIXED: Use (Number).intValue() for aggregates
         List<Object[]> expiringData = stockBatchRepository.getExpiringProducts(
                 pharmacyId, LocalDate.now().plusDays(30));
 
@@ -155,7 +146,6 @@ public class ReportServiceImpl implements ReportService {
                             .productId(row[0] != null ? ((Number) row[0]).longValue() : 0L)
                             .productName((String) row[1])
                             .batchNumber((String) row[2])
-                            // ✅ FIXED: currentStock from SUM might be Long
                             .currentStock(row[4] != null ? ((Number) row[4]).intValue() : 0)
                             .expiryDate(expiryDate.toString())
                             .daysUntilExpiry((int) daysUntil)
@@ -180,32 +170,21 @@ public class ReportServiceImpl implements ReportService {
         LocalDate startDate = request.getStartDate();
         LocalDate endDate = request.getEndDate();
         Long pharmacyId = request.getPharmacyId();
-
-        // ✅ CONVERT to LocalDateTime for Repository queries
         LocalDateTime startDateTime = toStartOfDay(startDate);
         LocalDateTime endDateTime = toEndOfDay(endDate);
-
-        // ✅ Revenue from sales
         BigDecimal totalRevenue = saleRepository.getTotalRevenue(pharmacyId, startDateTime, endDateTime);
-
-        // ✅ Expenses from Expense module
         BigDecimal totalExpenses = expenseRepository.getTotalExpensesByDateRange(
                 pharmacyId, startDateTime, endDateTime);
-
-        // ✅ Calculate profit
         BigDecimal netProfit = totalRevenue.subtract(totalExpenses);
         BigDecimal profitMargin = totalRevenue.compareTo(BigDecimal.ZERO) > 0 ?
                 netProfit.multiply(BigDecimal.valueOf(100)).divide(totalRevenue, 2, BigDecimal.ROUND_HALF_UP) :
                 BigDecimal.ZERO;
 
-        // ✅ Monthly/Daily data for charts (combine sales + expenses)
         List<Object[]> dailySalesData = saleRepository.getDailySales(pharmacyId, startDateTime, endDateTime);
         List<Object[]> dailyExpensesData = expenseRepository.getDailyExpenses(pharmacyId, startDateTime, endDateTime);
 
-        // ✅ Merge sales and expenses by date - FIXED: Rebuild DTO instead of mutating
         Map<String, FinancialReportResponse.MonthlyFinancialDTO> monthlyMap = new LinkedHashMap<>();
 
-        // Add sales data first
         if (dailySalesData != null) {
             for (Object[] row : dailySalesData) {
                 String date = row[0] != null ? row[0].toString() : "";
@@ -216,7 +195,7 @@ public class ReportServiceImpl implements ReportService {
                         .month(date)
                         .revenue(revenueValue)
                         .expenses(BigDecimal.ZERO)
-                        .profit(revenueValue)  // ✅ profit = revenue initially (no expenses yet)
+                        .profit(revenueValue)
                         .build());
             }
         }
@@ -229,7 +208,6 @@ public class ReportServiceImpl implements ReportService {
                 BigDecimal expensesValue = expenses != null ? expenses : BigDecimal.ZERO;
 
                 if (monthlyMap.containsKey(date)) {
-                    // ✅ Rebuild the DTO with merged values (because @Builder creates immutable objects)
                     FinancialReportResponse.MonthlyFinancialDTO existing = monthlyMap.get(date);
                     BigDecimal revenue = existing.getRevenue() != null ? existing.getRevenue() : BigDecimal.ZERO;
 
@@ -237,7 +215,7 @@ public class ReportServiceImpl implements ReportService {
                             .month(date)
                             .revenue(revenue)
                             .expenses(expensesValue)
-                            .profit(revenue.subtract(expensesValue))  // ✅ Correct profit calculation
+                            .profit(revenue.subtract(expensesValue))
                             .build());
                 } else {
                     // Expenses only, no sales for this date
@@ -245,7 +223,7 @@ public class ReportServiceImpl implements ReportService {
                             .month(date)
                             .revenue(BigDecimal.ZERO)
                             .expenses(expensesValue)
-                            .profit(BigDecimal.ZERO.subtract(expensesValue))  // ✅ Negative profit
+                            .profit(BigDecimal.ZERO.subtract(expensesValue))
                             .build());
                 }
             }
@@ -253,7 +231,6 @@ public class ReportServiceImpl implements ReportService {
 
         List<FinancialReportResponse.MonthlyFinancialDTO> monthlyData = new ArrayList<>(monthlyMap.values());
 
-        // ✅ Expenses by category
         List<Object[]> categoryData = expenseRepository.getExpensesByCategory(
                 pharmacyId, startDateTime, endDateTime);
 
@@ -315,7 +292,6 @@ public class ReportServiceImpl implements ReportService {
                             .batchNumber((String) row[2])
                             .expiryDate(expiryDate.toString())
                             .daysUntilExpiry((int) daysUntil)
-                            // ✅ FIXED: currentStock from SUM might be Long
                             .currentStock(row[4] != null ? ((Number) row[4]).intValue() : 0)
                             .status(status)
                             .estimatedValue(0.0)

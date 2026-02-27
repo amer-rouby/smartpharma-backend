@@ -5,7 +5,6 @@ import com.smartpharma.dto.settings.response.PharmacySettingsResponse;
 
 public interface PharmacySettingsService {
 
-    // ✅ أضف الـ method دي:
     PharmacySettingsResponse getSettings(Long pharmacyId);
 
     PharmacySettingsResponse updateSettings(Long pharmacyId, PharmacySettingsRequest request);

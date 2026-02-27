@@ -27,14 +27,11 @@ public class ExpenseController {
 
     private final ExpenseService expenseService;
 
-    // ✅ Create Expense
-// ✅ Create Expense - FIXED: Make userId optional and get from SecurityContext
     @PostMapping
     public ResponseEntity<ApiResponse<ExpenseResponse>> createExpense(
             @RequestBody @Valid ExpenseRequest request,
-            @RequestAttribute(value = "userId", required = false) Long userId) {  // ← أضف required = false
+            @RequestAttribute(value = "userId", required = false) Long userId) {
 
-        // ✅ FIXED: Get userId from authenticated user if not in attributes
         Long effectiveUserId = userId;
         if (effectiveUserId == null) {
             var authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -43,7 +40,6 @@ public class ExpenseController {
             }
         }
 
-        // ✅ Fallback to 1 if still null (for testing)
         if (effectiveUserId == null) {
             effectiveUserId = 1L;
         }
@@ -51,7 +47,7 @@ public class ExpenseController {
         ExpenseResponse response = expenseService.createExpense(request, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(response, "Expense created successfully"));
     }
-    // ✅ Get All Expenses (Paginated)
+
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> getExpenses(
             @RequestParam Long pharmacyId,
@@ -70,7 +66,6 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success(expenses));
     }
 
-    // ✅ Get Expense by ID
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ExpenseResponse>> getExpense(
             @PathVariable Long id,
@@ -79,7 +74,6 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    // ✅ Update Expense
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ExpenseResponse>> updateExpense(
             @PathVariable Long id,
@@ -90,7 +84,6 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success(response, "Expense updated successfully"));
     }
 
-    // ✅ Delete Expense (Soft Delete)
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteExpense(
             @PathVariable Long id,
@@ -99,7 +92,6 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success(null, "Expense deleted successfully"));
     }
 
-    // ✅ Search Expenses
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> searchExpenses(
             @RequestParam Long pharmacyId,
@@ -113,7 +105,6 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success(results));
     }
 
-    // ✅ Get Expenses by Category
     @GetMapping("/category/{category}")
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> getExpensesByCategory(
             @RequestParam Long pharmacyId,
@@ -127,14 +118,12 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success(results));
     }
 
-    // ✅ Expense Summary for Reports
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<ExpenseSummaryResponse>> getExpenseSummary(
             @RequestParam Long pharmacyId,
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate) {
 
-        // ✅ Default to last 30 days if no dates provided
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : LocalDate.now().minusDays(30).atStartOfDay();
         LocalDateTime end = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.now();
 

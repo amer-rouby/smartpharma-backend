@@ -36,7 +36,6 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
         NotificationSettings settings = settingsRepository.findByUserId(userId)
                 .orElseGet(() -> createDefaultSettings(userId));
 
-        // Update general settings
         if (request.getEmailNotifications() != null) {
             settings.setEmailNotifications(request.getEmailNotifications());
         }
@@ -76,7 +75,6 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
             settings.setNotifyExpiredProducts(request.getNotifyExpiredProducts());
         }
 
-        // Update sales notifications
         if (request.getNotifyNewSale() != null) {
             settings.setNotifyNewSale(request.getNotifyNewSale());
         }
@@ -87,7 +85,6 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
             settings.setNotifyRefund(request.getNotifyRefund());
         }
 
-        // Update expense notifications
         if (request.getNotifyNewExpense() != null) {
             settings.setNotifyNewExpense(request.getNotifyNewExpense());
         }
@@ -95,7 +92,6 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
             settings.setNotifyLargeExpense(request.getNotifyLargeExpense());
         }
 
-        // Update system notifications
         if (request.getNotifySystemUpdates() != null) {
             settings.setNotifySystemUpdates(request.getNotifySystemUpdates());
         }

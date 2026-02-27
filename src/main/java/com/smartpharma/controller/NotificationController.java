@@ -21,13 +21,12 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "http://localhost:4200")
-@PreAuthorize("isAuthenticated()")  // ✅ أي user مسجل دخول يقدر يدخل
+@PreAuthorize("isAuthenticated()")
 public class NotificationController {
 
     private final NotificationService notificationService;
     private final JwtService jwtService;
 
-    // ✅ Helper: استخراج userId من الـ token
     private Long extractUserIdFromToken(@RequestHeader("Authorization") String authHeader) {
         try {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -43,9 +42,6 @@ public class NotificationController {
         return null;
     }
 
-    // ================================
-    // ✅ GET /api/notifications
-    // ================================
     @GetMapping
     public ResponseEntity<ApiResponse<Page<NotificationResponse>>> getUserNotifications(
             @RequestParam Long pharmacyId,
@@ -63,9 +59,6 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(notifications));
     }
 
-    // ================================
-    // ✅ GET /api/notifications/unread-count
-    // ================================
     @GetMapping("/unread-count")
     public ResponseEntity<ApiResponse<Long>> getUnreadCount(
             @RequestParam Long pharmacyId,
@@ -81,9 +74,6 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(count));
     }
 
-    // ================================
-    // ✅ GET /api/notifications/unread
-    // ================================
     @GetMapping("/unread")
     public ResponseEntity<ApiResponse<List<NotificationResponse>>> getUnreadNotifications(
             @RequestParam Long pharmacyId,
@@ -99,9 +89,6 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(notifications));
     }
 
-    // ================================
-    // ✅ PUT /api/notifications/{id}/read  ← FIXED: Added missing method
-    // ================================
     @PutMapping("/{id}/read")
     public ResponseEntity<ApiResponse<NotificationResponse>> markAsRead(
             @PathVariable Long id,
@@ -117,11 +104,7 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(notification, "Notification marked as read"));
     }
 
-    // ================================
-    // ✅ PUT /api/notifications/read-all  ← FIXED: Added missing method (دي اللي كنت ناقصاها!)
-    // ================================
-// ✅ FIXED: استخدم @PostMapping عشان يتطابق مع الـ Frontend
-    @PostMapping("/read-all")  // ← ← ← ده التعديل المهم!
+    @PostMapping("/read-all")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Integer>> markAllAsRead(
             @RequestParam Long pharmacyId,
@@ -137,9 +120,6 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(count, "All notifications marked as read"));
     }
 
-    // ================================
-    // ✅ DELETE /api/notifications/{id}
-    // ================================
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteNotification(
             @PathVariable Long id,
@@ -155,9 +135,6 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(null, "Notification deleted"));
     }
 
-    // ================================
-    // ✅ POST /api/notifications/check-alerts
-    // ================================
     @PostMapping("/check-alerts")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")  // ✅ فقط admins و managers يقدروا يشغلوا الـ alerts
     public ResponseEntity<ApiResponse<Void>> checkAndCreateAlerts(@RequestParam Long pharmacyId) {
@@ -166,9 +143,6 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(null, "Alerts checked successfully"));
     }
 
-    // ================================
-    // ✅ POST /api/notifications (لإنشاء notification يدوي - للـ admins فقط)
-    // ================================
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<NotificationResponse>> createNotification(

@@ -10,17 +10,14 @@ import java.time.LocalDateTime;
 
 public interface StockMovementService {
 
-    // Create movement
     StockMovementResponse createMovement(StockMovementRequest request, Long userId);
 
-    // Get movements
     Page<StockMovementResponse> getMovementsByPharmacy(Long pharmacyId, int page, int size);
     Page<StockMovementResponse> getMovementsByBatch(Long batchId, int page, int size);
     Page<StockMovementResponse> getMovementsByDateRange(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate, int page, int size);
 
-    // Get stats
     StockMovementStats getMovementStats(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate);
-    // Auto-create movements
+
     void createStockInMovement(Long batchId, Integer quantity, BigDecimal unitPrice, String reference, Long userId);
     void createStockOutMovement(Long batchId, Integer quantity, String reason, String reference, Long userId);
     void createAdjustmentMovement(Long batchId, Integer quantityBefore, Integer quantityAfter, String reason, Long userId);

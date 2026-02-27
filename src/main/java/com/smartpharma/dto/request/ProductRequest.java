@@ -43,8 +43,6 @@ public class ProductRequest {
     private BigDecimal buyPrice;
 
     private Map<String, Object> extraAttributes;
-
-    // ✅ ✅ ✅ إضافة حقل المخزون الأولي ✅ ✅ ✅
     @JsonProperty("initialStock")
     private Integer initialStock;
 }

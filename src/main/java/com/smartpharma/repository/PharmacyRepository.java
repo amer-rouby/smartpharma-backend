@@ -12,23 +12,13 @@ import java.util.Optional;
 
 @Repository
 public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
-
-    // ================================
-    // ✅ Basic Find Methods
-    // ================================
-
     Optional<Pharmacy> findByLicenseNumber(String licenseNumber);
-
     Optional<Pharmacy> findByEmail(String email);
-
-    // ✅ FIXED: Added missing method
     Optional<Pharmacy> findByIdAndDeletedAtIsNull(Long id);
-
     List<Pharmacy> findBySubscriptionStatus(SubscriptionStatus status);
 
-    // ================================
-    // ✅ Custom Queries
-    // ================================
+    @Query("SELECT p FROM Pharmacy p WHERE p.deletedAt IS NULL")
+    List<Pharmacy> findByDeletedAtIsNull();
 
     @Query("SELECT p FROM Pharmacy p WHERE p.subscriptionStatus = 'ACTIVE' AND p.deletedAt IS NULL")
     List<Pharmacy> findActivePharmacies();
@@ -36,17 +26,8 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
     @Query("SELECT p FROM Pharmacy p WHERE p.id = :id AND p.deletedAt IS NULL")
     Optional<Pharmacy> findByIdAndActive(@Param("id") Long id);
 
-    // ================================
-    // ✅ Exists Methods
-    // ================================
-
     boolean existsByLicenseNumber(String licenseNumber);
-
     boolean existsByEmail(String email);
-
-    // ================================
-    // ✅ Count Methods
-    // ================================
 
     @Query("SELECT COUNT(p) FROM Pharmacy p WHERE p.deletedAt IS NULL")
     Long countActivePharmacies();

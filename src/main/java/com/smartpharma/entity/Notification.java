@@ -44,7 +44,7 @@ public class Notification {
     private boolean read = false;
 
     @Column(name = "related_entity_type")
-    private String relatedEntityType;  // "PRODUCT", "SALE", "EXPENSE"
+    private String relatedEntityType;
 
     @Column(name = "related_entity_id")
     private Long relatedEntityId;

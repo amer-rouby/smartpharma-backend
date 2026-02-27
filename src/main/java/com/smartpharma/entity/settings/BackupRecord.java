@@ -31,10 +31,10 @@ public class BackupRecord {
     private Long fileSize;
 
     @Column(name = "backup_type")
-    private String backupType; // FULL, INCREMENTAL
+    private String backupType;
 
     @Column(name = "status")
-    private String status; // PENDING, COMPLETED, FAILED
+    private String status;
 
     @Column(name = "description")
     private String description;

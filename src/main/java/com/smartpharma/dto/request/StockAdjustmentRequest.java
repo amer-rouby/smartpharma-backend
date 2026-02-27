@@ -1,5 +1,3 @@
-// src/main/java/com/smartpharma/dto/request/StockAdjustmentRequest.java
-
 package com.smartpharma.dto.request;
 
 import jakarta.validation.constraints.NotNull;
@@ -15,9 +13,9 @@ import lombok.NoArgsConstructor;
 public class StockAdjustmentRequest {
 
     @NotNull
-    private Integer quantity;  // Positive for add, negative for deduct
+    private Integer quantity;
 
     private String reason;
 
-    private String reference;  // Optional reference number
+    private String reference;
 }

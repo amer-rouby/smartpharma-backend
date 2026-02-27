@@ -21,15 +21,9 @@ import java.util.Map;
 @Service
 public class ReportExportService {
 
-    // ================================
-    // ✅ Excel Export (شغال 100%)
-    // ================================
-
     public byte[] exportExpensesToExcel(List<Map<String, Object>> expenses) throws Exception {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("المصروفات");
-
-            // ✅ Create header style
             CellStyle headerStyle = workbook.createCellStyle();
             org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
             headerFont.setBold(true);
@@ -38,7 +32,6 @@ public class ReportExportService {
             headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
             headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
-            // ✅ Create header row
             Row headerRow = sheet.createRow(0);
             String[] headers = {"التصنيف", "العنوان", "المبلغ", "التاريخ", "طريقة الدفع", "الرقم المرجعي"};
 
@@ -48,7 +41,6 @@ public class ReportExportService {
                 cell.setCellStyle(headerStyle);
             }
 
-            // ✅ Add data rows
             int rowNum = 1;
             for (Map<String, Object> expense : expenses) {
                 Row row = sheet.createRow(rowNum++);
@@ -60,7 +52,6 @@ public class ReportExportService {
                 row.createCell(5).setCellValue((String) expense.get("referenceNumber"));
             }
 
-            // ✅ Auto-size columns
             for (int i = 0; i < headers.length; i++) {
                 sheet.autoSizeColumn(i);
             }
@@ -71,17 +62,11 @@ public class ReportExportService {
         }
     }
 
-    // ================================
-    // ✅ PDF Export - FIXED Color issue
-    // ================================
-
-    // ✅ FIXED: PDF Export with fallback font
     public byte[] exportExpensesToPdf(List<Map<String, Object>> expenses) throws Exception {
         Document document = new Document(PageSize.A4.rotate());
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PdfWriter.getInstance(document, outputStream);
 
-        // ✅ FIXED: Try Arabic font, fallback to HELVETICA if not found
         com.lowagie.text.Font titleFont;
         com.lowagie.text.Font headerFont;
         com.lowagie.text.Font dataFont;
@@ -96,7 +81,6 @@ public class ReportExportService {
             headerFont = new com.lowagie.text.Font(arabicFont, 12, com.lowagie.text.Font.BOLD);
             dataFont = new com.lowagie.text.Font(arabicFont, 10, com.lowagie.text.Font.NORMAL);
         } catch (Exception e) {
-            // ✅ Fallback to standard font (English only)
             BaseFont baseFont = BaseFont.createFont(
                     BaseFont.HELVETICA,
                     BaseFont.WINANSI,
@@ -109,27 +93,23 @@ public class ReportExportService {
 
         document.open();
 
-        // ✅ Add title (English fallback if Arabic font not available)
         Paragraph title = new Paragraph("Expenses Report", titleFont);
         title.setAlignment(Element.ALIGN_CENTER);
         title.setSpacingAfter(20);
         document.add(title);
 
-        // ✅ Add table
         PdfPTable table = new PdfPTable(6);
         table.setWidthPercentage(100);
         table.setWidths(new int[]{2, 3, 2, 2, 2, 2});
 
-        // ✅ Add headers - FIXED: استخدم java.awt.Color
         String[] headers = {"Category", "Title", "Amount", "Date", "Payment", "Reference"};
         for (String header : headers) {
             PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
             cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-            cell.setBackgroundColor(new java.awt.Color(220, 220, 220));  // ✅ FIXED
+            cell.setBackgroundColor(new java.awt.Color(220, 220, 220));
             table.addCell(cell);
         }
 
-        // ✅ Add data
         for (Map<String, Object> expense : expenses) {
             table.addCell(new PdfPCell(new Phrase((String) expense.get("category"), dataFont)));
             table.addCell(new PdfPCell(new Phrase((String) expense.get("title"), dataFont)));
@@ -144,10 +124,6 @@ public class ReportExportService {
 
         return outputStream.toByteArray();
     }
-    // ================================
-    // ✅ Financial Report Excel
-    // ================================
-
     public byte[] exportFinancialReportToExcel(
             double totalRevenue,
             double totalExpenses,
@@ -157,7 +133,6 @@ public class ReportExportService {
             List<Map<String, Object>> expensesByCategory
     ) throws Exception {
         try (Workbook workbook = new XSSFWorkbook()) {
-            // ✅ Summary Sheet
             Sheet summarySheet = workbook.createSheet("الملخص");
             Row row1 = summarySheet.createRow(0);
             row1.createCell(0).setCellValue("إجمالي الإيرادات");
@@ -175,7 +150,6 @@ public class ReportExportService {
             row4.createCell(0).setCellValue("هامش الربح %");
             row4.createCell(1).setCellValue(profitMargin);
 
-            // ✅ Monthly Data Sheet
             Sheet monthlySheet = workbook.createSheet("البيانات الشهرية");
             Row headerRow = monthlySheet.createRow(0);
             headerRow.createCell(0).setCellValue("الشهر");
@@ -192,7 +166,6 @@ public class ReportExportService {
                 row.createCell(3).setCellValue(Double.parseDouble(data.get("profit").toString()));
             }
 
-            // ✅ Category Sheet
             Sheet categorySheet = workbook.createSheet("التصنيفات");
             Row catHeaderRow = categorySheet.createRow(0);
             catHeaderRow.createCell(0).setCellValue("التصنيف");

@@ -13,9 +13,9 @@ import java.util.List;
 @AllArgsConstructor
 public class ExpiryReportResponse {
     private Long totalExpiring;
-    private Long urgentExpiring;      // خلال 7 أيام
-    private Long warningExpiring;     // خلال 30 يوم
-    private Long okExpiring;          // خلال 90 يوم
+    private Long urgentExpiring;
+    private Long warningExpiring;
+    private Long okExpiring;
     private List<ExpiringProductDTO> expiringProducts;
 
     @Data
@@ -29,7 +29,7 @@ public class ExpiryReportResponse {
         private String expiryDate;
         private Integer daysUntilExpiry;
         private Integer currentStock;
-        private String status;  // URGENT, WARNING, OK
+        private String status;
         private Double estimatedValue;
     }
 }

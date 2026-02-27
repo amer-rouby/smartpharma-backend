@@ -19,14 +19,8 @@ import java.util.List;
 @Repository
 public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
 
-    // ================================
-    // ✅ Pagination Query (for getAllBatches)
-    // ================================
     Page<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status, Pageable pageable);
 
-    // ================================
-    // ✅ Non-Pagination Queries (for reports, alerts, etc.)
-    // ================================
     List<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status);
 
     List<StockBatch> findByProductIdAndStatus(Long productId, BatchStatus status);
@@ -96,10 +90,6 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
         AND sb.expiryDate < CURRENT_DATE
     """)
     Long countExpiredBatches(@Param("pharmacyId") Long pharmacyId);
-
-    // ================================
-    // ✅ Report Queries
-    // ================================
 
     @Query("""
         SELECT COALESCE(SUM(sb.quantityCurrent * p.sellPrice), 0)

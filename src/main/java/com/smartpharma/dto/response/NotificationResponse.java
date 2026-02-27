@@ -14,18 +14,14 @@ public class NotificationResponse {
     private Long id;
     private String title;
     private String message;
-    private String type;              // LOW_STOCK, EXPIRY_WARNING, EXPIRED, etc.
-    private String priority;          // LOW, MEDIUM, HIGH, URGENT
+    private String type;
+    private String priority;
     private boolean read;
-    private String createdAt;         // ISO 8601 string
-    private String relatedEntityType; // PRODUCT, STOCK_BATCH, SALE, etc.
+    private String createdAt;
+    private String relatedEntityType;
     private Long relatedEntityId;
-
-    // ✅ Optional: Arabic labels for frontend convenience
     private String typeLabelAr;
     private String priorityLabelAr;
-
-    // ✅ Helper: Get icon name for frontend
     public String getIconName() {
         if (type == null) return "notifications";
 
@@ -40,7 +36,6 @@ public class NotificationResponse {
         };
     }
 
-    // ✅ Helper: Get color for priority
     public String getPriorityColor() {
         if (priority == null) return "#6b7280";
 

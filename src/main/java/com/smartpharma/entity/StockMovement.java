@@ -70,12 +70,12 @@ public class StockMovement {
     private Long pharmacyId;
 
     public enum MovementType {
-        STOCK_IN,           // وارد مخزن (شراء، إرجاع)
-        STOCK_OUT,          // صادر مخزن (بيع، هالك)
-        STOCK_ADJUSTMENT,   // تعديل مخزن
-        TRANSFER_IN,        // تحويل وارد
-        TRANSFER_OUT,       // تحويل صادر
-        EXPIRED,            // انتهاء صلاحية
-        DISCARDED           // تلف/إتلاف
+        STOCK_IN,
+        STOCK_OUT,
+        STOCK_ADJUSTMENT,
+        TRANSFER_IN,
+        TRANSFER_OUT,
+        EXPIRED,
+        DISCARDED
     }
 }

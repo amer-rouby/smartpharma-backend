@@ -20,22 +20,18 @@ public class NotificationSettingsRequest {
     private String quietHoursStart;
     private String quietHoursEnd;
 
-    // Inventory
     private Boolean notifyLowStock;
     private Boolean notifyOutOfStock;
     private Boolean notifyExpiryWarning;
     private Boolean notifyExpiredProducts;
 
-    // Sales
     private Boolean notifyNewSale;
     private Boolean notifyLargeSale;
     private Boolean notifyRefund;
 
-    // Expenses
     private Boolean notifyNewExpense;
     private Boolean notifyLargeExpense;
 
-    // System
     private Boolean notifySystemUpdates;
     private Boolean notifyBackupReminder;
     private Boolean notifySecurityAlerts;

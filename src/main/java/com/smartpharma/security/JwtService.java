@@ -30,10 +30,6 @@ public class JwtService {
     @Value("${jwt.refresh-expiration}")
     private long refreshExpiration;
 
-    // ================================
-    // ✅ Extract methods
-    // ================================
-
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
@@ -55,19 +51,14 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
-    // ================================
-    // ✅ Generate methods - FIXED to include role claim
-    // ================================
-
     public String generateToken(UserDetails userDetails, Long pharmacyId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("pharmacyId", pharmacyId);
 
-        // ✅ FIXED: Add userId and role claims if userDetails is our custom User entity
         if (userDetails instanceof User user) {
             claims.put("userId", user.getId());
             if (user.getRole() != null) {
-                claims.put("role", user.getRole().name());  // ← مهم جداً للـ @PreAuthorize
+                claims.put("role", user.getRole().name());
             }
         }
 
@@ -87,10 +78,6 @@ public class JwtService {
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
-
-    // ================================
-    // ✅ Validation methods
-    // ================================
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);

@@ -34,15 +34,12 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     @Override
     public ExpenseResponse createExpense(ExpenseRequest request, Long userId) {
-        // ✅ Validate pharmacy exists
         Pharmacy pharmacy = pharmacyRepository.findByIdAndDeletedAtIsNull(request.getPharmacyId())
                 .orElseThrow(() -> new ResourceNotFoundException("Pharmacy not found"));
 
-        // ✅ Validate user exists
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // ✅ Create expense entity
         Expense expense = Expense.builder()
                 .pharmacy(pharmacy)
                 .category(request.getCategory())
@@ -65,7 +62,6 @@ public class ExpenseServiceImpl implements ExpenseService {
         Expense expense = expenseRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
 
-        // ✅ Update fields
         expense.setCategory(request.getCategory());
         expense.setTitle(request.getTitle());
         expense.setDescription(request.getDescription());
@@ -84,7 +80,6 @@ public class ExpenseServiceImpl implements ExpenseService {
         Expense expense = expenseRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
 
-        // ✅ Soft delete
         expense.markAsDeleted();
         expenseRepository.save(expense);
     }
@@ -128,7 +123,6 @@ public class ExpenseServiceImpl implements ExpenseService {
                 ? totalExpenses.divide(BigDecimal.valueOf(totalTransactions), 2, BigDecimal.ROUND_HALF_UP)
                 : BigDecimal.ZERO;
 
-        // ✅ Expenses by category
         List<Object[]> categoryData = expenseRepository.getExpensesByCategory(pharmacyId, startDate, endDate);
         Map<String, BigDecimal> expensesByCategory = categoryData.stream()
                 .collect(Collectors.toMap(
@@ -136,7 +130,6 @@ public class ExpenseServiceImpl implements ExpenseService {
                         row -> (BigDecimal) row[1]
                 ));
 
-        // ✅ Daily expenses for chart
         List<Object[]> dailyData = expenseRepository.getDailyExpenses(pharmacyId, startDate, endDate);
         List<ExpenseSummaryResponse.DailyExpenseDTO> dailyExpenses = dailyData.stream()
                 .map(row -> ExpenseSummaryResponse.DailyExpenseDTO.builder()
@@ -146,7 +139,6 @@ public class ExpenseServiceImpl implements ExpenseService {
                         .build())
                 .collect(Collectors.toList());
 
-        // ✅ Recent expenses
         List<Expense> recent = expenseRepository.findRecentExpenses(pharmacyId, Pageable.ofSize(5));
         List<ExpenseSummaryResponse.RecentExpenseDTO> recentExpenses = recent.stream()
                 .map(e -> ExpenseSummaryResponse.RecentExpenseDTO.builder()
@@ -180,7 +172,6 @@ public class ExpenseServiceImpl implements ExpenseService {
         return expenseRepository.getExpensesByCategory(pharmacyId, startDate, endDate);
     }
 
-    // ✅ Helper: Map Entity to Response DTO
     private ExpenseResponse mapToResponse(Expense expense) {
         return ExpenseResponse.builder()
                 .id(expense.getId())

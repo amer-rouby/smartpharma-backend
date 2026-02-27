@@ -43,7 +43,6 @@ public class Product {
     @Column(length = 100)
     private String barcode;
 
-    // ✅ FIXED: Added code field
     @Column(length = 50, unique = true)
     private String code;
 
@@ -90,9 +89,6 @@ public class Product {
     @ToString.Exclude
     private List<DemandPrediction> predictions = new ArrayList<>();
 
-    /**
-     * ✅ يحسب إجمالي المخزون من الدفعات النشطة فقط
-     */
     @Transient
     public Integer getTotalStock() {
         if (this.stockBatches == null) {
@@ -105,18 +101,12 @@ public class Product {
                 .sum();
     }
 
-    /**
-     * ✅ يتحقق إذا كان المنتج منخفض المخزون
-     */
     @Transient
     public boolean isLowStock() {
         Integer total = getTotalStock();
         return total != null && total <= minStockLevel;
     }
 
-    /**
-     * ✅ يتحقق إذا كان المنتج نفد منه المخزون
-     */
     @Transient
     public boolean isOutOfStock() {
         Integer total = getTotalStock();

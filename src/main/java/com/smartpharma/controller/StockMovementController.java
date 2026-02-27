@@ -91,7 +91,6 @@ public class StockMovementController {
 
         log.info("Getting movement stats for pharmacy: {} from {} to {}", pharmacyId, startDate, endDate);
 
-        // Convert LocalDate to LocalDateTime for service layer if needed
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
 

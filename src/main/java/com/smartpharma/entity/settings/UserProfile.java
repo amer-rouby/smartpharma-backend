@@ -55,7 +55,7 @@ public class UserProfile {
     private LocalDateTime dateOfBirth;
 
     @Column(name = "gender")
-    private String gender;  // MALE, FEMALE, OTHER
+    private String gender;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -18,10 +18,6 @@ import java.util.Optional;
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
-    // ================================
-    // ✅ Basic Queries
-    // ================================
-
     Page<Expense> findByPharmacyIdAndDeletedAtIsNull(Long pharmacyId, Pageable pageable);
 
     Optional<Expense> findByIdAndPharmacyIdAndDeletedAtIsNull(Long id, Long pharmacyId);
@@ -30,10 +26,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             Long pharmacyId,
             LocalDateTime startDate,
             LocalDateTime endDate);
-
-    // ================================
-    // ✅ Filter Queries
-    // ================================
 
     Page<Expense> findByPharmacyIdAndCategoryAndDeletedAtIsNull(
             Long pharmacyId,
@@ -44,10 +36,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             Long pharmacyId,
             String title,
             Pageable pageable);
-
-    // ================================
-    // ✅ Aggregation Queries (للـ Reports)
-    // ================================
 
     @Query("""
         SELECT COALESCE(SUM(e.amount), 0) FROM Expense e
@@ -103,10 +91,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
         ORDER BY e.expenseDate DESC
     """)
     List<Expense> findRecentExpenses(@Param("pharmacyId") Long pharmacyId, Pageable pageable);
-
-    // ================================
-    // ✅ Count Queries
-    // ================================
 
     @Query("SELECT COUNT(e) FROM Expense e WHERE e.pharmacy.id = :pharmacyId AND e.deletedAt IS NULL")
     Long countByPharmacyId(@Param("pharmacyId") Long pharmacyId);

@@ -19,7 +19,6 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class StockBatchRequest {
 
-    // ✅ Required fields
     @NotNull(message = "Product ID is required")
     private Long productId;
 
@@ -33,8 +32,7 @@ public class StockBatchRequest {
     @NotNull(message = "Expiry date is required")
     private LocalDate expiryDate;
 
-    // ✅ Optional fields
-    private LocalDate productionDate;  // ← ← ← ده اللي كان ناقص!
+    private LocalDate productionDate;
 
     private BigDecimal buyPrice;
     private BigDecimal sellPrice;
@@ -44,7 +42,6 @@ public class StockBatchRequest {
     private String warehouse;
     private String notes;
 
-    // ✅ Helper: quantityCurrent defaults to quantityInitial if not provided
     public Integer getQuantityCurrent() {
         return quantityInitial;  // Or add separate field if needed
     }
