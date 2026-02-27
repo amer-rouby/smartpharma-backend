@@ -16,7 +16,8 @@ import java.util.Map;
 @Entity
 @Table(name = "products", schema = "smartpharma", indexes = {
         @Index(name = "idx_products_pharmacy", columnList = "pharmacy_id"),
-        @Index(name = "idx_products_barcode", columnList = "barcode")
+        @Index(name = "idx_products_barcode", columnList = "barcode"),
+        @Index(name = "idx_products_code", columnList = "code")
 })
 @Where(clause = "deleted_at IS NULL")
 @Data
@@ -41,6 +42,10 @@ public class Product {
 
     @Column(length = 100)
     private String barcode;
+
+    // ✅ FIXED: Added code field
+    @Column(length = 50, unique = true)
+    private String code;
 
     @Column(length = 100)
     private String category;
@@ -86,7 +91,7 @@ public class Product {
     private List<DemandPrediction> predictions = new ArrayList<>();
 
     /**
-     * ✅ يحسب إجمالي المخزون من الدفعات النشطة فقط (ليس مخزناً في الداتابيز)
+     * ✅ يحسب إجمالي المخزون من الدفعات النشطة فقط
      */
     @Transient
     public Integer getTotalStock() {
