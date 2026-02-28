@@ -6,10 +6,7 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "sale_items", schema = "smartpharma", indexes = {
-        @Index(name = "idx_sale_item_transaction", columnList = "transaction_id"),
-        @Index(name = "idx_sale_item_product", columnList = "product_id")
-})
+@Table(name = "sale_items", schema = "smartpharma")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,14 +17,19 @@ public class SaleItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ✅ ✅ ✅ مهم جداً: اسم الحقل "transaction" مش "sale" ✅ ✅ ✅
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transaction_id", nullable = false)
+    @ToString.Exclude
     private SaleTransaction transaction;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    @ToString.Exclude
+    private StockBatch batch;
 
     @Column(nullable = false)
     private Integer quantity;
@@ -37,4 +39,12 @@ public class SaleItem {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;
+
+    @PrePersist
+    @PreUpdate
+    public void calculateTotalPrice() {
+        if (quantity != null && unitPrice != null) {
+            this.totalPrice = unitPrice.multiply(BigDecimal.valueOf(quantity));
+        }
+    }
 }

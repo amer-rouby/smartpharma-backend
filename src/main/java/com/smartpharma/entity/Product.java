@@ -14,14 +14,11 @@ import java.util.List;
 import java.util.Map;
 
 @Entity
-@Table(
-        name = "products",
-        schema = "smartpharma",
-        indexes = {
-                @Index(name = "idx_products_pharmacy", columnList = "pharmacy_id"),
-                @Index(name = "idx_products_barcode", columnList = "barcode")
-        }
-)
+@Table(name = "products", schema = "smartpharma", indexes = {
+        @Index(name = "idx_products_pharmacy", columnList = "pharmacy_id"),
+        @Index(name = "idx_products_barcode", columnList = "barcode"),
+        @Index(name = "idx_products_code", columnList = "code")
+})
 @Where(clause = "deleted_at IS NULL")
 @Data
 @NoArgsConstructor
@@ -46,23 +43,31 @@ public class Product {
     @Column(length = 100)
     private String barcode;
 
+    @Column(length = 50, unique = true)
+    private String code;
+
     @Column(length = 100)
     private String category;
 
     @Column(length = 50)
+    @Builder.Default
     private String unitType = "BOX";
 
     @Column
+    @Builder.Default
     private Integer minStockLevel = 10;
 
     @Column(name = "is_prescription_required")
+    @Builder.Default
     private Boolean prescriptionRequired = false;
 
     @Column(nullable = false, precision = 10, scale = 2, columnDefinition = "NUMERIC(10,2) DEFAULT 0.00")
-    private BigDecimal sellPrice;
+    @Builder.Default
+    private BigDecimal sellPrice = BigDecimal.ZERO;
 
     @Column(precision = 10, scale = 2, columnDefinition = "NUMERIC(10,2) DEFAULT 0.00")
-    private BigDecimal buyPrice;
+    @Builder.Default
+    private BigDecimal buyPrice = BigDecimal.ZERO;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -84,14 +89,27 @@ public class Product {
     @ToString.Exclude
     private List<DemandPrediction> predictions = new ArrayList<>();
 
-    public Double getTotalStock() {
+    @Transient
+    public Integer getTotalStock() {
         if (this.stockBatches == null) {
-            return 0.0;
+            return 0;
         }
         return stockBatches.stream()
-                .filter(batch -> batch.getQuantityCurrent() > 0)
+                .filter(batch -> batch != null && batch.getQuantityCurrent() != null)
                 .filter(batch -> batch.getStatus() == StockBatch.BatchStatus.ACTIVE)
-                .mapToDouble(StockBatch::getQuantityCurrent)
+                .mapToInt(StockBatch::getQuantityCurrent)
                 .sum();
+    }
+
+    @Transient
+    public boolean isLowStock() {
+        Integer total = getTotalStock();
+        return total != null && total <= minStockLevel;
+    }
+
+    @Transient
+    public boolean isOutOfStock() {
+        Integer total = getTotalStock();
+        return total != null && total == 0;
     }
 }

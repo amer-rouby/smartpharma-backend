@@ -1,19 +1,28 @@
 package com.smartpharma.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
-
     private boolean success;
     private String message;
     private T data;
-    private Integer statusCode;
+    private int statusCode;
+
+    public static <T> ApiResponse<T> success(T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .message("Operation completed successfully")
+                .data(data)
+                .statusCode(200)
+                .build();
+    }
 
     public static <T> ApiResponse<T> success(T data, String message) {
         return ApiResponse.<T>builder()
@@ -24,10 +33,20 @@ public class ApiResponse<T> {
                 .build();
     }
 
-    public static <T> ApiResponse<T> error(String message, Integer statusCode) {
+    public static <T> ApiResponse<T> error(String message) {
         return ApiResponse.<T>builder()
                 .success(false)
                 .message(message)
+                .data(null)
+                .statusCode(500)
+                .build();
+    }
+
+    public static <T> ApiResponse<T> error(String message, int statusCode) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .data(null)
                 .statusCode(statusCode)
                 .build();
     }

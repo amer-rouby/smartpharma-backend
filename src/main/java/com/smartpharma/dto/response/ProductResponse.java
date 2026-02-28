@@ -14,7 +14,6 @@ import java.util.Map;
 @AllArgsConstructor
 @Builder
 public class ProductResponse {
-
     private Long id;
     private Long pharmacyId;
     private String name;
@@ -27,6 +26,6 @@ public class ProductResponse {
     private BigDecimal sellPrice;
     private BigDecimal buyPrice;
     private Map<String, Object> extraAttributes;
-    private Double totalStock;
+    private Integer totalStock;
     private LocalDateTime createdAt;
 }

@@ -1,12 +1,20 @@
+// src/main/java/com/smartpharma/dto/request/StockBatchRequest.java
+
 package com.smartpharma.dto.request;
 
-import jakarta.validation.constraints.*;
-import lombok.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class StockBatchRequest {
@@ -14,25 +22,27 @@ public class StockBatchRequest {
     @NotNull(message = "Product ID is required")
     private Long productId;
 
-    @Size(max = 100)
+    @NotBlank(message = "Batch number is required")
     private String batchNumber;
 
     @NotNull(message = "Initial quantity is required")
-    @Min(1)
+    @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantityInitial;
 
     @NotNull(message = "Expiry date is required")
-    @Future(message = "Expiry date must be in the future")
     private LocalDate expiryDate;
 
-    @NotNull(message = "Buy price is required")
-    @DecimalMin(value = "0.01", message = "Buy price must be greater than 0")
-    private BigDecimal buyPrice;
+    private LocalDate productionDate;
 
-    @NotNull(message = "Sell price is required")
-    @DecimalMin(value = "0.01", message = "Sell price must be greater than 0")
+    private BigDecimal buyPrice;
     private BigDecimal sellPrice;
 
-    @Size(max = 50)
     private String location;
+    private String shelf;
+    private String warehouse;
+    private String notes;
+
+    public Integer getQuantityCurrent() {
+        return quantityInitial;  // Or add separate field if needed
+    }
 }

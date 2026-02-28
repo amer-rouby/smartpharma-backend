@@ -1,8 +1,9 @@
 package com.smartpharma.dto.request;
 
-import jakarta.validation.constraints.DecimalMin;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,28 +13,36 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class ProductRequest {
 
-    @NotBlank(message = "Product name is required")
+    @NotBlank(message = "اسم المنتج مطلوب")
     private String name;
 
     private String scientificName;
+
     private String barcode;
+
     private String category;
+
+    @Builder.Default
     private String unitType = "BOX";
+
+    @Builder.Default
     private Integer minStockLevel = 10;
+
+    @Builder.Default
     private Boolean prescriptionRequired = false;
 
-    // ✅ حقول السعر
-    @NotNull(message = "Sell price is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Sell price must be greater than 0")
+    @NotNull(message = "سعر البيع مطلوب")
+    @Positive(message = "سعر البيع يجب أن يكون أكبر من صفر")
     private BigDecimal sellPrice;
 
-    @DecimalMin(value = "0.0", message = "Buy price must be non-negative")
     private BigDecimal buyPrice;
 
     private Map<String, Object> extraAttributes;
+    @JsonProperty("initialStock")
+    private Integer initialStock;
 }
