@@ -63,7 +63,9 @@ public class DemandPrediction {
     private LocalDateTime updatedAt;
 
     // Helper: check if actual sales data exists
-    public boolean isRealized() { return actualQuantity != null; }
+    public boolean isRealized() {
+        return actualQuantity != null;
+    }
 
     // Helper: check if prediction date is in the past
     public boolean isExpired() {
@@ -72,8 +74,11 @@ public class DemandPrediction {
 
     // Calculate accuracy percentage based on actual vs predicted
     public BigDecimal calculateAccuracy() {
-        if (actualQuantity == null || predictedQuantity == null || predictedQuantity == 0) return null;
+        if (actualQuantity == null || predictedQuantity == null || predictedQuantity == 0) {
+            return null;
+        }
         int error = Math.abs(actualQuantity - predictedQuantity);
-        return BigDecimal.valueOf(Math.max(0, 100.0 - (error * 100.0 / predictedQuantity)));
+        double accuracy = Math.max(0, 100.0 - (error * 100.0 / predictedQuantity));
+        return BigDecimal.valueOf(accuracy).setScale(2, BigDecimal.ROUND_HALF_UP);
     }
 }

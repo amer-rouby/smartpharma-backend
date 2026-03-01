@@ -31,33 +31,52 @@ public class DemandPredictionResponse {
     private String recommendation;
     private LocalDateTime createdAt;
 
-    // Map entity to response DTO
+    // Map entity to response DTO - آمن ضد NullPointerException
     public static DemandPredictionResponse fromEntity(DemandPrediction prediction, Integer currentStock) {
+        // التعامل الآمن مع القيم التي قد تكون null
+        Integer predictedQty = prediction.getPredictedQuantity() != null ? prediction.getPredictedQuantity() : 0;
+        Integer stock = currentStock != null ? currentStock : 0;
+
+        // حالة عدم وجود بيانات المنتج
         if (prediction.getProduct() == null) {
             return DemandPredictionResponse.builder()
                     .predictionId(prediction.getId())
-                    .productId(null).productName("Unknown").productCode(null)
+                    .productId(null)
+                    .productName("Unknown")
+                    .productCode(null)
                     .pharmacyId(prediction.getPharmacy() != null ? prediction.getPharmacy().getId() : null)
                     .predictionDate(prediction.getPredictionDate())
-                    .predictedQuantity(prediction.getPredictedQuantity())
-                    .currentStock(currentStock).recommendedOrder(0)
+                    .predictedQuantity(predictedQty)
+                    .currentStock(stock)
+                    .recommendedOrder(0)
                     .confidenceLevel(prediction.getConfidenceLevel())
                     .algorithmVersion(prediction.getAlgorithmVersion())
-                    .trend("stable").seasonalityFactor("medium")
+                    .trend("stable")
+                    .seasonalityFactor("medium")
                     .recommendation("Product data unavailable")
-                    .createdAt(prediction.getCreatedAt()).build();
+                    .createdAt(prediction.getCreatedAt())
+                    .build();
         }
 
-        Integer recommendedOrder = Math.max(0,
-                prediction.getPredictedQuantity() - (currentStock != null ? currentStock : 0));
+        // حساب الكمية المقترحة للطلب بأمان
+        Integer recommendedOrder = Math.max(0, predictedQty - stock);
 
-        String trend = calculateTrend(prediction.getPredictedQuantity(), currentStock);
+        // حساب الاتجاه مع معالجة null
+        String trend = calculateTrend(predictedQty, stock);
+
+        // الحصول على عامل الموسمية
         String seasonality = getSeasonalityFactor(prediction.getPredictionDate());
-        String productName = prediction.getProduct().getName();
 
+        // اسم المنتج
+        String productName = prediction.getProduct().getName() != null ? prediction.getProduct().getName() : "Unknown";
+
+        // توليد التوصية
         String recommendation = generateRecommendation(
-                productName, prediction.getPredictedQuantity(),
-                currentStock, recommendedOrder, trend);
+                productName,
+                predictedQty,
+                stock,
+                recommendedOrder,
+                trend);
 
         return DemandPredictionResponse.builder()
                 .predictionId(prediction.getId())
@@ -66,19 +85,21 @@ public class DemandPredictionResponse {
                 .productCode(prediction.getProduct().getCode())
                 .pharmacyId(prediction.getPharmacy() != null ? prediction.getPharmacy().getId() : null)
                 .predictionDate(prediction.getPredictionDate())
-                .predictedQuantity(prediction.getPredictedQuantity())
-                .currentStock(currentStock)
+                .predictedQuantity(predictedQty)
+                .currentStock(stock)
                 .recommendedOrder(recommendedOrder)
                 .confidenceLevel(prediction.getConfidenceLevel())
                 .algorithmVersion(prediction.getAlgorithmVersion())
-                .trend(trend).seasonalityFactor(seasonality)
+                .trend(trend)
+                .seasonalityFactor(seasonality)
                 .recommendation(recommendation)
-                .createdAt(prediction.getCreatedAt()).build();
+                .createdAt(prediction.getCreatedAt())
+                .build();
     }
 
     // Determine demand trend based on predicted vs current stock
     private static String calculateTrend(Integer predicted, Integer current) {
-        if (current == null) return "stable";
+        if (current == null || current == 0) return "stable";
         if (predicted > current * 1.2) return "increasing";
         if (predicted < current * 0.8) return "decreasing";
         return "stable";
