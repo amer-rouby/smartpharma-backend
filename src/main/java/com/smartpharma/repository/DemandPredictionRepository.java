@@ -97,6 +97,13 @@ public interface DemandPredictionRepository extends JpaRepository<DemandPredicti
     @Query("SELECT MAX(dp.predictionDate) FROM DemandPrediction dp WHERE dp.pharmacy.id = :pharmacyId")
     Optional<LocalDate> findLatestPredictionDateByPharmacy(@Param("pharmacyId") Long pharmacyId);
 
+    @Query("""
+        SELECT AVG(dp.accuracyPercentage) FROM DemandPrediction dp
+        WHERE dp.product.id = :productId
+        AND dp.actualQuantity IS NOT NULL
+    """)
+
+    BigDecimal getAverageAccuracy(@Param("productId") Long productId);
     /**
      * Delete old predictions before specified date.
      * Used for cleanup/maintenance operations.

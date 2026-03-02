@@ -17,6 +17,12 @@ import java.util.Optional;
 @Repository
 public interface SaleTransactionRepository extends JpaRepository<SaleTransaction, Long> {
 
+    @Query("""
+        SELECT st FROM SaleTransaction st
+        WHERE st.pharmacy.id = :pharmacyId
+        AND st.deletedAt IS NULL
+        ORDER BY st.transactionDate DESC
+    """)
     Page<SaleTransaction> findByPharmacyId(Long pharmacyId, Pageable pageable);
 
     @Query("SELECT st FROM SaleTransaction st WHERE st.id = :id AND st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
@@ -203,4 +209,19 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     List<Object[]> findTopSellingProducts(
             @Param("pharmacyId") Long pharmacyId,
             Pageable pageable);
+
+    @Query("""
+        SELECT CAST(st.transactionDate AS date) as saleDate, 
+               COALESCE(SUM(st.totalAmount), 0) as total
+        FROM SaleTransaction st
+        WHERE st.pharmacy.id = :pharmacyId
+          AND st.deletedAt IS NULL
+          AND CAST(st.transactionDate AS date) BETWEEN :startDate AND :endDate
+        GROUP BY CAST(st.transactionDate AS date)
+        ORDER BY saleDate
+    """)
+    List<Object[]> findDailyRevenueByPharmacyAndDateRange(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }
