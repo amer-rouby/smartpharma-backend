@@ -5,14 +5,15 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * DTO for API response - demand prediction data.
- */
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class DemandPredictionResponse {
 
     private Long predictionId;
@@ -31,58 +32,22 @@ public class DemandPredictionResponse {
     private String recommendation;
     private LocalDateTime createdAt;
 
-    // Map entity to response DTO - آمن ضد NullPointerException
     public static DemandPredictionResponse fromEntity(DemandPrediction prediction, Integer currentStock) {
-        // التعامل الآمن مع القيم التي قد تكون null
         Integer predictedQty = prediction.getPredictedQuantity() != null ? prediction.getPredictedQuantity() : 0;
         Integer stock = currentStock != null ? currentStock : 0;
-
-        // حالة عدم وجود بيانات المنتج
-        if (prediction.getProduct() == null) {
-            return DemandPredictionResponse.builder()
-                    .predictionId(prediction.getId())
-                    .productId(null)
-                    .productName("Unknown")
-                    .productCode(null)
-                    .pharmacyId(prediction.getPharmacy() != null ? prediction.getPharmacy().getId() : null)
-                    .predictionDate(prediction.getPredictionDate())
-                    .predictedQuantity(predictedQty)
-                    .currentStock(stock)
-                    .recommendedOrder(0)
-                    .confidenceLevel(prediction.getConfidenceLevel())
-                    .algorithmVersion(prediction.getAlgorithmVersion())
-                    .trend("stable")
-                    .seasonalityFactor("medium")
-                    .recommendation("Product data unavailable")
-                    .createdAt(prediction.getCreatedAt())
-                    .build();
-        }
-
-        // حساب الكمية المقترحة للطلب بأمان
         Integer recommendedOrder = Math.max(0, predictedQty - stock);
 
-        // حساب الاتجاه مع معالجة null
         String trend = calculateTrend(predictedQty, stock);
-
-        // الحصول على عامل الموسمية
         String seasonality = getSeasonalityFactor(prediction.getPredictionDate());
-
-        // اسم المنتج
-        String productName = prediction.getProduct().getName() != null ? prediction.getProduct().getName() : "Unknown";
-
-        // توليد التوصية
-        String recommendation = generateRecommendation(
-                productName,
-                predictedQty,
-                stock,
-                recommendedOrder,
-                trend);
+        String productName = prediction.getProduct() != null && prediction.getProduct().getName() != null
+                ? prediction.getProduct().getName() : "Unknown";
+        String recommendation = generateRecommendation(productName, predictedQty, stock, recommendedOrder, trend);
 
         return DemandPredictionResponse.builder()
                 .predictionId(prediction.getId())
-                .productId(prediction.getProduct().getId())
+                .productId(prediction.getProduct() != null ? prediction.getProduct().getId() : null)
                 .productName(productName)
-                .productCode(prediction.getProduct().getCode())
+                .productCode(prediction.getProduct() != null ? prediction.getProduct().getCode() : null)
                 .pharmacyId(prediction.getPharmacy() != null ? prediction.getPharmacy().getId() : null)
                 .predictionDate(prediction.getPredictionDate())
                 .predictedQuantity(predictedQty)
@@ -97,7 +62,6 @@ public class DemandPredictionResponse {
                 .build();
     }
 
-    // Determine demand trend based on predicted vs current stock
     private static String calculateTrend(Integer predicted, Integer current) {
         if (current == null || current == 0) return "stable";
         if (predicted > current * 1.2) return "increasing";
@@ -105,7 +69,6 @@ public class DemandPredictionResponse {
         return "stable";
     }
 
-    // Get seasonality factor based on month
     private static String getSeasonalityFactor(LocalDate date) {
         if (date == null) return "medium";
         int month = date.getMonthValue();
@@ -115,19 +78,13 @@ public class DemandPredictionResponse {
         return "medium";
     }
 
-    // Generate Arabic recommendation message
-    private static String generateRecommendation(
-            String productName, Integer predicted, Integer current,
-            Integer recommended, String trend) {
-
-        if (productName == null) productName = "المنتج";
-
+    private static String generateRecommendation(String productName, Integer predicted, Integer current,
+                                                 Integer recommended, String trend) {
         if (recommended <= 0) {
             return String.format("المخزون الحالي كافٍ لـ '%s' للأسبوع القادم", productName);
         }
         if ("increasing".equals(trend)) {
-            return String.format("الطلب على '%s' في ارتفاع - ننصح بطلب %d وحدة إضافي",
-                    productName, recommended);
+            return String.format("الطلب على '%s' في ارتفاع - ننصح بطلب %d وحدة إضافي", productName, recommended);
         }
         return String.format("ننصح بطلب %d وحدة من '%s' للأسبوع القادم", recommended, productName);
     }
