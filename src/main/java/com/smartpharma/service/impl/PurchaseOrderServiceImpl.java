@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -84,20 +85,15 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .createdBy(user)
                 .build();
 
-        // Add items
-        // في method createOrder، عدّل الجزء الخاص بـ items كالتالي:
-
         for (PurchaseOrderItemRequest itemReq : request.getItems()) {
             Product product = productRepository.findByIdAndPharmacyId(itemReq.getProductId(), pharmacyId)
                     .orElseThrow(() -> new RuntimeException("Product not found: " + itemReq.getProductId()));
 
-            // ✅ FIXED: Validate unitPrice
             BigDecimal unitPrice = itemReq.getUnitPrice();
             if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) < 0) {
                 throw new RuntimeException("Invalid unit price for product: " + product.getName());
             }
 
-            // ✅ Validate quantity
             Integer quantity = itemReq.getQuantity();
             if (quantity == null || quantity < 1) {
                 throw new RuntimeException("Invalid quantity for product: " + product.getName());
@@ -106,15 +102,14 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             PurchaseOrderItem item = PurchaseOrderItem.builder()
                     .product(product)
                     .quantity(quantity)
-                    .unitPrice(unitPrice)  // ✅ مؤكد إنه مش null
+                    .unitPrice(unitPrice)
                     .notes(itemReq.getNotes())
                     .build();
 
-            // ✅ احسب totalPrice قبل الـ add
             item.calculateTotal();
-
-            order.addItem(item);  // ✅ ده هيستدعي recalculateTotal() الآمنة
+            order.addItem(item);
         }
+
         PurchaseOrder saved = orderRepository.save(order);
         log.info("Purchase order created: number={}, supplier={}, total={}",
                 saved.getOrderNumber(), supplier.getName(), saved.getTotalAmount());
@@ -124,20 +119,17 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Override
     @Transactional
     public PurchaseOrderResponse createFromPrediction(Long predictionId, Long pharmacyId, Long userId) {
-        // Check if order already exists for this prediction
         List<PurchaseOrder> existing = orderRepository.findByPredictionId(predictionId);
         if (!existing.isEmpty()) {
             throw new RuntimeException("Purchase order already exists for this prediction");
         }
 
-        // Get prediction details (you'll need to call prediction service or repository)
-        // For now, create a basic order - you can enhance this later
         PurchaseOrderRequest request = PurchaseOrderRequest.builder()
-                .supplierId(null) // User will select supplier
+                .supplierId(null)
                 .orderDate(LocalDate.now())
                 .sourceType("PREDICTION")
                 .sourceId(predictionId)
-                .items(List.of()) // User will add items
+                .items(List.of())
                 .build();
 
         return createOrder(request, pharmacyId, userId);
@@ -163,10 +155,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         order.setPaymentTerms(request.getPaymentTerms());
         order.setNotes(request.getNotes());
 
-        // Clear existing items
         order.getItems().clear();
 
-        // Add new items
         for (PurchaseOrderItemRequest itemReq : request.getItems()) {
             Product product = productRepository.findByIdAndPharmacyId(itemReq.getProductId(), pharmacyId)
                     .orElseThrow(() -> new RuntimeException("Product not found: " + itemReq.getProductId()));
@@ -251,24 +241,44 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         order.setStatus("RECEIVED");
         order.setActualDeliveryDate(LocalDate.now());
 
-        // Create stock batches for received items
         for (PurchaseOrderItem item : order.getItems()) {
             if (item.getQuantity() > 0) {
+                Product product = item.getProduct();
+                BigDecimal newBuyPrice = item.getUnitPrice();
+
                 StockBatch batch = StockBatch.builder()
-                        .product(item.getProduct())
+                        .product(product)
                         .pharmacy(order.getPharmacy())
                         .batchNumber("PO-" + order.getOrderNumber() + "-" + item.getProduct().getId())
                         .quantityInitial(item.getQuantity())
                         .quantityCurrent(item.getQuantity())
-                        .expiryDate(LocalDate.now().plusMonths(24)) // Default, user can update
-                        .buyPrice(item.getUnitPrice())
-                        .sellPrice(item.getProduct().getSellPrice())
+                        .expiryDate(LocalDate.now().plusMonths(24))
+                        .buyPrice(newBuyPrice)
+                        .sellPrice(product.getSellPrice())
                         .status(StockBatch.BatchStatus.ACTIVE)
                         .createdBy(User.builder().id(userId).build())
                         .build();
 
                 stockBatchRepository.save(batch);
                 item.setReceivedQuantity(item.getQuantity());
+
+                if (product.getBuyPrice() == null || product.getBuyPrice().compareTo(newBuyPrice) != 0) {
+                    BigDecimal oldBuyPrice = product.getBuyPrice();
+                    product.setBuyPrice(newBuyPrice);
+
+                    BigDecimal profitMargin = BigDecimal.valueOf(0.25);
+                    BigDecimal newSellPrice = newBuyPrice.multiply(BigDecimal.ONE.add(profitMargin))
+                            .setScale(2, RoundingMode.HALF_UP);
+
+                    if (product.getSellPrice() == null || product.getSellPrice().compareTo(newSellPrice) != 0) {
+                        product.setSellPrice(newSellPrice);
+                    }
+
+                    productRepository.save(product);
+
+                    log.info("Product prices updated | productId: {} | productName: {} | oldBuyPrice: {} | newBuyPrice: {} | newSellPrice: {}",
+                            product.getId(), product.getName(), oldBuyPrice, newBuyPrice, newSellPrice);
+                }
             }
         }
 
