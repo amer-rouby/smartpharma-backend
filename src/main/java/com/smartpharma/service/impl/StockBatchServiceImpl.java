@@ -2,13 +2,16 @@ package com.smartpharma.service.impl;
 
 import com.smartpharma.dto.request.StockAdjustmentRequest;
 import com.smartpharma.dto.request.StockBatchRequest;
+import com.smartpharma.dto.response.StockAdjustmentHistoryDTO;
 import com.smartpharma.dto.response.StockBatchResponse;
 import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.Product;
+import com.smartpharma.entity.StockAdjustmentHistory;
 import com.smartpharma.entity.StockBatch;
 import com.smartpharma.entity.User;
 import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.ProductRepository;
+import com.smartpharma.repository.StockAdjustmentHistoryRepository;
 import com.smartpharma.repository.StockBatchRepository;
 import com.smartpharma.service.StockBatchService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,12 +36,12 @@ public class StockBatchServiceImpl implements StockBatchService {
     private final StockBatchRepository stockBatchRepository;
     private final ProductRepository productRepository;
     private final PharmacyRepository pharmacyRepository;
+    private final StockAdjustmentHistoryRepository stockAdjustmentHistoryRepository;
 
     @Override
     @Transactional(readOnly = true)
     public Page<StockBatchResponse> getAllBatches(Long pharmacyId, int page, int size) {
         log.debug("Fetching batches for pharmacy: {}, page: {}, size: {}", pharmacyId, page, size);
-
         Pageable pageable = PageRequest.of(page, size);
         return stockBatchRepository.findByPharmacyIdAndStatus(pharmacyId, StockBatch.BatchStatus.ACTIVE, pageable)
                 .map(this::mapToResponse);
@@ -47,14 +51,11 @@ public class StockBatchServiceImpl implements StockBatchService {
     @Transactional(readOnly = true)
     public StockBatchResponse getBatch(Long id, Long pharmacyId) {
         log.debug("Fetching batch {} for pharmacy: {}", id, pharmacyId);
-
         StockBatch batch = stockBatchRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Batch not found with id: " + id));
-
         if (!batch.getPharmacy().getId().equals(pharmacyId)) {
             throw new RuntimeException("Access denied: Batch does not belong to this pharmacy");
         }
-
         return mapToResponse(batch);
     }
 
@@ -84,16 +85,14 @@ public class StockBatchServiceImpl implements StockBatchService {
             if (buyPrice == null) {
                 buyPrice = BigDecimal.ZERO;
             }
-            log.info("Using buyPrice: {}", buyPrice);
         }
 
         BigDecimal sellPrice = request.getSellPrice();
         if (sellPrice == null) {
             sellPrice = product.getSellPrice();
             if (sellPrice == null) {
-                sellPrice = BigDecimal.ZERO;
+                sellPrice = buyPrice.multiply(BigDecimal.valueOf(1.25)).setScale(2, BigDecimal.ROUND_HALF_UP);
             }
-            log.info("Using sellPrice: {}", sellPrice);
         }
 
         StockBatch batch = StockBatch.builder()
@@ -116,7 +115,6 @@ public class StockBatchServiceImpl implements StockBatchService {
 
         StockBatch saved = stockBatchRepository.save(batch);
         log.info("Batch created successfully: id={}, batchNumber={}", saved.getId(), saved.getBatchNumber());
-
         return mapToResponse(saved);
     }
 
@@ -126,7 +124,7 @@ public class StockBatchServiceImpl implements StockBatchService {
         log.info("Updating batch {} for pharmacy: {}, user: {}", id, pharmacyId, userId);
 
         if (userId == null) {
-            throw new RuntimeException("Unauthorized: User ID is required");
+            log.warn("User ID is null for batch update: {}. Proceeding without user tracking.", id);
         }
 
         StockBatch batch = stockBatchRepository.findById(id)
@@ -136,11 +134,15 @@ public class StockBatchServiceImpl implements StockBatchService {
             throw new RuntimeException("Access denied: Batch does not belong to this pharmacy");
         }
 
-        // Update fields
         batch.setBatchNumber(request.getBatchNumber());
         batch.setQuantityInitial(request.getQuantityInitial());
+        batch.setQuantityCurrent(request.getQuantityCurrent());
         batch.setExpiryDate(request.getExpiryDate());
         batch.setProductionDate(request.getProductionDate());
+
+        if (request.getStatus() != null) {
+            batch.setStatus(StockBatch.BatchStatus.valueOf(request.getStatus()));
+        }
 
         if (request.getBuyPrice() != null) {
             batch.setBuyPrice(request.getBuyPrice());
@@ -153,14 +155,12 @@ public class StockBatchServiceImpl implements StockBatchService {
         batch.setShelf(request.getShelf());
         batch.setWarehouse(request.getWarehouse());
         batch.setNotes(request.getNotes());
-        batch.setUpdatedBy(User.builder().id(userId).build());
+        batch.setUpdatedAt(java.time.LocalDateTime.now());
 
         StockBatch updated = stockBatchRepository.save(batch);
-        log.info("Batch updated successfully: id={}", updated.getId());
-
+        log.info("Batch updated successfully: id={}, status={}", updated.getId(), updated.getStatus());
         return mapToResponse(updated);
     }
-
     @Override
     @Transactional
     public void deleteBatch(Long id, Long pharmacyId, Long userId) {
@@ -178,9 +178,8 @@ public class StockBatchServiceImpl implements StockBatchService {
         }
 
         batch.setStatus(StockBatch.BatchStatus.DISCARDED);
-        batch.setUpdatedBy(User.builder().id(userId).build());
+        batch.setUpdatedAt(LocalDateTime.now());
         stockBatchRepository.save(batch);
-
         log.info("Batch marked as discarded: id={}", id);
     }
 
@@ -188,7 +187,6 @@ public class StockBatchServiceImpl implements StockBatchService {
     @Transactional(readOnly = true)
     public List<StockBatchResponse> getExpiringBatches(Long pharmacyId, int days) {
         log.debug("Fetching expiring batches for pharmacy: {}, days: {}", pharmacyId, days);
-
         LocalDate thresholdDate = LocalDate.now().plusDays(days);
         return stockBatchRepository.findExpiringBatches(pharmacyId, thresholdDate)
                 .stream()
@@ -200,7 +198,6 @@ public class StockBatchServiceImpl implements StockBatchService {
     @Transactional(readOnly = true)
     public List<StockBatchResponse> getExpiredBatches(Long pharmacyId) {
         log.debug("Fetching expired batches for pharmacy: {}", pharmacyId);
-
         LocalDate today = LocalDate.now();
         return stockBatchRepository.findExpiredBatches(pharmacyId, today)
                 .stream()
@@ -211,33 +208,87 @@ public class StockBatchServiceImpl implements StockBatchService {
     @Override
     @Transactional
     public StockBatchResponse adjustStock(Long batchId, StockAdjustmentRequest request, Long userId) {
-        log.info("Adjusting stock for batch: {}, user: {}", batchId, userId);
+        log.info("Adjusting stock for batch: {}, type: {}, quantity: {}, user: {}",
+                batchId, request.getType(), request.getQuantity(), userId);
 
         if (userId == null) {
-            throw new RuntimeException("Unauthorized: User ID is required");
+            log.warn("User ID is null for batch adjustment: {}. Proceeding without user tracking.", batchId);
         }
 
         StockBatch batch = stockBatchRepository.findById(batchId)
                 .orElseThrow(() -> new RuntimeException("Batch not found with id: " + batchId));
 
-        int newQuantity = batch.getQuantityCurrent() + request.getQuantity();
-        if (newQuantity < 0) {
-            throw new RuntimeException("Insufficient stock for adjustment");
-        }
+        Integer currentQuantity = batch.getQuantityCurrent();
+        Integer adjustmentQuantity = request.getQuantity();
+        String type = request.getType();
+
+        Integer newQuantity = switch (type) {
+            case "ADD" -> currentQuantity + adjustmentQuantity;
+            case "REMOVE" -> {
+                if (adjustmentQuantity > currentQuantity) {
+                    throw new RuntimeException("Insufficient stock: current=" + currentQuantity + ", requested=" + adjustmentQuantity);
+                }
+                yield currentQuantity - adjustmentQuantity;
+            }
+            case "CORRECTION" -> adjustmentQuantity;
+            default -> throw new IllegalArgumentException("Invalid adjustment type: " + type);
+        };
 
         batch.setQuantityCurrent(newQuantity);
+        updateBatchStatus(batch, newQuantity);
 
-        if (request.getReason() != null) {
-            String currentNotes = batch.getNotes() != null ? batch.getNotes() : "";
-            batch.setNotes(currentNotes + "\n[Adjustment] " + request.getReason());
-        }
+        StockAdjustmentHistory history = StockAdjustmentHistory.builder()
+                .batch(batch)
+                .type(type)
+                .quantity(adjustmentQuantity)
+                .reason(request.getReason())
+                .previousQuantity(currentQuantity)
+                .newQuantity(newQuantity)
+                .notes(request.getNotes())
+                .adjustedBy(userId)
+                .build();
 
-        batch.setUpdatedBy(User.builder().id(userId).build());
+        stockAdjustmentHistoryRepository.save(history);
+
+        String shortNote = String.format("[%s] %s: %d→%d",
+                request.getReason(), type, currentQuantity, newQuantity);
+        batch.setNotes(shortNote);
+
+        batch.setUpdatedAt(LocalDateTime.now());
 
         StockBatch updated = stockBatchRepository.save(batch);
-        log.info("Stock adjusted successfully: batch={}, newQuantity={}", batchId, newQuantity);
+        log.info("Stock adjusted | batchId: {} | type: {} | qty: {} | {}→{} | status: {}",
+                batchId, type, adjustmentQuantity, currentQuantity, newQuantity, updated.getStatus());
 
         return mapToResponse(updated);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockAdjustmentHistoryDTO> getAdjustmentHistory(Long batchId, Long pharmacyId) {
+        StockBatch batch = stockBatchRepository.findById(batchId)
+                .orElseThrow(() -> new RuntimeException("Batch not found"));
+
+        if (!batch.getPharmacy().getId().equals(pharmacyId)) {
+            throw new RuntimeException("Access denied");
+        }
+
+        return stockAdjustmentHistoryRepository.findByBatchIdOrderByAdjustmentDateDesc(batchId)
+                .stream()
+                .map(this::mapHistoryToDTO)
+                .collect(Collectors.toList());
+    }
+
+    private void updateBatchStatus(StockBatch batch, Integer newQuantity) {
+        if (batch.isExpired()) {
+            batch.setStatus(StockBatch.BatchStatus.EXPIRED);
+        } else if (newQuantity <= 0) {
+            batch.setStatus(StockBatch.BatchStatus.EXPIRED);
+        } else if (newQuantity < batch.getProduct().getMinStockLevel()) {
+            batch.setStatus(StockBatch.BatchStatus.LOW);
+        } else {
+            batch.setStatus(StockBatch.BatchStatus.ACTIVE);
+        }
     }
 
     private StockBatchResponse mapToResponse(StockBatch batch) {
@@ -262,6 +313,24 @@ public class StockBatchServiceImpl implements StockBatchService {
                 .isExpiringSoon(batch.isExpiringSoon(30))
                 .createdAt(batch.getCreatedAt())
                 .updatedAt(batch.getUpdatedAt())
+                .build();
+    }
+
+    private StockAdjustmentHistoryDTO mapHistoryToDTO(StockAdjustmentHistory history) {
+        return StockAdjustmentHistoryDTO.builder()
+                .id(history.getId())
+                .batchId(history.getBatch().getId())
+                .batchNumber(history.getBatch().getBatchNumber())
+                .productName(history.getBatch().getProduct().getName())
+                .type(history.getType())
+                .quantity(history.getQuantity())
+                .reason(history.getReason())
+                .previousQuantity(history.getPreviousQuantity())
+                .newQuantity(history.getNewQuantity())
+                .notes(history.getNotes())
+                .adjustmentDate(history.getAdjustmentDate())
+                .adjustedBy(history.getAdjustedBy())
+                .adjustedByName(history.getAdjustedByName())
                 .build();
     }
 }

@@ -1,21 +1,20 @@
 package com.smartpharma.dto.request;
 
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class StockAdjustmentRequest {
+    @NotNull
+    private String type;
 
     @NotNull
+    @Min(1)
     private Integer quantity;
 
+    @NotNull
     private String reason;
 
-    private String reference;
+    private String notes;
 }

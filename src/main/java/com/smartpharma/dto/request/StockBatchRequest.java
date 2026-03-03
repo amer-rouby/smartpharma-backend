@@ -1,35 +1,25 @@
-// src/main/java/com/smartpharma/dto/request/StockBatchRequest.java
-
 package com.smartpharma.dto.request;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class StockBatchRequest {
 
-    @NotNull(message = "Product ID is required")
+    @NotNull
     private Long productId;
 
-    @NotBlank(message = "Batch number is required")
+    @NotNull
     private String batchNumber;
 
-    @NotNull(message = "Initial quantity is required")
-    @Min(value = 1, message = "Quantity must be at least 1")
+    @NotNull
     private Integer quantityInitial;
 
-    @NotNull(message = "Expiry date is required")
+    private Integer quantityCurrent;
+
+    @NotNull
     private LocalDate expiryDate;
 
     private LocalDate productionDate;
@@ -40,9 +30,7 @@ public class StockBatchRequest {
     private String location;
     private String shelf;
     private String warehouse;
-    private String notes;
 
-    public Integer getQuantityCurrent() {
-        return quantityInitial;  // Or add separate field if needed
-    }
+    private String notes;
+    private String status;
 }

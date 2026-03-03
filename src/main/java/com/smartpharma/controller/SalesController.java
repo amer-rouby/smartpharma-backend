@@ -68,8 +68,8 @@ public class SalesController {
         log.info("POST /api/sales - pharmacyId: {}, items: {}", pharmacyId, request.getItems().size());
 
         Long currentUserId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.User) {
-            currentUserId = 1L;
+        if (authentication != null && authentication.getDetails() instanceof Map details) {
+            currentUserId = (Long) details.get("userId");
         }
 
         SaleTransactionDTO response = saleTransactionService.createSale(request, currentUserId);
@@ -97,7 +97,6 @@ public class SalesController {
         return ResponseEntity.ok(ApiResponse.success(null, "Sale deleted successfully"));
     }
 
-    // Analytics endpoint
     @GetMapping("/analytics")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
     public ResponseEntity<ApiResponse<SalesReportResponse>> getSalesAnalytics(

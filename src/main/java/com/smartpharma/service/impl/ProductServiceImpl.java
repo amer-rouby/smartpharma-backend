@@ -59,7 +59,6 @@ public class ProductServiceImpl implements ProductService {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
 
-        // التحقق من تكرار الباركود
         if (request.getBarcode() != null && !request.getBarcode().trim().isEmpty()) {
             if (productRepository.findByPharmacyIdAndBarcode(pharmacyId, request.getBarcode().trim()).isPresent()) {
                 throw new RuntimeException("Barcode already exists");
@@ -82,8 +81,6 @@ public class ProductServiceImpl implements ProductService {
 
         productRepository.save(product);
         log.info("Product created: id={}, name={}", product.getId(), product.getName());
-
-        // إنشاء Stock Batch أولي لو فيه مخزون ابتدائي
         if (request.getInitialStock() != null && request.getInitialStock() > 0) {
             BigDecimal effectiveBuyPrice = request.getBuyPrice() != null
                     ? request.getBuyPrice()
@@ -114,8 +111,6 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse updateProduct(Long id, ProductRequest request, Long pharmacyId) {
         Product product = productRepository.findByIdAndPharmacyId(id, pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
-
-        // تحديث الحقول الأساسية
         product.setName(request.getName());
         product.setScientificName(request.getScientificName());
         product.setBarcode(request.getBarcode());
@@ -124,13 +119,11 @@ public class ProductServiceImpl implements ProductService {
         product.setMinStockLevel(request.getMinStockLevel());
         product.setPrescriptionRequired(request.getPrescriptionRequired());
 
-        // ✅ تحديث سعر الشراء
         if (request.getBuyPrice() != null) {
             product.setBuyPrice(request.getBuyPrice());
 
-            // ✅ إذا لم يتم تحديد سعر بيع، احسبه تلقائياً بنسبة 25%
             if (request.getSellPrice() == null) {
-                BigDecimal profitMargin = BigDecimal.valueOf(0.25); // 25%
+                BigDecimal profitMargin = BigDecimal.valueOf(0.25);
                 BigDecimal autoSellPrice = request.getBuyPrice()
                         .multiply(BigDecimal.ONE.add(profitMargin))
                         .setScale(2, RoundingMode.HALF_UP);
@@ -159,7 +152,6 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findByIdAndPharmacyId(id, pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        // Soft delete
         if (product.getDeletedAt() != null) {
             log.warn("Product already deleted: id={}", id);
             return;
@@ -188,7 +180,6 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
-    // ✅ ✅ ✅ Helper Method للـ Mapping ✅ ✅ ✅
     private ProductResponse mapToResponse(Product product) {
         if (product == null) return null;
 

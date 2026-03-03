@@ -275,7 +275,6 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
         Integer currentStock = getCurrentStock(prediction.getProduct() != null ? prediction.getProduct().getId() : null);
         Integer recommendedOrder = Math.max(0, predictedQty - currentStock);
 
-        // ✅ FIXED: Return success response instead of throwing exception
         if (recommendedOrder <= 0) {
             return PurchaseOrderSummaryDTO.builder()
                     .purchaseOrderId(predictionId)
