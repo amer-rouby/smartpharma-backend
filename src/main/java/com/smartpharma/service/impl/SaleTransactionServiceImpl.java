@@ -9,6 +9,7 @@ import com.smartpharma.repository.*;
 import com.smartpharma.service.SaleTransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,7 +24,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
-
 
 @Service
 @RequiredArgsConstructor
@@ -48,7 +48,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                                                 String sortBy, String sortDirection) {
         log.debug("Fetching sales | pharmacyId: {} | page: {} | size: {} | sortBy: {} | sortDirection: {}",
                 pharmacyId, page, size, sortBy, sortDirection);
-
         Pageable pageable = createPageable(sortBy, sortDirection, page, size);
         return saleTransactionRepository.findByPharmacyId(pharmacyId, pageable)
                 .map(this::mapToDTO);
@@ -58,10 +57,8 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     @Transactional(readOnly = true)
     public SaleTransactionDTO getSaleById(Long id, Long pharmacyId) {
         log.debug("Fetching sale | id: {} | pharmacyId: {}", id, pharmacyId);
-
         SaleTransaction sale = saleTransactionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sale not found with id: " + id));
-
         validatePharmacyAccess(sale, pharmacyId);
         return mapToDTO(sale);
     }
@@ -87,7 +84,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .build();
 
         List<SaleItem> saleItems = new ArrayList<>();
-
         for (SaleItemRequest itemRequest : request.getItems()) {
             SaleItem saleItem = processSaleItem(itemRequest, sale);
             saleItems.add(saleItem);
@@ -99,7 +95,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         SaleTransaction savedSale = saleTransactionRepository.save(sale);
         log.info("Sale created successfully | id: {} | total: {} | items: {}",
                 savedSale.getId(), savedSale.getTotalAmount(), savedSale.getItems().size());
-
         return mapToDTO(savedSale);
     }
 
@@ -107,10 +102,8 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     @Transactional
     public SaleTransactionDTO updateSale(Long id, SaleRequest request, Long pharmacyId) {
         log.info("Updating sale | id: {} | pharmacyId: {}", id, pharmacyId);
-
         SaleTransaction entity = saleTransactionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sale not found: " + id));
-
         validatePharmacyAccess(entity, pharmacyId);
 
         Optional.ofNullable(request.getDiscountAmount()).ifPresent(entity::setDiscountAmount);
@@ -121,7 +114,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
         entity.calculateTotals();
         SaleTransaction updated = saleTransactionRepository.save(entity);
-
         log.info("Sale updated successfully | id: {} | total: {}", updated.getId(), updated.getTotalAmount());
         return mapToDTO(updated);
     }
@@ -130,15 +122,11 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     @Transactional
     public void deleteSale(Long id, Long pharmacyId) {
         log.info("Soft deleting sale | id: {} | pharmacyId: {}", id, pharmacyId);
-
         SaleTransaction sale = saleTransactionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sale not found: " + id));
-
         validatePharmacyAccess(sale, pharmacyId);
-
         sale.markAsDeleted();
         saleTransactionRepository.save(sale);
-
         log.info("Sale deleted successfully | id: {}", id);
     }
 
@@ -148,7 +136,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                                                  LocalDate endDate, String period) {
         log.info("Generating sales analytics | pharmacyId: {} | period: {} to {}",
                 pharmacyId, startDate, endDate);
-
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
@@ -190,7 +177,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     @Transactional(readOnly = true)
     public Map<String, Object> getSalesStats(Long pharmacyId) {
         log.debug("Fetching sales stats for pharmacyId: {}", pharmacyId);
-
         LocalDate today = LocalDate.now();
         LocalDateTime startDate = today.atStartOfDay();
         LocalDateTime endDate = today.atTime(LocalTime.MAX);
@@ -210,7 +196,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         stats.put("todayCount", todayCount);
         stats.put("totalProducts", totalProducts);
         stats.put("timestamp", LocalDateTime.now());
-
         return stats;
     }
 
@@ -232,7 +217,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     public Page<SaleTransactionDTO> getSalesByDateRange(Long pharmacyId, LocalDate startDate, LocalDate endDate) {
         log.info("Fetching sales by date range | pharmacyId: {} | {} to {}",
                 pharmacyId, startDate, endDate);
-
         return saleTransactionRepository.findByPharmacyIdAndDateRange(
                 pharmacyId,
                 startDate.atStartOfDay(),
@@ -245,11 +229,9 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     @Transactional(readOnly = true)
     public Page<SaleTransactionDTO> searchSales(Long pharmacyId, String query) {
         log.info("Searching sales | pharmacyId: {} | query: {}", pharmacyId, query);
-
         if (query == null || query.trim().isEmpty()) {
             return Page.empty();
         }
-
         return saleTransactionRepository.searchSales(pharmacyId, query.trim(), PageRequest.of(0, 20))
                 .map(this::mapToDTO);
     }
@@ -258,9 +240,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     @Transactional(readOnly = true)
     public List<SaleTransactionDTO> getRecentSales(Long pharmacyId, int limit) {
         log.debug("Fetching recent sales | pharmacyId: {} | limit: {}", pharmacyId, limit);
-
         int safeLimit = Math.max(1, Math.min(limit, 50));
-
         return saleTransactionRepository.findRecentSalesByPharmacyId(pharmacyId, PageRequest.of(0, safeLimit))
                 .stream()
                 .map(this::mapToDTO)
@@ -272,17 +252,35 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     public Map<String, Object> getSalesByCategory(Long pharmacyId, LocalDate startDate, LocalDate endDate) {
         log.info("Fetching sales by category | pharmacyId: {} | {} to {}",
                 pharmacyId, startDate, endDate);
-
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
         List<SaleItem> saleItems = saleItemRepository.findByPharmacyIdAndDateRange(
                 pharmacyId, startDateTime, endDateTime);
-
         Map<String, BigDecimal> salesByCategory = saleItems.stream()
-                .filter(item -> item.getProduct() != null && item.getProduct().getCategory() != null)
+                .filter(item -> {
+                    try {
+                        Product product = item.getProduct();
+                        if (product == null) return false;
+                        if (!Hibernate.isInitialized(product)) {
+                            Hibernate.initialize(product);
+                        }
+                        if (product.getDeletedAt() != null) return false;
+                        return product.getCategory() != null;
+                    } catch (Exception e) {
+                        log.warn("Skipping sale item {} due to product error: {}",
+                                item.getId(), e.getMessage());
+                        return false;
+                    }
+                })
                 .collect(Collectors.groupingBy(
-                        item -> item.getProduct().getCategory(),
+                        item -> {
+                            try {
+                                return item.getProduct().getCategory();
+                            } catch (Exception e) {
+                                return "أخرى";
+                            }
+                        },
                         Collectors.reducing(BigDecimal.ZERO, SaleItem::getTotalPrice, BigDecimal::add)
                 ));
 
@@ -290,7 +288,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         response.put("salesByCategory", salesByCategory);
         response.put("totalCategories", salesByCategory.size());
         response.put("dateRange", Map.of("start", startDate, "end", endDate));
-
         return response;
     }
 
@@ -298,10 +295,8 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getTopProducts(Long pharmacyId, int limit) {
         log.info("Fetching top products | pharmacyId: {} | limit: {}", pharmacyId, limit);
-
         int safeLimit = Math.max(1, Math.min(limit, 20));
         Pageable pageable = PageRequest.of(0, safeLimit);
-
         List<Object[]> topProducts = saleItemRepository.findTopSellingProducts(pharmacyId, pageable);
 
         return topProducts.stream()
@@ -316,10 +311,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .collect(Collectors.toList());
     }
 
-    // =========================================================================
-    // دوال مساعدة للـ Sorting
-    // =========================================================================
-
     private Pageable createPageable(String sortBy, String sortDirection, int page, int size) {
         Sort sort = createSort(sortBy, sortDirection);
         return PageRequest.of(page, size, sort);
@@ -329,12 +320,10 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection)
                 ? Sort.Direction.ASC
                 : Sort.Direction.DESC;
-
         List<String> allowedFields = Arrays.asList("transactionDate", "totalAmount", "invoiceNumber", "id");
         if (!allowedFields.contains(sortBy)) {
-            sortBy = "transactionDate"; // default
+            sortBy = "transactionDate";
         }
-
         return Sort.by(direction, sortBy);
     }
 
@@ -343,7 +332,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .orElseThrow(() -> new RuntimeException("Product not found: " + itemRequest.getProductId()));
 
         StockBatch selectedBatch = selectStockBatch(product.getId(), itemRequest.getQuantity());
-
         if (selectedBatch == null) {
             throw new RuntimeException("Insufficient stock for product: " + product.getName());
         }
@@ -358,17 +346,14 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
         saleItem.calculateTotalPrice();
         deductStock(selectedBatch, itemRequest.getQuantity());
-
         return saleItem;
     }
 
     private StockBatch selectStockBatch(Long productId, Integer requestedQuantity) {
         List<StockBatch> activeBatches = stockBatchRepository.findByProductIdAndStatusActive(productId);
-
         if (activeBatches == null || activeBatches.isEmpty()) {
             return null;
         }
-
         activeBatches.sort(Comparator.comparing(StockBatch::getExpiryDate));
 
         Integer remainingQuantity = requestedQuantity;
@@ -376,7 +361,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
         for (StockBatch batch : activeBatches) {
             Integer available = Optional.ofNullable(batch.getQuantityCurrent()).orElse(0);
-
             if (available >= remainingQuantity) {
                 selectedBatch = batch;
                 break;
@@ -387,7 +371,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 }
             }
         }
-
         return selectedBatch;
     }
 
@@ -395,12 +378,10 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         if (batch == null || batch.getQuantityCurrent() == null) {
             return;
         }
-
         Integer newQuantity = batch.getQuantityCurrent() - quantity;
         if (newQuantity < 0) {
             throw new RuntimeException("Stock deduction error: insufficient quantity");
         }
-
         batch.setQuantityCurrent(newQuantity);
         stockBatchRepository.save(batch);
         log.debug("Stock deducted | batch: {} | quantity: {} | remaining: {}",
@@ -436,7 +417,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         response.put("totalAmount", total);
         response.put("count", count);
         response.put("date", date);
-
         return response;
     }
 
@@ -461,7 +441,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                                                                 LocalDateTime start,
                                                                 LocalDateTime end) {
         List<Object[]> data = saleTransactionRepository.getRevenueByPaymentMethod(pharmacyId, start, end);
-
         return data.stream()
                 .collect(Collectors.toMap(
                         obj -> ((SaleTransaction.PaymentMethod) obj[0]).name(),
@@ -473,7 +452,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
     private Map<String, Long> fetchDailyOrders(Long pharmacyId, LocalDateTime start, LocalDateTime end) {
         List<Object[]> data = saleTransactionRepository.getDailySales(pharmacyId, start, end);
-
         return data.stream()
                 .collect(Collectors.toMap(
                         obj -> {
@@ -496,13 +474,8 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         return 0L;
     }
 
-    // =========================================================================
-    // دوال تحويل DTO
-    // =========================================================================
-
     private SaleTransactionDTO mapToDTO(SaleTransaction sale) {
         if (sale == null) return null;
-
         return SaleTransactionDTO.builder()
                 .id(sale.getId())
                 .invoiceNumber(sale.getInvoiceNumber())
@@ -517,25 +490,63 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .pharmacyName(sale.getPharmacy().getName())
                 .items(Optional.ofNullable(sale.getItems()).orElse(Collections.emptyList()).stream()
                         .map(this::mapItemToDTO)
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toList()))
                 .build();
     }
 
     private SaleTransactionDTO.SaleItemDTO mapItemToDTO(SaleItem item) {
-        if (item == null) return null;
+        try {
+            if (item == null) return null;
 
-        Product product = item.getProduct();
+            String productName = "منتج غير متاح";
+            String productBarcode = null;
+            Long productId = null;
+            String productCategory = null;
 
-        return SaleTransactionDTO.SaleItemDTO.builder()
-                .id(item.getId())
-                .productId(product != null ? product.getId() : null)
-                .productName(product != null ? product.getName() : null)
-                .barcode(product != null ? product.getBarcode() : null)
-                .quantity(item.getQuantity())
-                .unitPrice(item.getUnitPrice())
-                .totalPrice(item.getTotalPrice())
-                .batchNumber(item.getBatch() != null ? item.getBatch().getBatchNumber() : null)
-                .expiryDate(item.getBatch() != null ? item.getBatch().getExpiryDate() : null)
-                .build();
+            try {
+                Product product = item.getProduct();
+                if (product != null) {
+                    if (!Hibernate.isInitialized(product)) {
+                        try {
+                            Hibernate.initialize(product);
+                        } catch (Exception e) {
+                            log.warn("Could not initialize product for sale item {}: {}",
+                                    item.getId(), e.getMessage());
+                        }
+                    }
+
+                    if (product.getDeletedAt() == null) {
+                        productId = product.getId();
+                        productName = product.getName() != null ?
+                                product.getName() : "منتج غير متاح";
+                        productBarcode = product.getBarcode();
+                        productCategory = product.getCategory();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Error loading product for sale item {}: {}", item.getId(), e.getMessage());
+            }
+
+            return SaleTransactionDTO.SaleItemDTO.builder()
+                    .id(item.getId())
+                    .productId(productId)
+                    .productName(productName)
+                    .category(productCategory)
+                    .barcode(productBarcode)
+                    .quantity(item.getQuantity())
+                    .unitPrice(item.getUnitPrice())
+                    .totalPrice(item.getTotalPrice())
+                    .batchNumber(item.getBatch() != null ? item.getBatch().getBatchNumber() : null)
+                    .expiryDate(item.getBatch() != null ? item.getBatch().getExpiryDate() : null)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Failed to map sale item {} to DTO", item != null ? item.getId() : "unknown", e);
+            return SaleTransactionDTO.SaleItemDTO.builder()
+                    .id(item != null ? item.getId() : null)
+                    .productName("خطأ في تحميل البيانات")
+                    .build();
+        }
     }
 }

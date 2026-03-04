@@ -45,8 +45,7 @@ public class SaleTransactionDTO {
         private Integer quantity;
         private BigDecimal unitPrice;
         private BigDecimal totalPrice;
-        // You can keep notes here too if individual items have notes,
-        // but the error was caused by it missing from the outer class.
+        private String category;
         private String batchNumber;
         private java.time.LocalDate expiryDate;
     }

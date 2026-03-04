@@ -13,9 +13,11 @@ import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.ProductRepository;
 import com.smartpharma.repository.StockAdjustmentHistoryRepository;
 import com.smartpharma.repository.StockBatchRepository;
+import com.smartpharma.repository.UserRepository;
 import com.smartpharma.service.StockBatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +38,7 @@ public class StockBatchServiceImpl implements StockBatchService {
     private final StockBatchRepository stockBatchRepository;
     private final ProductRepository productRepository;
     private final PharmacyRepository pharmacyRepository;
+    private final UserRepository userRepository;
     private final StockAdjustmentHistoryRepository stockAdjustmentHistoryRepository;
 
     @Override
@@ -53,6 +56,10 @@ public class StockBatchServiceImpl implements StockBatchService {
         log.debug("Fetching batch {} for pharmacy: {}", id, pharmacyId);
         StockBatch batch = stockBatchRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Batch not found with id: " + id));
+
+        if (!Hibernate.isInitialized(batch.getPharmacy())) {
+            Hibernate.initialize(batch.getPharmacy());
+        }
         if (!batch.getPharmacy().getId().equals(pharmacyId)) {
             throw new RuntimeException("Access denied: Batch does not belong to this pharmacy");
         }
@@ -95,6 +102,15 @@ public class StockBatchServiceImpl implements StockBatchService {
             }
         }
 
+        User userRef = null;
+        if (userId != null) {
+            try {
+                userRef = userRepository.getReferenceById(userId);
+            } catch (Exception e) {
+                log.warn("Could not load user reference for userId: {}", userId);
+            }
+        }
+
         StockBatch batch = StockBatch.builder()
                 .product(product)
                 .pharmacy(pharmacy)
@@ -109,7 +125,7 @@ public class StockBatchServiceImpl implements StockBatchService {
                 .shelf(request.getShelf())
                 .warehouse(request.getWarehouse())
                 .notes(request.getNotes())
-                .createdBy(User.builder().id(userId).build())
+                .createdBy(userRef)
                 .status(StockBatch.BatchStatus.ACTIVE)
                 .build();
 
@@ -161,6 +177,7 @@ public class StockBatchServiceImpl implements StockBatchService {
         log.info("Batch updated successfully: id={}, status={}", updated.getId(), updated.getStatus());
         return mapToResponse(updated);
     }
+
     @Override
     @Transactional
     public void deleteBatch(Long id, Long pharmacyId, Long userId) {
@@ -212,7 +229,7 @@ public class StockBatchServiceImpl implements StockBatchService {
                 batchId, request.getType(), request.getQuantity(), userId);
 
         if (userId == null) {
-            log.warn("User ID is null for batch adjustment: {}. Proceeding without user tracking.", batchId);
+            throw new RuntimeException("Unauthorized: User ID is required for stock adjustment");
         }
 
         StockBatch batch = stockBatchRepository.findById(batchId)
@@ -292,45 +309,109 @@ public class StockBatchServiceImpl implements StockBatchService {
     }
 
     private StockBatchResponse mapToResponse(StockBatch batch) {
-        return StockBatchResponse.builder()
-                .id(batch.getId())
-                .productId(batch.getProduct().getId())
-                .productName(batch.getProduct().getName())
-                .pharmacyId(batch.getPharmacy().getId())
-                .batchNumber(batch.getBatchNumber())
-                .quantityCurrent(batch.getQuantityCurrent())
-                .quantityInitial(batch.getQuantityInitial())
-                .expiryDate(batch.getExpiryDate())
-                .productionDate(batch.getProductionDate())
-                .buyPrice(batch.getBuyPrice())
-                .sellPrice(batch.getSellPrice())
-                .location(batch.getLocation())
-                .shelf(batch.getShelf())
-                .warehouse(batch.getWarehouse())
-                .notes(batch.getNotes())
-                .status(batch.getStatus().name())
-                .isExpired(batch.isExpired())
-                .isExpiringSoon(batch.isExpiringSoon(30))
-                .createdAt(batch.getCreatedAt())
-                .updatedAt(batch.getUpdatedAt())
-                .build();
+        try {
+            if (batch == null) {
+                return null;
+            }
+
+            String productName = "منتج غير متاح";
+            String productBarcode = null;
+            Long productId = null;
+
+            try {
+                if (batch.getProduct() != null) {
+                    if (!Hibernate.isInitialized(batch.getProduct())) {
+                        try {
+                            Hibernate.initialize(batch.getProduct());
+                        } catch (Exception e) {
+                            log.warn("Could not initialize product for batch {}: {}",
+                                    batch.getId(), e.getMessage());
+                        }
+                    }
+
+                    if (batch.getProduct().getDeletedAt() == null) {
+                        productId = batch.getProduct().getId();
+                        productName = batch.getProduct().getName() != null ?
+                                batch.getProduct().getName() : "منتج غير متاح";
+                        productBarcode = batch.getProduct().getBarcode();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Error loading product for batch {}: {}", batch.getId(), e.getMessage());
+            }
+
+            return StockBatchResponse.builder()
+                    .id(batch.getId())
+                    .productId(productId)
+                    .productName(productName)
+                    .productBarcode(productBarcode)
+                    .pharmacyId(batch.getPharmacy().getId())
+                    .batchNumber(batch.getBatchNumber())
+                    .quantityCurrent(batch.getQuantityCurrent())
+                    .quantityInitial(batch.getQuantityInitial())
+                    .expiryDate(batch.getExpiryDate())
+                    .productionDate(batch.getProductionDate())
+                    .buyPrice(batch.getBuyPrice())
+                    .sellPrice(batch.getSellPrice())
+                    .location(batch.getLocation())
+                    .shelf(batch.getShelf())
+                    .warehouse(batch.getWarehouse())
+                    .status(batch.getStatus() != null ? batch.getStatus().name() : null)
+                    .notes(batch.getNotes())
+                    .createdAt(batch.getCreatedAt())
+                    .updatedAt(batch.getUpdatedAt())
+                    .isExpired(batch.isExpired())
+                    .isExpiringSoon(batch.isExpiringSoon(30))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Failed to map batch {} to response: {}",
+                    batch != null ? batch.getId() : "unknown", e.getMessage());
+            return StockBatchResponse.builder()
+                    .id(batch != null ? batch.getId() : null)
+                    .productName("خطأ في تحميل البيانات")
+                    .build();
+        }
     }
 
     private StockAdjustmentHistoryDTO mapHistoryToDTO(StockAdjustmentHistory history) {
-        return StockAdjustmentHistoryDTO.builder()
-                .id(history.getId())
-                .batchId(history.getBatch().getId())
-                .batchNumber(history.getBatch().getBatchNumber())
-                .productName(history.getBatch().getProduct().getName())
-                .type(history.getType())
-                .quantity(history.getQuantity())
-                .reason(history.getReason())
-                .previousQuantity(history.getPreviousQuantity())
-                .newQuantity(history.getNewQuantity())
-                .notes(history.getNotes())
-                .adjustmentDate(history.getAdjustmentDate())
-                .adjustedBy(history.getAdjustedBy())
-                .adjustedByName(history.getAdjustedByName())
-                .build();
+        try {
+            String productName = "منتج غير متاح";
+            try {
+                if (history.getBatch() != null && history.getBatch().getProduct() != null) {
+                    if (!Hibernate.isInitialized(history.getBatch().getProduct())) {
+                        Hibernate.initialize(history.getBatch().getProduct());
+                    }
+                    if (history.getBatch().getProduct().getDeletedAt() == null) {
+                        productName = history.getBatch().getProduct().getName() != null ?
+                                history.getBatch().getProduct().getName() : "منتج غير متاح";
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Could not load product for history {}: {}", history.getId(), e.getMessage());
+            }
+
+            return StockAdjustmentHistoryDTO.builder()
+                    .id(history.getId())
+                    .batchId(history.getBatch() != null ? history.getBatch().getId() : null)
+                    .batchNumber(history.getBatch() != null ? history.getBatch().getBatchNumber() : null)
+                    .productName(productName)
+                    .type(history.getType())
+                    .quantity(history.getQuantity())
+                    .reason(history.getReason())
+                    .previousQuantity(history.getPreviousQuantity())
+                    .newQuantity(history.getNewQuantity())
+                    .notes(history.getNotes())
+                    .adjustmentDate(history.getAdjustmentDate())
+                    .adjustedBy(history.getAdjustedBy())
+                    .adjustedByName(history.getAdjustedByName())
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to map history {} to DTO", history != null ? history.getId() : "unknown", e);
+            return StockAdjustmentHistoryDTO.builder()
+                    .id(history != null ? history.getId() : null)
+                    .productName("خطأ في تحميل البيانات")
+                    .build();
+        }
     }
 }
