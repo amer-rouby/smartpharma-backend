@@ -1,4 +1,5 @@
 package com.smartpharma.service.impl;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartpharma.dto.response.AlertStatsResponse;
 import com.smartpharma.dto.response.StockAlertResponse;
@@ -14,11 +15,13 @@ import com.smartpharma.repository.StockBatchRepository;
 import com.smartpharma.service.StockAlertService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -30,6 +33,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class StockAlertServiceImpl implements StockAlertService {
+
     private final StockAlertRepository alertRepository;
     private final StockBatchRepository batchRepository;
     private final ProductRepository productRepository;
@@ -142,10 +146,27 @@ public class StockAlertServiceImpl implements StockAlertService {
                                           StockAlert.AlertType type, String title, String message, String severity) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
-        Product product = productId != null ? productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found")) : null;
-        StockBatch batch = batchId != null ? batchRepository.findById(batchId)
-                .orElseThrow(() -> new RuntimeException("Batch not found")) : null;
+
+        Product product = null;
+        if (productId != null) {
+            try {
+                product = productRepository.findById(productId).orElse(null);
+                if (product != null && product.getDeletedAt() != null) {
+                    product = null;
+                }
+            } catch (Exception e) {
+                log.warn("Could not load product {}: {}", productId, e.getMessage());
+            }
+        }
+
+        StockBatch batch = null;
+        if (batchId != null) {
+            try {
+                batch = batchRepository.findById(batchId).orElse(null);
+            } catch (Exception e) {
+                log.warn("Could not load batch {}: {}", batchId, e.getMessage());
+            }
+        }
 
         boolean exists = alertRepository.findByPharmacyIdAndStatus(pharmacyId, "UNREAD", PageRequest.of(0, 100))
                 .stream()
@@ -201,8 +222,12 @@ public class StockAlertServiceImpl implements StockAlertService {
         int createdCount = 0;
 
         for (Product product : products) {
+            if (product.getDeletedAt() != null) {
+                continue;
+            }
+
             Long totalStock = batchRepository.sumQuantityByProductId(product.getId());
-            if (totalStock <= product.getMinStockLevel()) {
+            if (totalStock != null && totalStock <= product.getMinStockLevel()) {
                 String title = totalStock == 0 ? "نفاد المخزون" : "مخزون منخفض";
                 String message = String.format("المنتج '%s' - المخزون الحالي: %d (الحد الأدنى: %d)",
                         product.getName(), totalStock, product.getMinStockLevel());
@@ -225,34 +250,62 @@ public class StockAlertServiceImpl implements StockAlertService {
         LocalDate thirtyDaysLater = today.plusDays(30);
         int expiredCount = 0, expiringCount = 0;
 
-        // Expired batches
         List<StockBatch> expiredBatches = batchRepository.findExpiredBatches(pharmacyId, today);
         for (StockBatch batch : expiredBatches) {
             if (batch.getStatus() != com.smartpharma.entity.StockBatch.BatchStatus.DISCARDED) {
-                long daysSinceExpiry = java.time.temporal.ChronoUnit.DAYS.between(batch.getExpiryDate(), today);
-                String title = "منتج منتهي الصلاحية";
-                String message = String.format("المنتج '%s' (دفعة %s) منتهي الصلاحية منذ %d يوم",
-                        batch.getProduct().getName(), batch.getBatchNumber(), daysSinceExpiry);
+                try {
+                    Product product = batch.getProduct();
+                    if (product == null) continue;
 
-                StockAlertResponse alert = createAlert(pharmacyId, batch.getProduct().getId(), batch.getId(),
-                        StockAlert.AlertType.EXPIRED, title, message, "CRITICAL");
-                if (alert != null) expiredCount++;
+                    if (!Hibernate.isInitialized(product)) {
+                        Hibernate.initialize(product);
+                    }
+
+                    if (product.getDeletedAt() != null) {
+                        continue;
+                    }
+
+                    long daysSinceExpiry = java.time.temporal.ChronoUnit.DAYS.between(batch.getExpiryDate(), today);
+                    String title = "منتج منتهي الصلاحية";
+                    String message = String.format("المنتج '%s' (دفعة %s) منتهي الصلاحية منذ %d يوم",
+                            product.getName(), batch.getBatchNumber(), daysSinceExpiry);
+
+                    StockAlertResponse alert = createAlert(pharmacyId, product.getId(), batch.getId(),
+                            StockAlert.AlertType.EXPIRED, title, message, "CRITICAL");
+                    if (alert != null) expiredCount++;
+                } catch (Exception e) {
+                    log.warn("Skipping expired batch {} due to error: {}", batch.getId(), e.getMessage());
+                }
             }
         }
 
-        // Expiring soon batches
         List<StockBatch> expiringBatches = batchRepository.findExpiringBatches(pharmacyId, thirtyDaysLater);
         for (StockBatch batch : expiringBatches) {
             if (batch.getStatus() == com.smartpharma.entity.StockBatch.BatchStatus.ACTIVE) {
-                long daysUntilExpiry = java.time.temporal.ChronoUnit.DAYS.between(today, batch.getExpiryDate());
-                String title = "ينتهي قريباً";
-                String message = String.format("المنتج '%s' (دفعة %s) ينتهي خلال %d يوم",
-                        batch.getProduct().getName(), batch.getBatchNumber(), daysUntilExpiry);
-                String severity = daysUntilExpiry <= 7 ? "HIGH" : "MEDIUM";
+                try {
+                    Product product = batch.getProduct();
+                    if (product == null) continue;
 
-                StockAlertResponse alert = createAlert(pharmacyId, batch.getProduct().getId(), batch.getId(),
-                        StockAlert.AlertType.EXPIRING_SOON, title, message, severity);
-                if (alert != null) expiringCount++;
+                    if (!Hibernate.isInitialized(product)) {
+                        Hibernate.initialize(product);
+                    }
+
+                    if (product.getDeletedAt() != null) {
+                        continue;
+                    }
+
+                    long daysUntilExpiry = java.time.temporal.ChronoUnit.DAYS.between(today, batch.getExpiryDate());
+                    String title = "ينتهي قريباً";
+                    String message = String.format("المنتج '%s' (دفعة %s) ينتهي خلال %d يوم",
+                            product.getName(), batch.getBatchNumber(), daysUntilExpiry);
+                    String severity = daysUntilExpiry <= 7 ? "HIGH" : "MEDIUM";
+
+                    StockAlertResponse alert = createAlert(pharmacyId, product.getId(), batch.getId(),
+                            StockAlert.AlertType.EXPIRING_SOON, title, message, severity);
+                    if (alert != null) expiringCount++;
+                } catch (Exception e) {
+                    log.warn("Skipping expiring batch {} due to error: {}", batch.getId(), e.getMessage());
+                }
             }
         }
         log.info("Created {} expired alerts, {} expiring soon alerts", expiredCount, expiringCount);

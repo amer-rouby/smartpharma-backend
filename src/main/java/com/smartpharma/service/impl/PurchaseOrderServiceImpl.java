@@ -2,10 +2,12 @@ package com.smartpharma.service.impl;
 
 import com.smartpharma.dto.request.PurchaseOrderItemRequest;
 import com.smartpharma.dto.request.PurchaseOrderRequest;
+import com.smartpharma.dto.request.StockMovementRequest;
 import com.smartpharma.dto.response.PurchaseOrderResponse;
 import com.smartpharma.entity.*;
 import com.smartpharma.repository.*;
 import com.smartpharma.service.PurchaseOrderService;
+import com.smartpharma.service.StockMovementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -14,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -24,7 +25,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class PurchaseOrderServiceImpl implements PurchaseOrderService {
-
     private final PurchaseOrderRepository orderRepository;
     private final PurchaseOrderItemRepository itemRepository;
     private final SupplierRepository supplierRepository;
@@ -32,10 +32,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final PharmacyRepository pharmacyRepository;
     private final UserRepository userRepository;
     private final StockBatchRepository stockBatchRepository;
+    private final StockMovementService stockMovementService;
 
     @Override
     @Transactional(readOnly = true)
     public Page<PurchaseOrderResponse> getAllOrders(Long pharmacyId, int page, int size) {
+        log.info("Fetching purchase orders for pharmacy: {}, page: {}, size: {}", pharmacyId, page, size);
         return orderRepository.findByPharmacyId(pharmacyId, PageRequest.of(page, size))
                 .map(PurchaseOrderResponse::fromEntity);
     }
@@ -268,7 +270,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
                     BigDecimal profitMargin = BigDecimal.valueOf(0.25);
                     BigDecimal newSellPrice = newBuyPrice.multiply(BigDecimal.ONE.add(profitMargin))
-                            .setScale(2, RoundingMode.HALF_UP);
+                            .setScale(2, BigDecimal.ROUND_HALF_UP);
 
                     if (product.getSellPrice() == null || product.getSellPrice().compareTo(newSellPrice) != 0) {
                         product.setSellPrice(newSellPrice);
@@ -278,6 +280,24 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
                     log.info("Product prices updated | productId: {} | productName: {} | oldBuyPrice: {} | newBuyPrice: {} | newSellPrice: {}",
                             product.getId(), product.getName(), oldBuyPrice, newBuyPrice, newSellPrice);
+                }
+
+                // ✅ تسجيل حركة مخزن STOCK_IN
+                try {
+                    StockMovementRequest movementRequest = StockMovementRequest.builder()
+                            .batchId(batch.getId())
+                            .movementType(StockMovement.MovementType.STOCK_IN)
+                            .quantity(item.getQuantity())
+                            .unitPrice(newBuyPrice)
+                            .referenceNumber(order.getOrderNumber())
+                            .reason("استلام طلب شراء: " + order.getOrderNumber())
+                            .build();
+
+                    stockMovementService.createMovement(movementRequest, userId);
+                    log.info("Stock movement created for received order: batchId={}, quantity={}",
+                            batch.getId(), item.getQuantity());
+                } catch (Exception e) {
+                    log.error("Failed to create stock movement for received order: {}", e.getMessage());
                 }
             }
         }
