@@ -104,6 +104,7 @@ public class StockBatch {
     public enum BatchStatus {
         ACTIVE,
         EXPIRED,
-        DISCARDED
+        DISCARDED,
+        LOW
     }
 }

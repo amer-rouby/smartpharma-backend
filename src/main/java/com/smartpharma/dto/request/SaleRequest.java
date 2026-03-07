@@ -20,7 +20,7 @@ public class SaleRequest {
 
     @NotEmpty(message = "At least one item is required")
     private List<SaleItemRequest> items;
-
+    private String notes;
     private String customerPhone;
 
     private String paymentMethod = "CASH";

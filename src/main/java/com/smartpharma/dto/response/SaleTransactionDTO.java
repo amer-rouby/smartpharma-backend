@@ -23,6 +23,9 @@ public class SaleTransactionDTO {
     private String paymentMethod;
     private String customerPhone;
 
+    // ADD THIS LINE HERE
+    private String notes;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime transactionDate;
 
@@ -42,5 +45,8 @@ public class SaleTransactionDTO {
         private Integer quantity;
         private BigDecimal unitPrice;
         private BigDecimal totalPrice;
+        private String category;
+        private String batchNumber;
+        private java.time.LocalDate expiryDate;
     }
 }

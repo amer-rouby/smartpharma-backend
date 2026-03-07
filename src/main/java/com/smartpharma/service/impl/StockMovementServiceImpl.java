@@ -8,6 +8,7 @@ import com.smartpharma.entity.StockMovement;
 import com.smartpharma.entity.User;
 import com.smartpharma.repository.StockBatchRepository;
 import com.smartpharma.repository.StockMovementRepository;
+import com.smartpharma.repository.UserRepository;
 import com.smartpharma.service.StockMovementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     private final StockMovementRepository movementRepository;
     private final StockBatchRepository batchRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -37,7 +39,6 @@ public class StockMovementServiceImpl implements StockMovementService {
         int quantityBefore = batch.getQuantityCurrent();
         int quantityAfter;
 
-        // Calculate quantity after based on movement type
         switch (request.getMovementType()) {
             case STOCK_IN, TRANSFER_IN -> quantityAfter = quantityBefore + request.getQuantity();
             case STOCK_OUT, TRANSFER_OUT, EXPIRED, DISCARDED -> {
@@ -47,18 +48,25 @@ public class StockMovementServiceImpl implements StockMovementService {
                 quantityAfter = quantityBefore - request.getQuantity();
             }
             case STOCK_ADJUSTMENT -> quantityAfter = request.getQuantity();
-            default -> throw new IllegalArgumentException("Invalid movement type");
+            default -> throw new IllegalArgumentException("Invalid movement type: " + request.getMovementType());
         }
 
-        // Update batch quantity
         batch.setQuantityCurrent(quantityAfter);
         batchRepository.save(batch);
 
-        // Calculate total value
         BigDecimal totalValue = request.getUnitPrice() != null ?
                 request.getUnitPrice().multiply(BigDecimal.valueOf(request.getQuantity())) : null;
 
-        // Create movement
+        // ✅ ✅ ✅ الحل: التعامل مع userId == null ✅ ✅ ✅
+        User userRef = null;
+        if (userId != null) {
+            try {
+                userRef = userRepository.getReferenceById(userId);
+            } catch (Exception e) {
+                log.warn("Could not load user reference for userId: {}. Proceeding without user association.", userId);
+            }
+        }
+
         StockMovement movement = StockMovement.builder()
                 .batch(batch)
                 .movementType(request.getMovementType())
@@ -70,13 +78,13 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .referenceNumber(request.getReferenceNumber())
                 .reason(request.getReason())
                 .notes(request.getNotes())
-                .user(User.builder().id(userId).build())
+                .user(userRef)
                 .pharmacyId(batch.getPharmacy().getId())
                 .build();
 
         movementRepository.save(movement);
-        log.info("Stock movement created: type={}, batch={}, qty={} -> {}",
-                request.getMovementType(), batch.getId(), quantityBefore, quantityAfter);
+        log.info("Stock movement created: type={}, batch={}, qty={} -> {}, user={}",
+                request.getMovementType(), batch.getId(), quantityBefore, quantityAfter, userId);
 
         return StockMovementResponse.fromEntity(movement);
     }
@@ -108,26 +116,38 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Override
     @Transactional(readOnly = true)
     public StockMovementStats getMovementStats(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate) {
-        Long totalMovements = movementRepository.countMovementsByTypeAndDateRange(pharmacyId, StockMovement.MovementType.STOCK_IN, startDate, endDate);
+        log.info("Calculating stats for pharmacy: {} from {} to {}", pharmacyId, startDate, endDate);
+
+        Long totalMovements = 0L;
+        totalMovements += movementRepository.countMovementsByTypeAndDateRange(pharmacyId, StockMovement.MovementType.STOCK_IN, startDate, endDate);
         totalMovements += movementRepository.countMovementsByTypeAndDateRange(pharmacyId, StockMovement.MovementType.STOCK_OUT, startDate, endDate);
         totalMovements += movementRepository.countMovementsByTypeAndDateRange(pharmacyId, StockMovement.MovementType.STOCK_ADJUSTMENT, startDate, endDate);
+        totalMovements += movementRepository.countMovementsByTypeAndDateRange(pharmacyId, StockMovement.MovementType.TRANSFER_IN, startDate, endDate);
+        totalMovements += movementRepository.countMovementsByTypeAndDateRange(pharmacyId, StockMovement.MovementType.TRANSFER_OUT, startDate, endDate);
+        totalMovements += movementRepository.countMovementsByTypeAndDateRange(pharmacyId, StockMovement.MovementType.EXPIRED, startDate, endDate);
+        totalMovements += movementRepository.countMovementsByTypeAndDateRange(pharmacyId, StockMovement.MovementType.DISCARDED, startDate, endDate);
 
         Integer totalStockIn = movementRepository.sumStockInByDateRange(pharmacyId, startDate, endDate);
         Integer totalStockOut = movementRepository.sumStockOutByDateRange(pharmacyId, startDate, endDate);
-        Integer totalAdjustments = movementRepository.sumStockOutByDateRange(pharmacyId, startDate, endDate).intValue(); // Simplified
-        Integer totalExpired = movementRepository.sumStockOutByDateRange(pharmacyId, startDate, endDate).intValue(); // Simplified
-        Integer totalTransferred = 0; // Would need separate queries
 
-        return StockMovementStats.builder()
+        Integer totalAdjustments = movementRepository.sumByTypeAndDateRange(pharmacyId, StockMovement.MovementType.STOCK_ADJUSTMENT, startDate, endDate);
+        Integer totalExpired = movementRepository.sumByTypeAndDateRange(pharmacyId, StockMovement.MovementType.EXPIRED, startDate, endDate);
+        Integer totalTransferred = movementRepository.sumByTypeAndDateRange(pharmacyId, StockMovement.MovementType.TRANSFER_IN, startDate, endDate);
+
+        StockMovementStats stats = StockMovementStats.builder()
                 .totalMovements(totalMovements)
-                .totalStockIn(totalStockIn)
-                .totalStockOut(totalStockOut)
-                .totalAdjustments(totalAdjustments)
-                .totalExpired(totalExpired)
-                .totalTransferred(totalTransferred)
+                .totalStockIn(totalStockIn != null ? totalStockIn : 0)
+                .totalStockOut(totalStockOut != null ? totalStockOut : 0)
+                .totalAdjustments(totalAdjustments != null ? totalAdjustments : 0)
+                .totalExpired(totalExpired != null ? totalExpired : 0)
+                .totalTransferred(totalTransferred != null ? totalTransferred : 0)
                 .build();
-    }
 
+        log.info("Stats calculated: totalMovements={}, totalStockIn={}, totalStockOut={}",
+                stats.getTotalMovements(), stats.getTotalStockIn(), stats.getTotalStockOut());
+
+        return stats;
+    }
     @Override
     @Transactional
     public void createStockInMovement(Long batchId, Integer quantity, BigDecimal unitPrice, String reference, Long userId) {

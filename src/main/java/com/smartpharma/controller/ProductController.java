@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -140,5 +142,26 @@ public class ProductController {
         return ResponseEntity.ok(
                 ApiResponse.success(products, "Low stock products retrieved")
         );
+    }
+
+    @PostMapping("/calculate-sell-price")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> calculateSellPrice(
+            @RequestParam BigDecimal buyPrice,
+            @RequestParam(defaultValue = "25") int profitMarginPercent) {
+
+        log.info("Calculating sell price: buyPrice={}, margin={}%", buyPrice, profitMarginPercent);
+
+        BigDecimal profitMargin = BigDecimal.valueOf(profitMarginPercent).divide(BigDecimal.valueOf(100));
+        BigDecimal sellPrice = buyPrice.multiply(BigDecimal.ONE.add(profitMargin))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("buyPrice", buyPrice);
+        response.put("profitMarginPercent", profitMarginPercent);
+        response.put("sellPrice", sellPrice);
+        response.put("profitAmount", sellPrice.subtract(buyPrice));
+
+        return ResponseEntity.ok(ApiResponse.success(response, "Sell price calculated successfully"));
     }
 }

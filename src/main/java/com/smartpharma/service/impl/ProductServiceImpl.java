@@ -14,7 +14,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -77,8 +80,12 @@ public class ProductServiceImpl implements ProductService {
                 .build();
 
         productRepository.save(product);
-
+        log.info("Product created: id={}, name={}", product.getId(), product.getName());
         if (request.getInitialStock() != null && request.getInitialStock() > 0) {
+            BigDecimal effectiveBuyPrice = request.getBuyPrice() != null
+                    ? request.getBuyPrice()
+                    : request.getSellPrice();
+
             StockBatch batch = StockBatch.builder()
                     .product(product)
                     .pharmacy(pharmacy)
@@ -86,12 +93,14 @@ public class ProductServiceImpl implements ProductService {
                     .quantityInitial(request.getInitialStock())
                     .quantityCurrent(request.getInitialStock())
                     .expiryDate(LocalDate.now().plusMonths(24))
-                    .buyPrice(request.getBuyPrice() != null ? request.getBuyPrice() : request.getSellPrice())
+                    .buyPrice(effectiveBuyPrice)
                     .sellPrice(request.getSellPrice())
                     .location("Shelf-1")
                     .status(StockBatch.BatchStatus.ACTIVE)
                     .build();
             stockBatchRepository.save(batch);
+            log.info("Initial stock batch created: productId={}, quantity={}, buyPrice={}",
+                    product.getId(), request.getInitialStock(), effectiveBuyPrice);
         }
 
         return mapToResponse(product);
@@ -102,7 +111,6 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse updateProduct(Long id, ProductRequest request, Long pharmacyId) {
         Product product = productRepository.findByIdAndPharmacyId(id, pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
-
         product.setName(request.getName());
         product.setScientificName(request.getScientificName());
         product.setBarcode(request.getBarcode());
@@ -110,12 +118,32 @@ public class ProductServiceImpl implements ProductService {
         product.setUnitType(request.getUnitType());
         product.setMinStockLevel(request.getMinStockLevel());
         product.setPrescriptionRequired(request.getPrescriptionRequired());
-        product.setSellPrice(request.getSellPrice());
-        product.setBuyPrice(request.getBuyPrice());
+
+        if (request.getBuyPrice() != null) {
+            product.setBuyPrice(request.getBuyPrice());
+
+            if (request.getSellPrice() == null) {
+                BigDecimal profitMargin = BigDecimal.valueOf(0.25);
+                BigDecimal autoSellPrice = request.getBuyPrice()
+                        .multiply(BigDecimal.ONE.add(profitMargin))
+                        .setScale(2, RoundingMode.HALF_UP);
+                product.setSellPrice(autoSellPrice);
+                log.info("Auto-calculated sell price: buyPrice={}, sellPrice={}, margin=25%",
+                        request.getBuyPrice(), autoSellPrice);
+            } else {
+                product.setSellPrice(request.getSellPrice());
+            }
+        } else if (request.getSellPrice() != null) {
+            product.setSellPrice(request.getSellPrice());
+        }
+
         product.setExtraAttributes(request.getExtraAttributes());
 
-        productRepository.save(product);
-        return mapToResponse(product);
+        Product updated = productRepository.save(product);
+        log.info("Product updated: id={}, name={}, buyPrice={}, sellPrice={}",
+                updated.getId(), updated.getName(), updated.getBuyPrice(), updated.getSellPrice());
+
+        return mapToResponse(updated);
     }
 
     @Override
@@ -123,8 +151,15 @@ public class ProductServiceImpl implements ProductService {
     public void deleteProduct(Long id, Long pharmacyId) {
         Product product = productRepository.findByIdAndPharmacyId(id, pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
-        product.setDeletedAt(java.time.LocalDateTime.now());
+
+        if (product.getDeletedAt() != null) {
+            log.warn("Product already deleted: id={}", id);
+            return;
+        }
+
+        product.setDeletedAt(LocalDateTime.now());
         productRepository.save(product);
+        log.info("Product soft deleted: id={}", id);
     }
 
     @Override
@@ -146,9 +181,11 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse mapToResponse(Product product) {
+        if (product == null) return null;
+
         return ProductResponse.builder()
                 .id(product.getId())
-                .pharmacyId(product.getPharmacy().getId())
+                .pharmacyId(product.getPharmacy() != null ? product.getPharmacy().getId() : null)
                 .name(product.getName())
                 .scientificName(product.getScientificName())
                 .barcode(product.getBarcode())
