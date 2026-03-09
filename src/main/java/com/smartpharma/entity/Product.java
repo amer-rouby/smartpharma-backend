@@ -89,6 +89,10 @@ public class Product {
     @ToString.Exclude
     private List<DemandPrediction> predictions = new ArrayList<>();
 
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private List<SaleItem> saleItems = new ArrayList<>();
+
     @Transient
     public Integer getTotalStock() {
         if (this.stockBatches == null) {

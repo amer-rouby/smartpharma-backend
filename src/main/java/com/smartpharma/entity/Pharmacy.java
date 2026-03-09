@@ -1,11 +1,11 @@
 package com.smartpharma.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.Where;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +17,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Pharmacy {
 
     @Id
@@ -58,11 +59,18 @@ public class Pharmacy {
 
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude
+    @JsonIgnoreProperties({"pharmacy"})
     private List<User> users = new ArrayList<>();
 
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude
+    @JsonIgnoreProperties({"pharmacy"})
     private List<Product> products = new ArrayList<>();
+
+    @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnoreProperties({"pharmacy"})
+    private List<Payment> payments = new ArrayList<>();
 
     public enum SubscriptionStatus {
         TRIAL, ACTIVE, SUSPENDED, CANCELLED
