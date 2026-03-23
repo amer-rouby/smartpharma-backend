@@ -282,7 +282,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                             product.getId(), product.getName(), oldBuyPrice, newBuyPrice, newSellPrice);
                 }
 
-                // ✅ تسجيل حركة مخزن STOCK_IN
                 try {
                     StockMovementRequest movementRequest = StockMovementRequest.builder()
                             .batchId(batch.getId())

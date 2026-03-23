@@ -1,13 +1,14 @@
 package com.smartpharma.config;
 
-import com.smartpharma.service.FawryPaymentService;
-import com.smartpharma.service.InstaPayPaymentService;
-import com.smartpharma.service.PaymentService;
+import com.smartpharma.service.Payment.PaymentGateway;
+import com.smartpharma.service.Payment.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Slf4j
 @Component
@@ -15,13 +16,16 @@ import org.springframework.stereotype.Component;
 public class PaymentGatewayInitializer implements ApplicationRunner {
 
     private final PaymentService paymentService;
-    private final InstaPayPaymentService instaPayService;
-    private final FawryPaymentService fawryService;
+    private final List<PaymentGateway> paymentGateways;
 
     @Override
     public void run(ApplicationArguments args) {
-        paymentService.registerGateway(instaPayService);
-        paymentService.registerGateway(fawryService);
-        log.info("✅ Payment gateways registered: INSTAPAY, FAWRY");
+        for (PaymentGateway gateway : paymentGateways) {
+            paymentService.registerGateway(gateway);
+            log.info("✓ Registered gateway: {} for method: {}",
+                    gateway.getClass().getSimpleName(),
+                    gateway.getPaymentMethod());
+        }
+        log.info("Total registered gateways: {}", paymentGateways.size());
     }
 }

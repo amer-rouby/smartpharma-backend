@@ -4,7 +4,7 @@ import com.smartpharma.dto.request.ExpenseRequest;
 import com.smartpharma.dto.response.ExpenseResponse;
 import com.smartpharma.dto.response.ExpenseSummaryResponse;
 import com.smartpharma.entity.Expense;
-import com.smartpharma.entity.ExpenseCategory;
+import com.smartpharma.entity.enums.ExpenseCategory;
 import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.User;
 import com.smartpharma.exception.ResourceNotFoundException;

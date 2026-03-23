@@ -22,7 +22,6 @@ public class PurchaseOrderItemResponse {
     private int pendingQuantity;
 
     public static PurchaseOrderItemResponse fromEntity(com.smartpharma.entity.PurchaseOrderItem item) {
-        // ✅ معالجة آمنة للمنتج لو محذوف أو مش موجود
         String productName = "منتج غير متاح";
         String productBarcode = null;
         Long productId = null;

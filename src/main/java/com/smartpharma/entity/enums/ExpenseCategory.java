@@ -1,4 +1,4 @@
-package com.smartpharma.entity;
+package com.smartpharma.entity.enums;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

@@ -136,7 +136,7 @@ public class NotificationController {
     }
 
     @PostMapping("/check-alerts")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")  // ✅ فقط admins و managers يقدروا يشغلوا الـ alerts
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<Void>> checkAndCreateAlerts(@RequestParam Long pharmacyId) {
         notificationService.checkAndCreateLowStockAlerts(pharmacyId);
         notificationService.checkAndCreateExpiryAlerts(pharmacyId);

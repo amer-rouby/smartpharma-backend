@@ -1,16 +1,16 @@
-package com.smartpharma.entity;
+package com.smartpharma.entity.enums;
 
-public enum PaymentStatus {
+public enum RefundStatus {
     PENDING("قيد الانتظار"),
+    APPROVED("موافق عليه"),
+    REJECTED("مرفوض"),
     PROCESSING("قيد المعالجة"),
     COMPLETED("مكتمل"),
-    FAILED("فشل"),
-    CANCELLED("ملغي"),
-    REFUNDED("تم الاسترداد");
+    FAILED("فشل");
 
     private final String arabicName;
 
-    PaymentStatus(String arabicName) {
+    RefundStatus(String arabicName) {
         this.arabicName = arabicName;
     }
 

@@ -1,6 +1,6 @@
 package com.smartpharma.dto.response;
 
-import com.smartpharma.entity.ExpenseCategory;
+import com.smartpharma.entity.enums.ExpenseCategory;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

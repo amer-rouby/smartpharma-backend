@@ -96,7 +96,6 @@ public class PurchaseOrder {
     @Builder.Default
     private List<PurchaseOrderItem> items = new ArrayList<>();
 
-    // ✅ FIXED: Helper methods آمنة
     public void addItem(PurchaseOrderItem item) {
         items.add(item);
         item.setPurchaseOrder(this);
@@ -109,7 +108,6 @@ public class PurchaseOrder {
         recalculateTotal();
     }
 
-    // ✅ FIXED: recalculateTotal مع null safety
     public void recalculateTotal() {
         if (items == null || items.isEmpty()) {
             this.totalAmount = BigDecimal.ZERO;
@@ -118,7 +116,7 @@ public class PurchaseOrder {
 
         this.totalAmount = items.stream()
                 .map(PurchaseOrderItem::getTotalPrice)
-                .filter(Objects::nonNull)  // ✅ فلتر الـ null values
+                .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

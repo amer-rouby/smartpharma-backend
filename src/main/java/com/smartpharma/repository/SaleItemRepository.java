@@ -24,7 +24,6 @@ public interface SaleItemRepository extends JpaRepository<SaleItem, Long> {
     @Query("SELECT si FROM SaleItem si JOIN si.transaction t WHERE t.pharmacy.id = :pharmacyId")
     List<SaleItem> findByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 
-    // ✅ ORIGINAL: يقبل LocalDateTime (للكود القديم)
     @Query("""
         SELECT si FROM SaleItem si 
         JOIN si.transaction t 
@@ -36,7 +35,6 @@ public interface SaleItemRepository extends JpaRepository<SaleItem, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
-    // ✅ NEW: يقبل LocalDate (للكود الجديد) - باستخدام CAST
     @Query("""
         SELECT si FROM SaleItem si 
         JOIN si.transaction t 
@@ -48,7 +46,6 @@ public interface SaleItemRepository extends JpaRepository<SaleItem, Long> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
-    // ✅ ORIGINAL: يقبل LocalDateTime (للكود القديم)
     @Query("""
         SELECT si FROM SaleItem si 
         JOIN si.transaction t 
@@ -62,7 +59,6 @@ public interface SaleItemRepository extends JpaRepository<SaleItem, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
-    // ✅ NEW: يقبل LocalDate (للكود الجديد) - باستخدام CAST - الحل القاطع!
     @Query("""
         SELECT si FROM SaleItem si 
         JOIN si.transaction t 
@@ -96,7 +92,6 @@ public interface SaleItemRepository extends JpaRepository<SaleItem, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
-    // ✅ NEW: إضافة طريقة findTopSellingProducts المفقودة
     @Query("""
         SELECT si.product.id, si.product.name, SUM(si.quantity), SUM(si.totalPrice)
         FROM SaleItem si

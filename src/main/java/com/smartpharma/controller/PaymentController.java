@@ -3,8 +3,7 @@ package com.smartpharma.controller;
 import com.smartpharma.dto.request.PaymentRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.PaymentResponse;
-import com.smartpharma.entity.Payment;
-import com.smartpharma.service.PaymentService;
+import com.smartpharma.service.Payment.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import java.math.BigDecimal;
 import java.util.Map;
 
@@ -27,24 +27,37 @@ public class PaymentController {
 
     @PostMapping("/process")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<PaymentResponse>> processPayment(@Valid @RequestBody PaymentRequest request) {
+    public ResponseEntity<ApiResponse<PaymentResponse>> processPayment(
+            @Valid @RequestBody PaymentRequest request) {
+
         log.info("Payment request received: {}", request);
+
         try {
             PaymentResponse response = paymentService.processPayment(request);
-            if ("COMPLETED".equals(response.getStatus())) {
-                return ResponseEntity.ok(ApiResponse.success(response, "Payment processed successfully"));
-            } else {
-                return ResponseEntity.badRequest().body(ApiResponse.error(response.getMessage()));
-            }
+
+            return switch (response.getStatus()) {
+                case "COMPLETED", "PENDING" ->
+                        ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
+                case "FAILED" ->
+                        ResponseEntity.badRequest().body(ApiResponse.error(response.getMessage()));
+                default ->
+                        ResponseEntity.status(422).body(ApiResponse.error(response.getMessage()));
+            };
+
         } catch (Exception e) {
             log.error("Payment processing failed: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().body(ApiResponse.error("Payment failed: " + e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Payment failed: " + e.getMessage()));
         }
     }
 
     @PostMapping("/{reference}/refund")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
-    public ResponseEntity<ApiResponse<PaymentResponse>> refundPayment(@PathVariable String reference, @RequestParam BigDecimal amount, @RequestParam(required = false, defaultValue = "Customer request") String reason) {
+    public ResponseEntity<ApiResponse<PaymentResponse>> refundPayment(
+            @PathVariable String reference,
+            @RequestParam BigDecimal amount,
+            @RequestParam(required = false, defaultValue = "Customer request") String reason) {
+
         log.info("Refund request for: {}, amount: {}", reference, amount);
         try {
             PaymentResponse response = paymentService.refundPayment(reference, amount, reason);
@@ -57,7 +70,9 @@ public class PaymentController {
 
     @PostMapping("/{reference}/cancel")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
-    public ResponseEntity<ApiResponse<PaymentResponse>> cancelPayment(@PathVariable String reference) {
+    public ResponseEntity<ApiResponse<PaymentResponse>> cancelPayment(
+            @PathVariable String reference) {
+
         log.info("Cancel request for: {}", reference);
         try {
             PaymentResponse response = paymentService.cancelPayment(reference);
@@ -70,40 +85,59 @@ public class PaymentController {
 
     @GetMapping("/{reference}/verify")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<PaymentResponse>> verifyPayment(@PathVariable String reference) {
+    public ResponseEntity<ApiResponse<PaymentResponse>> verifyPayment(
+            @PathVariable String reference) {
+
         try {
-            PaymentResponse response = paymentService.verifyPayment(reference);
-            if ("NOT_FOUND".equals(response.getStatus())) {
+            PaymentResponse response = paymentService.getPaymentByReference(reference);
+
+            if (response == null) {
                 return ResponseEntity.notFound().build();
             }
             return ResponseEntity.ok(ApiResponse.success(response, "Payment verified"));
+
         } catch (Exception e) {
             log.error("Verification failed: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().body(ApiResponse.error("Verification failed: " + e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Verification failed: " + e.getMessage()));
         }
     }
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Page<Payment>>> getPayments(@RequestParam Long pharmacyId, Pageable pageable) {
+    public ResponseEntity<ApiResponse<Page<PaymentResponse>>> getPayments(
+            @RequestParam Long pharmacyId,
+            Pageable pageable) {
+
         try {
-            Page<Payment> payments = paymentService.getPaymentsByPharmacy(pharmacyId, pageable);
+            Page<PaymentResponse> payments = paymentService.getPaymentsByPharmacy(pharmacyId, pageable);
             return ResponseEntity.ok(ApiResponse.success(payments, "Payments retrieved successfully"));
         } catch (Exception e) {
             log.error("Get payments failed: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().body(ApiResponse.error("Failed to retrieve payments: " + e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to retrieve payments: " + e.getMessage()));
         }
     }
 
     @GetMapping("/stats")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getPaymentStats(@RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getPaymentStats(
+            @RequestParam Long pharmacyId) {
+
         try {
             Map<String, Object> stats = paymentService.getPaymentStats(pharmacyId);
             return ResponseEntity.ok(ApiResponse.success(stats, "Stats retrieved successfully"));
         } catch (Exception e) {
             log.error("Get stats failed: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().body(ApiResponse.error("Failed to retrieve stats: " + e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to retrieve stats: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/diagnose/gateways")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, String>>> diagnoseGateways() {
+        Map<String, String> gateways = paymentService.getRegisteredGateways();
+        return ResponseEntity.ok(ApiResponse.success(gateways, "Registered gateways"));
     }
 }

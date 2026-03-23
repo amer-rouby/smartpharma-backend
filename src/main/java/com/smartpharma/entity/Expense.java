@@ -1,5 +1,6 @@
 package com.smartpharma.entity;
 
+import com.smartpharma.entity.enums.ExpenseCategory;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

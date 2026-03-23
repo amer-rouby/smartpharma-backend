@@ -21,7 +21,6 @@ import java.util.Map;
 @Service
 public class ReportExportService {
 
-    // ✅ Sales Report to PDF - FIXED Product Names
     public byte[] exportSalesReportToPdf(double totalRevenue, long totalOrders, double avgOrder,
                                          List<Map<String, Object>> dailySales, List<Map<String, Object>> topProducts,
                                          Map<String, ?> revenueByPayment) {
@@ -83,7 +82,6 @@ public class ReportExportService {
 
             // Data - FIXED: Get product name correctly
             for (Map<String, Object> product : topProducts) {
-                // ✅ Try multiple keys to get product name
                 String productName = getProductSafeName(product);
 
                 productsTable.addCell(new PdfPCell(new Phrase(productName, dataFont)));
@@ -101,7 +99,6 @@ public class ReportExportService {
         }
     }
 
-    // ✅ Helper method to safely get product name
     private String getProductSafeName(Map<String, Object> product) {
         // Try different possible keys
         String name = getSafeValue(product, "productName", null);
@@ -114,7 +111,6 @@ public class ReportExportService {
         return name;
     }
 
-    // ✅ Helper method to safely get value
     private String getSafeValue(Map<String, Object> map, String key, String defaultValue) {
         Object value = map.get(key);
         if (value == null) return defaultValue;

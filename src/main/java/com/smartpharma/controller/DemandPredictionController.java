@@ -270,7 +270,6 @@ public class DemandPredictionController {
 
             PurchaseOrderSummaryDTO summary = predictionService.createPurchaseFromPrediction(id, pharmacyId, userId);
 
-            // ✅ FIXED: Handle both cases (order created / no order needed)
             if ("NO_ORDER_NEEDED".equals(summary.getStatus())) {
                 return ResponseEntity.ok(ApiResponse.success(summary, summary.getMessage()));
             }
