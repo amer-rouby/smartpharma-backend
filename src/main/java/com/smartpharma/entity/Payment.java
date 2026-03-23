@@ -1,6 +1,9 @@
 package com.smartpharma.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.smartpharma.entity.enums.PaymentMethod;
+import com.smartpharma.entity.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -8,11 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "payments", schema = "smartpharma", indexes = {
-        @Index(name = "idx_payment_pharmacy", columnList = "pharmacy_id"),
-        @Index(name = "idx_payment_reference", columnList = "reference_number"),
-        @Index(name = "idx_payment_status", columnList = "status")
-})
+@Table(name = "payments", schema = "smartpharma")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,8 +25,11 @@ public class Payment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pharmacy_id", nullable = false)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "payments", "products", "users", "stockBatches"})
+    @JsonIgnore
     private Pharmacy pharmacy;
+
+    @Column(name = "pharmacy_id", insertable = false, updatable = false)
+    private Long pharmacyId;
 
     @Column(name = "reference_number", unique = true, nullable = false)
     private String referenceNumber;

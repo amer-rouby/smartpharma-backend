@@ -102,7 +102,6 @@ public class ProfileServiceImpl implements ProfileService {
         return getProfile(userId);
     }
 
-    // ✅ NEW: Update profile image URL
     @Override @Transactional
     public void updateProfileImageUrl(Long userId, String imageUrl) {
         UserProfile profile = profileRepository.findByUserId(userId)

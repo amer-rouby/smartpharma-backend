@@ -57,7 +57,6 @@ public class StockMovementServiceImpl implements StockMovementService {
         BigDecimal totalValue = request.getUnitPrice() != null ?
                 request.getUnitPrice().multiply(BigDecimal.valueOf(request.getQuantity())) : null;
 
-        // ✅ ✅ ✅ الحل: التعامل مع userId == null ✅ ✅ ✅
         User userRef = null;
         if (userId != null) {
             try {

@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import com.smartpharma.entity.ExpenseCategory;
+import com.smartpharma.entity.enums.ExpenseCategory;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 

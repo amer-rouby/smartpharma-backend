@@ -84,7 +84,7 @@ public class SaleTransaction {
     private List<SaleItem> items = new ArrayList<>();
 
     public enum PaymentMethod {
-        CASH, VISA, INSTAPAY, WALLET, CREDIT
+        CASH, VISA, INSTAPAY, WALLET, CREDIT, BANK_TRANSFER, FAWRY
     }
 
     public void addItem(SaleItem item) {

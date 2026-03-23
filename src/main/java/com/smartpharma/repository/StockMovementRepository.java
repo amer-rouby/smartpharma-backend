@@ -88,7 +88,6 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             @Param("endDate") LocalDateTime endDate
     );
 
-    // ✅ ✅ ✅ Method جديدة لحساب الكميات حسب النوع ✅ ✅ ✅
     @Query("""
         SELECT COALESCE(SUM(sm.quantity), 0) FROM StockMovement sm
         WHERE sm.pharmacyId = :pharmacyId

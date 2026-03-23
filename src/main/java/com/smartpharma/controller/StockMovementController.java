@@ -91,7 +91,6 @@ public class StockMovementController {
 
         log.info("Getting movement stats for pharmacy: {} from {} to {}", pharmacyId, startDate, endDate);
 
-        // ✅ تحويل التواريخ لتشمل اليوم كامل
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(23, 59, 59, 999999999);
 

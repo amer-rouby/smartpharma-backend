@@ -34,11 +34,8 @@ public class DataInitializer {
         return args -> {
             if (pharmacyRepository.findByLicenseNumber("PH-2024-001").isPresent() ||
                     pharmacyRepository.findByEmail("test@smartpharma.eg").isPresent()) {
-                System.out.println("✅ Test data already exists, skipping initialization...");
                 return;
             }
-
-            System.out.println("🚀 Initializing test data...");
 
             Pharmacy pharmacy = Pharmacy.builder()
                     .name("صيدلية الشفاء النموذجية")
@@ -51,8 +48,6 @@ public class DataInitializer {
                     .build();
 
             pharmacyRepository.save(pharmacy);
-            System.out.println("✅ Pharmacy created: " + pharmacy.getName());
-
             User admin = User.builder()
                     .pharmacy(pharmacy)
                     .username("admin")
@@ -64,7 +59,6 @@ public class DataInitializer {
                     .build();
 
             userRepository.save(admin);
-            System.out.println("✅ Admin user created: admin / admin123");
 
             User pharmacist = User.builder()
                     .pharmacy(pharmacy)
@@ -77,8 +71,6 @@ public class DataInitializer {
                     .build();
 
             userRepository.save(pharmacist);
-            System.out.println("✅ Pharmacist user created: pharmacist / pharm123");
-
             String[][] productsData = {
                     {"بنادول إكسترا", "Paracetamol + Caffeine", "1234567890123", "مسكنات", "BOX"},
                     {"أوجمنت 1 جم", "Amoxicillin + Clavulanic Acid", "1234567890124", "مضادات حيوية", "BOX"},
@@ -123,12 +115,6 @@ public class DataInitializer {
 
                 stockBatchRepository.save(batch);
             }
-
-            System.out.println("✅ " + productsData.length + " Products created with stock batches");
-            System.out.println("🎉 Test data initialization completed!");
-            System.out.println("\n📋 Login Credentials:");
-            System.out.println("   Admin: admin / admin123");
-            System.out.println("   Pharmacist: pharmacist / pharm123");
         };
     }
 }

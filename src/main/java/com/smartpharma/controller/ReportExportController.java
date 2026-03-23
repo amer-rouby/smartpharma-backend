@@ -30,7 +30,6 @@ public class ReportExportController {
     private final ExpenseService expenseService;
     private final ReportService reportService;
 
-    // ✅ Expenses Export - Excel
     @GetMapping("/expenses/excel")
     public ResponseEntity<byte[]> exportExpensesExcel(
             @RequestParam Long pharmacyId,
@@ -57,7 +56,6 @@ public class ReportExportController {
                 .body(excelData);
     }
 
-    // ✅ Expenses Export - PDF
     @GetMapping("/expenses/pdf")
     public ResponseEntity<byte[]> exportExpensesPdf(
             @RequestParam Long pharmacyId,
@@ -84,7 +82,6 @@ public class ReportExportController {
                 .body(pdfData);
     }
 
-    // ✅ Financial Report Export - Excel
     @GetMapping("/financial/excel")
     public ResponseEntity<byte[]> exportFinancialExcel(
             @RequestParam Long pharmacyId,
@@ -128,7 +125,6 @@ public class ReportExportController {
                 .body(excelData);
     }
 
-    // ✅ Sales Report Export - Excel (جديد)
     @GetMapping("/sales/excel")
     public ResponseEntity<byte[]> exportSalesExcel(
             @RequestParam Long pharmacyId,

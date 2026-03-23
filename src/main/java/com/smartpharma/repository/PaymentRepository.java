@@ -1,7 +1,7 @@
 package com.smartpharma.repository;
 
 import com.smartpharma.entity.Payment;
-import com.smartpharma.entity.PaymentStatus;
+import com.smartpharma.entity.enums.PaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -1,9 +1,9 @@
-package com.smartpharma.service;
+package com.smartpharma.service.Payment;
 
 import com.smartpharma.dto.request.PaymentRequest;
 import com.smartpharma.dto.response.PaymentResponse;
 import com.smartpharma.entity.Payment;
-import com.smartpharma.entity.PaymentMethod;
+import com.smartpharma.entity.enums.PaymentMethod;
 import com.smartpharma.repository.PaymentRepository;
 import com.smartpharma.repository.PharmacyRepository;
 import lombok.extern.slf4j.Slf4j;

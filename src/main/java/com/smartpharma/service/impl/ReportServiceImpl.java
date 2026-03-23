@@ -2,7 +2,7 @@ package com.smartpharma.service.impl;
 
 import com.smartpharma.dto.request.ReportRequest;
 import com.smartpharma.dto.response.*;
-import com.smartpharma.entity.ExpenseCategory;
+import com.smartpharma.entity.enums.ExpenseCategory;
 import com.smartpharma.repository.ExpenseRepository;
 import com.smartpharma.repository.ProductRepository;
 import com.smartpharma.repository.SaleTransactionRepository;

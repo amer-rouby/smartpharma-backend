@@ -24,4 +24,8 @@ public class SaleItemRequest {
     @NotNull(message = "Unit price is required")
     @DecimalMin(value = "0.01", message = "Unit price must be positive")
     private BigDecimal unitPrice;
+
+    @NotNull(message = "Total price is required")
+    @DecimalMin(value = "0.01", message = "Total price must be positive")
+    private BigDecimal totalPrice;
 }

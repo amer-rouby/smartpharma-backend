@@ -45,21 +45,19 @@ public class PurchaseOrderItem {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
-    // ✅ FIXED: calculateTotal مع default value
     @PrePersist
     @PreUpdate
     public void calculateTotal() {
         if (unitPrice != null && quantity != null && quantity > 0) {
             this.totalPrice = unitPrice.multiply(BigDecimal.valueOf(quantity));
         } else {
-            this.totalPrice = BigDecimal.ZERO;  // ✅ default value عشان ما ترجعش null
+            this.totalPrice = BigDecimal.ZERO;
         }
     }
 
-    // ✅ FIXED: getter آمن
     public BigDecimal getTotalPrice() {
         if (totalPrice == null) {
-            calculateTotal();  // ✅ احسبها لو مش محسوبة
+            calculateTotal();
         }
         return totalPrice;
     }

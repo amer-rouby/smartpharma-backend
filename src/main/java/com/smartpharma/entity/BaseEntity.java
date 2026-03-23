@@ -8,10 +8,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-/**
- * ✅ Base entity for common fields (audit + soft delete)
- * All entities should extend this class for consistency
- */
 @Data
 @MappedSuperclass
 public abstract class BaseEntity {
