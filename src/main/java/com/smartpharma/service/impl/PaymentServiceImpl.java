@@ -7,7 +7,7 @@ import com.smartpharma.entity.enums.PaymentMethod;
 import com.smartpharma.entity.enums.PaymentStatus;
 import com.smartpharma.repository.PaymentRepository;
 import com.smartpharma.service.Payment.PaymentGateway;
-import com.smartpharma.service.Payment.PaymentService;
+import com.smartpharma.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -145,20 +145,23 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<PaymentResponse> getPaymentsByPharmacy(Long pharmacyId, Pageable pageable) {
-        return paymentRepository.findByPharmacyId(pharmacyId, pageable)
+    public Page<PaymentResponse> getPaymentsByPharmacy(Long pharmacyId, String status, String paymentMethod, String search, Pageable pageable) {
+        return paymentRepository.findByPharmacyIdWithFilters(pharmacyId, status, paymentMethod, search, pageable)
                 .map(this::mapToResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> getPaymentStats(Long pharmacyId) {
-        Long totalPayments = paymentRepository.countByPharmacyIdAndStatus(
+        Long completedPayments = paymentRepository.countByPharmacyIdAndStatus(
                 pharmacyId, PaymentStatus.COMPLETED);
+        Long pendingPayments = paymentRepository.countByPharmacyIdAndStatus(
+                pharmacyId, PaymentStatus.PENDING);
         BigDecimal totalAmount = paymentRepository.getTotalCompletedPayments(pharmacyId);
 
         Map<String, Object> stats = new HashMap<>();
-        stats.put("totalPayments", totalPayments != null ? totalPayments : 0);
+        stats.put("completedPayments", completedPayments != null ? completedPayments : 0);
+        stats.put("pendingPayments", pendingPayments != null ? pendingPayments : 0);
         stats.put("totalAmount", totalAmount != null ? totalAmount : BigDecimal.ZERO);
         return stats;
     }

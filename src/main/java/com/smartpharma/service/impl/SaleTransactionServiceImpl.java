@@ -5,6 +5,7 @@ import com.smartpharma.dto.request.SaleRequest;
 import com.smartpharma.dto.response.SaleTransactionDTO;
 import com.smartpharma.dto.response.SalesReportResponse;
 import com.smartpharma.entity.*;
+import com.smartpharma.entity.enums.PaymentMethod;
 import com.smartpharma.repository.*;
 import com.smartpharma.service.SaleTransactionService;
 import lombok.RequiredArgsConstructor;
@@ -78,7 +79,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .invoiceNumber(generateInvoiceNumber())
                 .discountAmount(Optional.ofNullable(request.getDiscountAmount()).orElse(BigDecimal.ZERO))
                 .customerPhone(request.getCustomerPhone())
-                .paymentMethod(SaleTransaction.PaymentMethod.valueOf(
+                .paymentMethod(PaymentMethod.valueOf(
                         Optional.ofNullable(request.getPaymentMethod()).orElse("CASH").toUpperCase()))
                 .notes(request.getNotes())
                 .build();
@@ -108,7 +109,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
         Optional.ofNullable(request.getDiscountAmount()).ifPresent(entity::setDiscountAmount);
         Optional.ofNullable(request.getPaymentMethod())
-                .ifPresent(pm -> entity.setPaymentMethod(SaleTransaction.PaymentMethod.valueOf(pm.toUpperCase())));
+                .ifPresent(pm -> entity.setPaymentMethod(PaymentMethod.valueOf(pm.toUpperCase())));
         Optional.ofNullable(request.getCustomerPhone()).ifPresent(entity::setCustomerPhone);
         Optional.ofNullable(request.getNotes()).ifPresent(entity::setNotes);
 
@@ -443,7 +444,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         List<Object[]> data = saleTransactionRepository.getRevenueByPaymentMethod(pharmacyId, start, end);
         return data.stream()
                 .collect(Collectors.toMap(
-                        obj -> ((SaleTransaction.PaymentMethod) obj[0]).name(),
+                        obj -> ((PaymentMethod) obj[0]).name(),
                         obj -> (BigDecimal) obj[1],
                         BigDecimal::add,
                         LinkedHashMap::new

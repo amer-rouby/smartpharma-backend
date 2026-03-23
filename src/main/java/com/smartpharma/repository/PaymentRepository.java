@@ -42,4 +42,17 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     @Query("SELECT SUM(p.amount) FROM Payment p WHERE p.pharmacy.id = :pharmacyId AND p.status = 'COMPLETED'")
     BigDecimal getTotalCompletedPayments(@Param("pharmacyId") Long pharmacyId);
+
+    @Query(value = "SELECT * FROM smartpharma.payments p WHERE p.pharmacy_id = :pharmacyId " +
+            "AND (:status IS NULL OR p.status = :status) " +
+            "AND (:paymentMethod IS NULL OR p.payment_method = :paymentMethod) " +
+            "AND (:search IS NULL OR CAST(p.reference_number AS TEXT) ILIKE %:search% OR CAST(p.customer_phone AS TEXT) ILIKE %:search%) " +
+            "ORDER BY p.created_at DESC", nativeQuery = true)
+    Page<Payment> findByPharmacyIdWithFilters(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("status") String status,
+            @Param("paymentMethod") String paymentMethod,
+            @Param("search") String search,
+            Pageable pageable
+    );
 }
