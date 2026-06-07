@@ -1,5 +1,3 @@
-// src/main/java/com/smartpharma/repository/StockBatchRepository.java
-
 package com.smartpharma.repository;
 
 import com.smartpharma.entity.StockBatch;
@@ -48,14 +46,16 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     List<StockBatch> findExpiringBatches(@Param("pharmacyId") Long pharmacyId, @Param("expiryDate") LocalDate expiryDate);
 
     @Query("""
-        SELECT sb FROM StockBatch sb 
-        WHERE sb.pharmacy.id = :pharmacyId 
-        AND sb.status = 'ACTIVE' 
-        AND sb.expiryDate < :expiryDate
-        ORDER BY sb.expiryDate ASC
-    """)
-    List<StockBatch> findExpiredBatches(@Param("pharmacyId") Long pharmacyId, @Param("expiryDate") LocalDate expiryDate);
-
+    SELECT sb FROM StockBatch sb 
+    WHERE sb.pharmacy.id = :pharmacyId 
+    AND sb.status = 'ACTIVE' 
+    AND sb.expiryDate < :expiryDate
+    ORDER BY sb.expiryDate ASC
+""")
+    List<StockBatch> findExpiredBatches(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("expiryDate") LocalDate expiryDate
+    );
     @Lock(jakarta.persistence.LockModeType.OPTIMISTIC)
     StockBatch findByIdAndStatus(Long id, BatchStatus status);
 
@@ -128,7 +128,6 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
         JOIN Product p ON sb.product.id = p.id
         WHERE sb.pharmacy.id = :pharmacyId
         AND sb.status = 'ACTIVE'
-        AND sb.expiryDate >= CURRENT_DATE
         AND sb.expiryDate <= :expiryDate
         GROUP BY p.id, p.name, sb.batchNumber, sb.expiryDate
         ORDER BY sb.expiryDate ASC
@@ -136,6 +135,17 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     List<Object[]> getExpiringProducts(@Param("pharmacyId") Long pharmacyId,
                                        @Param("expiryDate") LocalDate expiryDate);
 
+    @Query("""
+    SELECT p.id, p.name, sb.batchNumber, sb.expiryDate, SUM(sb.quantityCurrent)
+    FROM StockBatch sb
+    JOIN Product p ON sb.product.id = p.id
+    WHERE sb.pharmacy.id = :pharmacyId
+    AND sb.status = 'ACTIVE'
+    AND sb.expiryDate < :today
+    GROUP BY p.id, p.name, sb.batchNumber, sb.expiryDate
+    ORDER BY sb.expiryDate ASC
+""")
+    List<Object[]> getExpiredProducts(@Param("pharmacyId") Long pharmacyId, @Param("today") LocalDate today);
     @Query("""
         SELECT COALESCE(SUM(sb.quantityCurrent), 0)
         FROM StockBatch sb

@@ -259,51 +259,85 @@ public class ReportServiceImpl implements ReportService {
     @Override
     public ExpiryReportResponse getExpiryReport(ReportRequest request) {
         Long pharmacyId = request.getPharmacyId();
+        LocalDate today = LocalDate.now();
 
         Long totalExpiring = stockBatchRepository.countExpiringBatches(
-                pharmacyId, LocalDate.now().plusDays(90));
+                pharmacyId, today.plusDays(90));
         Long urgent = stockBatchRepository.countExpiringBatches(
-                pharmacyId, LocalDate.now().plusDays(7));
+                pharmacyId, today.plusDays(7));
         Long warning = stockBatchRepository.countExpiringBatches(
-                pharmacyId, LocalDate.now().plusDays(30));
+                pharmacyId, today.plusDays(30));
+        Long expired = stockBatchRepository.countExpiredBatches(pharmacyId);
         Long ok = (totalExpiring != null ? totalExpiring : 0L) - (warning != null ? warning : 0L);
 
+        List<Object[]> expiredData = stockBatchRepository.getExpiredProducts(pharmacyId, LocalDate.now());
         List<Object[]> expiringData = stockBatchRepository.getExpiringProducts(
-                pharmacyId, LocalDate.now().plusDays(90));
+                pharmacyId, today.plusDays(90));
 
-        List<ExpiryReportResponse.ExpiringProductDTO> expiringProducts = expiringData.stream()
-                .filter(Objects::nonNull)
-                .map(row -> {
-                    LocalDate expiryDate = (LocalDate) row[3];
-                    long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), expiryDate);
+        List<ExpiryReportResponse.ExpiringProductDTO> expiringProducts = new ArrayList<>();
 
-                    String status;
-                    if (daysUntil <= 7) {
-                        status = "URGENT";
-                    } else if (daysUntil <= 30) {
-                        status = "WARNING";
-                    } else {
-                        status = "OK";
-                    }
+        if (expiredData != null) {
+            for (Object[] row : expiredData) {
+                if (row == null) continue;
 
-                    return ExpiryReportResponse.ExpiringProductDTO.builder()
-                            .productId(row[0] != null ? ((Number) row[0]).longValue() : 0L)
-                            .productName((String) row[1])
-                            .batchNumber((String) row[2])
-                            .expiryDate(expiryDate.toString())
-                            .daysUntilExpiry((int) daysUntil)
-                            .currentStock(row[4] != null ? ((Number) row[4]).intValue() : 0)
-                            .status(status)
-                            .estimatedValue(0.0)
-                            .build();
-                })
-                .collect(Collectors.toList());
+                LocalDate expiryDate = (LocalDate) row[3];
+                long daysSince = ChronoUnit.DAYS.between(expiryDate, today);
+
+                expiringProducts.add(ExpiryReportResponse.ExpiringProductDTO.builder()
+                        .productId(row[0] != null ? ((Number) row[0]).longValue() : 0L)
+                        .productName((String) row[1])
+                        .batchNumber((String) row[2])
+                        .expiryDate(expiryDate.toString())
+                        .daysUntilExpiry((int) -daysSince)
+                        .currentStock(row[4] != null ? ((Number) row[4]).intValue() : 0)
+                        .status("EXPIRED")
+                        .estimatedValue(0.0)
+                        .build());
+            }
+        }
+
+        if (expiringData != null) {
+            for (Object[] row : expiringData) {
+                if (row == null) continue;
+
+                LocalDate expiryDate = (LocalDate) row[3];
+
+                if (expiryDate.isBefore(today)) {
+                    continue;
+                }
+
+                long daysUntil = ChronoUnit.DAYS.between(today, expiryDate);
+
+                String status;
+                if (daysUntil <= 7) {
+                    status = "URGENT";
+                } else if (daysUntil <= 30) {
+                    status = "WARNING";
+                } else {
+                    status = "OK";
+                }
+
+                expiringProducts.add(ExpiryReportResponse.ExpiringProductDTO.builder()
+                        .productId(row[0] != null ? ((Number) row[0]).longValue() : 0L)
+                        .productName((String) row[1])
+                        .batchNumber((String) row[2])
+                        .expiryDate(expiryDate.toString())
+                        .daysUntilExpiry((int) daysUntil)
+                        .currentStock(row[4] != null ? ((Number) row[4]).intValue() : 0)
+                        .status(status)
+                        .estimatedValue(0.0)
+                        .build());
+            }
+        }
+
+        expiringProducts.sort(Comparator.comparing(ExpiryReportResponse.ExpiringProductDTO::getExpiryDate));
 
         return ExpiryReportResponse.builder()
                 .totalExpiring(totalExpiring != null ? totalExpiring : 0L)
                 .urgentExpiring(urgent != null ? urgent : 0L)
                 .warningExpiring(warning != null ? warning : 0L)
-                .okExpiring(ok)
+                .okExpiring(ok != null ? ok : 0L)
+                .expiredCount(expired != null ? expired : 0L)
                 .expiringProducts(expiringProducts)
                 .build();
     }

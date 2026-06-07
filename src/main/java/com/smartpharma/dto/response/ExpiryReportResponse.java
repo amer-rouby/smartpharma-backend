@@ -16,6 +16,7 @@ public class ExpiryReportResponse {
     private Long urgentExpiring;
     private Long warningExpiring;
     private Long okExpiring;
+    private Long expiredCount;
     private List<ExpiringProductDTO> expiringProducts;
 
     @Data
