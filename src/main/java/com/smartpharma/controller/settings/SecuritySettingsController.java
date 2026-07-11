@@ -18,7 +18,6 @@ import java.util.Map;
 @RequestMapping("/api/settings/security")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class SecuritySettingsController {
 
     private final SecuritySettingsService securitySettingsService;

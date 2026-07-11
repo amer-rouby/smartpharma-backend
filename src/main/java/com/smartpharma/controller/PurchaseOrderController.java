@@ -3,8 +3,8 @@ package com.smartpharma.controller;
 import com.smartpharma.dto.request.PurchaseOrderRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.PurchaseOrderResponse;
-import com.smartpharma.entity.User;
 import com.smartpharma.service.PurchaseOrderService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +26,6 @@ import java.util.Map;
 @RequestMapping("/api/purchase-orders")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class PurchaseOrderController {
 
     private final PurchaseOrderService purchaseOrderService;
@@ -70,7 +69,7 @@ public class PurchaseOrderController {
             @Valid @RequestBody PurchaseOrderRequest request,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders - pharmacyId: {}, userId: {}", pharmacyId, userId);
         PurchaseOrderResponse order = purchaseOrderService.createOrder(request, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(order, "Purchase order created successfully"));
@@ -82,7 +81,7 @@ public class PurchaseOrderController {
             @PathVariable Long predictionId,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders/from-prediction/{} - pharmacyId: {}", predictionId, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.createFromPrediction(predictionId, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(order, "Purchase order created from prediction"));
@@ -95,7 +94,7 @@ public class PurchaseOrderController {
             @Valid @RequestBody PurchaseOrderRequest request,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("PUT /api/purchase-orders/{} - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.updateOrder(id, request, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(order, "Purchase order updated successfully"));
@@ -107,7 +106,7 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("DELETE /api/purchase-orders/{} - pharmacyId: {}", id, pharmacyId);
         purchaseOrderService.deleteOrder(id, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(null, "Purchase order deleted successfully"));
@@ -119,7 +118,7 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders/{}/approve - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.approveOrder(id, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(order, "Purchase order approved"));
@@ -131,7 +130,7 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders/{}/cancel - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.cancelOrder(id, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(order, "Purchase order cancelled"));
@@ -143,7 +142,7 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders/{}/receive - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.receiveOrder(id, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(order, "Purchase order received"));
@@ -191,15 +190,5 @@ public class PurchaseOrderController {
         response.put("startDate", startDate);
         response.put("endDate", endDate);
         return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    private Long extractUserId(UserDetails userDetails) {
-        if (userDetails == null) return null;
-        if (userDetails instanceof User user) return user.getId();
-        try {
-            return Long.valueOf(userDetails.getUsername());
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

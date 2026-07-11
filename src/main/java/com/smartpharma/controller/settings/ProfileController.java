@@ -31,7 +31,6 @@ import java.util.UUID;
 @RequestMapping("/api/profile")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class ProfileController {
 
     private final ProfileService profileService;

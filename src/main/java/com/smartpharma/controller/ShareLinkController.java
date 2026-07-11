@@ -5,6 +5,7 @@ import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.ShareLinkResponse;
 import com.smartpharma.entity.ShareLink;
 import com.smartpharma.service.ShareLinkService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/share")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "*")
 public class ShareLinkController {
 
     private final ShareLinkService shareLinkService;
@@ -29,8 +29,8 @@ public class ShareLinkController {
             @Valid @RequestBody CreateShareLinkRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        Long userId = extractUserId(userDetails);
-        Long pharmacyId = extractPharmacyId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
+        Long pharmacyId = SecurityUtils.extractPharmacyId(userDetails);
 
         log.info("Creating share link for entityType: {}, entityId: {}",
                 request.getEntityType(), request.getEntityId());
@@ -58,19 +58,5 @@ public class ShareLinkController {
                         .entityId(shareLink.getEntityId())
                         .build(),
                 "Shared data retrieved successfully"));
-    }
-
-    private Long extractUserId(UserDetails userDetails) {
-        if (userDetails == null) return null;
-        try {
-            return Long.valueOf(userDetails.getUsername());
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private Long extractPharmacyId(UserDetails userDetails) {
-
-        return 4L;
     }
 }

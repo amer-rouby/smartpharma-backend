@@ -15,7 +15,7 @@ public class PurchaseOrderItemRequest {
     @NotNull(message = "الكمية مطلوبة")
     @Min(value = 1, message = "الكمية يجب أن تكون 1 على الأقل")
     private Integer quantity;
-
+    private String productName;
     @NotNull(message = "سعر الوحدة مطلوب")
     @Min(value = 0, message = "سعر الوحدة يجب أن يكون 0 أو أكثر")
     private BigDecimal unitPrice;

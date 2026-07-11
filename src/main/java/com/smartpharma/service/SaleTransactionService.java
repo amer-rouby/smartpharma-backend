@@ -22,7 +22,6 @@ public interface SaleTransactionService {
                                           LocalDate endDate, String period);
     Map<String, Object> getSalesStats(Long pharmacyId);
     Map<String, Object> getTodaySales(Long pharmacyId);
-    Map<String, Object> getTodaySalesSummary(Long pharmacyId);
     Page<SaleTransactionDTO> getSalesByDateRange(Long pharmacyId,
                                                  LocalDate startDate,
                                                  LocalDate endDate);

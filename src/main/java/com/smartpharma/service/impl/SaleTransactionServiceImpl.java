@@ -209,12 +209,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
     @Override
     @Transactional(readOnly = true)
-    public Map<String, Object> getTodaySalesSummary(Long pharmacyId) {
-        return getTodaySales(pharmacyId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Page<SaleTransactionDTO> getSalesByDateRange(Long pharmacyId, LocalDate startDate, LocalDate endDate) {
         log.info("Fetching sales by date range | pharmacyId: {} | {} to {}",
                 pharmacyId, startDate, endDate);

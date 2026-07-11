@@ -4,9 +4,9 @@ import com.smartpharma.dto.request.UpdatePredictionDTO;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.DemandPredictionResponse;
 import com.smartpharma.dto.response.PurchaseOrderSummaryDTO;
-import com.smartpharma.dto.response.ShareLinkDTO;
-import com.smartpharma.entity.User;
+import com.smartpharma.dto.response.ShareLinkResponse;
 import com.smartpharma.service.DemandPredictionService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +28,6 @@ import java.util.Map;
 @RequestMapping("/api/predictions")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class DemandPredictionController {
 
     private final DemandPredictionService predictionService;
@@ -40,7 +39,7 @@ public class DemandPredictionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate forDate,
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
-            Long userId = extractUserId(userDetails);
+            Long userId = SecurityUtils.extractUserId(userDetails);
             if (userId == null) {
                 return ResponseEntity.status(401).body(ApiResponse.error("Invalid authentication"));
             }
@@ -110,7 +109,7 @@ public class DemandPredictionController {
             @RequestParam Integer actualQuantity,
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
-            Long userId = extractUserId(userDetails);
+            Long userId = SecurityUtils.extractUserId(userDetails);
             if (userId == null) {
                 return ResponseEntity.status(401).body(ApiResponse.error("Invalid authentication"));
             }
@@ -131,7 +130,7 @@ public class DemandPredictionController {
             @RequestBody UpdatePredictionDTO updates,
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
-            Long pharmacyId = extractPharmacyIdFromUser(userDetails);
+            Long pharmacyId = SecurityUtils.extractPharmacyId(userDetails);
             if (pharmacyId == null) {
                 return ResponseEntity.status(401).body(ApiResponse.error("Invalid authentication"));
             }
@@ -151,7 +150,7 @@ public class DemandPredictionController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
-            Long pharmacyId = extractPharmacyIdFromUser(userDetails);
+            Long pharmacyId = SecurityUtils.extractPharmacyId(userDetails);
             if (pharmacyId == null) {
                 return ResponseEntity.status(401).body(ApiResponse.error("Invalid authentication"));
             }
@@ -170,7 +169,7 @@ public class DemandPredictionController {
     public ResponseEntity<byte[]> exportPredictionPdf(@PathVariable Long id,
                                                       @AuthenticationPrincipal UserDetails userDetails) {
         try {
-            Long pharmacyId = extractPharmacyIdFromUser(userDetails);
+            Long pharmacyId = SecurityUtils.extractPharmacyId(userDetails);
             if (pharmacyId == null) {
                 return ResponseEntity.status(401).build();
             }
@@ -190,7 +189,7 @@ public class DemandPredictionController {
     public ResponseEntity<byte[]> exportPredictionExcel(@PathVariable Long id,
                                                         @AuthenticationPrincipal UserDetails userDetails) {
         try {
-            Long pharmacyId = extractPharmacyIdFromUser(userDetails);
+            Long pharmacyId = SecurityUtils.extractPharmacyId(userDetails);
             if (pharmacyId == null) {
                 return ResponseEntity.status(401).build();
             }
@@ -207,13 +206,14 @@ public class DemandPredictionController {
 
     @PostMapping("/{id}/share")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<ShareLinkDTO>> sharePrediction(
+    public ResponseEntity<ApiResponse<ShareLinkResponse>> sharePrediction(
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, Object> requestBody,
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
-            Long pharmacyId = extractPharmacyIdFromUser(userDetails);
-            if (pharmacyId == null) {
+            Long pharmacyId = SecurityUtils.extractPharmacyId(userDetails);
+            Long userId = SecurityUtils.extractUserId(userDetails);
+            if (pharmacyId == null || userId == null) {
                 return ResponseEntity.status(401).body(ApiResponse.error("Invalid authentication"));
             }
             int expiryHours = 24;
@@ -221,7 +221,7 @@ public class DemandPredictionController {
                 expiryHours = Integer.parseInt(requestBody.get("expiryHours").toString());
             }
             log.info("Generating share link for prediction: {}, expiry: {}h", id, expiryHours);
-            ShareLinkDTO shareLink = predictionService.generateShareLink(id, pharmacyId, expiryHours);
+            ShareLinkResponse shareLink = predictionService.generateShareLink(id, pharmacyId, userId, expiryHours);
             return ResponseEntity.ok(ApiResponse.success(shareLink, "Share link generated"));
         } catch (Exception e) {
             log.error("Error generating share link", e);
@@ -230,22 +230,6 @@ public class DemandPredictionController {
         }
     }
 
-    private Long extractUserId(UserDetails userDetails) {
-        if (userDetails == null) return null;
-        if (userDetails instanceof User user) return user.getId();
-        try {
-            return Long.valueOf(userDetails.getUsername());
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private Long extractPharmacyIdFromUser(UserDetails userDetails) {
-        if (userDetails instanceof User user) {
-            return user.getPharmacy() != null ? user.getPharmacy().getId() : null;
-        }
-        return null;
-    }
     @PostMapping("/{id}/create-purchase")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<PurchaseOrderSummaryDTO>> createPurchaseFromPrediction(
@@ -254,8 +238,8 @@ public class DemandPredictionController {
             @AuthenticationPrincipal UserDetails userDetails) {
 
         try {
-            Long pharmacyId = extractPharmacyIdFromUser(userDetails);
-            Long userId = extractUserId(userDetails);
+            Long pharmacyId = SecurityUtils.extractPharmacyId(userDetails);
+            Long userId = SecurityUtils.extractUserId(userDetails);
 
             if (pharmacyId == null || userId == null) {
                 return ResponseEntity.status(401).body(ApiResponse.error("Invalid authentication"));

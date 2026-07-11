@@ -3,10 +3,6 @@ package com.smartpharma.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-/**
- * ✅ Custom exception for resource not found (404)
- * Used when an entity doesn't exist in the database
- */
 @ResponseStatus(HttpStatus.NOT_FOUND)
 public class ResourceNotFoundException extends RuntimeException {
 

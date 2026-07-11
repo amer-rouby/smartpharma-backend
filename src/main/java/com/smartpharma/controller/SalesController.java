@@ -23,7 +23,6 @@ import java.util.Map;
 @RequestMapping("/api/sales")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:3000"})
 public class SalesController {
 
     private final SaleTransactionService saleTransactionService;
@@ -134,7 +133,7 @@ public class SalesController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> getTodaySalesSummary(@RequestParam Long pharmacyId) {
         log.info("GET /api/sales/today/summary - pharmacyId: {}", pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(
-                saleTransactionService.getTodaySalesSummary(pharmacyId),
+                saleTransactionService.getTodaySales(pharmacyId),
                 "Today sales summary retrieved successfully"));
     }
 

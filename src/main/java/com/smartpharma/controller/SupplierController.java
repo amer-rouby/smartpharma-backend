@@ -3,8 +3,8 @@ package com.smartpharma.controller;
 import com.smartpharma.dto.request.SupplierRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.SupplierResponse;
-import com.smartpharma.entity.User;
 import com.smartpharma.service.SupplierService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +23,6 @@ import java.util.Map;
 @RequestMapping("/api/suppliers")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class SupplierController {
 
     private final SupplierService supplierService;
@@ -64,7 +63,7 @@ public class SupplierController {
             @Valid @RequestBody SupplierRequest request,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/suppliers - pharmacyId: {}, userId: {}", pharmacyId, userId);
         SupplierResponse supplier = supplierService.createSupplier(request, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(supplier, "Supplier created successfully"));
@@ -77,7 +76,7 @@ public class SupplierController {
             @Valid @RequestBody SupplierRequest request,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("PUT /api/suppliers/{} - pharmacyId: {}, userId: {}", id, pharmacyId, userId);
         SupplierResponse supplier = supplierService.updateSupplier(id, request, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(supplier, "Supplier updated successfully"));
@@ -89,7 +88,7 @@ public class SupplierController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("DELETE /api/suppliers/{} - pharmacyId: {}, userId: {}", id, pharmacyId, userId);
         supplierService.deleteSupplier(id, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(null, "Supplier deleted successfully"));
@@ -112,15 +111,5 @@ public class SupplierController {
         log.info("GET /api/suppliers/search - pharmacyId: {}, query: {}", pharmacyId, query);
         List<SupplierResponse> suppliers = supplierService.searchSuppliers(pharmacyId, query);
         return ResponseEntity.ok(ApiResponse.success(suppliers));
-    }
-
-    private Long extractUserId(UserDetails userDetails) {
-        if (userDetails == null) return null;
-        if (userDetails instanceof User user) return user.getId();
-        try {
-            return Long.valueOf(userDetails.getUsername());
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

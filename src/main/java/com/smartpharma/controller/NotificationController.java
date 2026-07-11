@@ -5,6 +5,7 @@ import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.NotificationResponse;
 import com.smartpharma.security.JwtService;
 import com.smartpharma.service.NotificationService;
+import com.smartpharma.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -20,27 +21,11 @@ import java.util.List;
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 @PreAuthorize("isAuthenticated()")
 public class NotificationController {
 
     private final NotificationService notificationService;
     private final JwtService jwtService;
-
-    private Long extractUserIdFromToken(@RequestHeader("Authorization") String authHeader) {
-        try {
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String jwt = authHeader.substring(7);
-                Long userId = jwtService.extractUserId(jwt);
-                if (userId != null) {
-                    return userId;
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Could not extract userId from token", e);
-        }
-        return null;
-    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<NotificationResponse>>> getUserNotifications(
@@ -50,7 +35,7 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        Long userId = extractUserIdFromToken(authHeader);
+        Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }
@@ -65,7 +50,7 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        Long userId = extractUserIdFromToken(authHeader);
+        Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }
@@ -80,7 +65,7 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        Long userId = extractUserIdFromToken(authHeader);
+        Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }
@@ -95,7 +80,7 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        Long userId = extractUserIdFromToken(authHeader);
+        Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }
@@ -111,7 +96,7 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        Long userId = extractUserIdFromToken(authHeader);
+        Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }
@@ -126,7 +111,7 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        Long userId = extractUserIdFromToken(authHeader);
+        Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }

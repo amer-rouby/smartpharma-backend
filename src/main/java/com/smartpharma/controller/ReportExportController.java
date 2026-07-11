@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/reports/export")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'PHARMACIST')")
-@CrossOrigin(origins = "http://localhost:4200")
 public class ReportExportController {
 
     private final ReportExportService exportService;
