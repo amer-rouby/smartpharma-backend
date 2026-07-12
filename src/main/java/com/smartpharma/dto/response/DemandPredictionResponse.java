@@ -81,11 +81,11 @@ public class DemandPredictionResponse {
     private static String generateRecommendation(String productName, Integer predicted, Integer current,
                                                  Integer recommended, String trend) {
         if (recommended <= 0) {
-            return String.format("المخزون الحالي كافٍ لـ '%s' للأسبوع القادم", productName);
+            return String.format("Current stock is sufficient for '%s' for the next week", productName);
         }
         if ("increasing".equals(trend)) {
-            return String.format("الطلب على '%s' في ارتفاع - ننصح بطلب %d وحدة إضافي", productName, recommended);
+            return String.format("Demand for '%s' is increasing - recommended to order %d additional unit(s)", productName, recommended);
         }
-        return String.format("ننصح بطلب %d وحدة من '%s' للأسبوع القادم", recommended, productName);
+        return String.format("Recommended to order %d unit(s) of '%s' for the next week", recommended, productName);
     }
 }

@@ -16,27 +16,27 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserRequest {
 
-    @NotBlank(message = "اسم المستخدم مطلوب")
-    @Size(min = 3, max = 50, message = "اسم المستخدم يجب أن يكون بين 3 و 50 حرف")
+    @NotBlank(message = "Username is required")
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     private String username;
 
-    @Size(min = 6, message = "كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+    @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
-    @NotBlank(message = "الاسم الكامل مطلوب")
+    @NotBlank(message = "Full name is required")
     @Size(max = 100)
     private String fullName;
 
-    @Email(message = "البريد الإلكتروني غير صحيح")
+    @Email(message = "Invalid email address")
     private String email;
 
     @Size(max = 20)
     private String phone;
 
-    @NotNull(message = "الدور مطلوب")
+    @NotNull(message = "Role is required")
     private User.UserRole role;
 
-    @NotNull(message = "الصيدلية مطلوبة")
+    @NotNull(message = "Pharmacy is required")
     private Long pharmacyId;
 
     @Builder.Default

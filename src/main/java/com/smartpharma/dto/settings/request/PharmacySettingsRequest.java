@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PharmacySettingsRequest {
 
-    @NotBlank(message = "اسم الصيدلية مطلوب")
+    @NotBlank(message = "Pharmacy name is required")
     @Size(max = 100)
     private String pharmacyName;
 
@@ -24,7 +24,7 @@ public class PharmacySettingsRequest {
     @Size(max = 50)
     private String phone;
 
-    @Email(message = "البريد الإلكتروني غير صحيح")
+    @Email(message = "Invalid email address")
     @Size(max = 100)
     private String email;
 

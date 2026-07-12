@@ -8,8 +8,17 @@ import lombok.*;
 @AllArgsConstructor
 public class RegisterRequest {
 
-    @NotNull(message = "Pharmacy ID is required")
     private Long pharmacyId;
+
+    @Size(max = 100)
+    private String pharmacyName;
+
+    @Size(max = 50)
+    private String licenseNumber;
+
+    @Email(message = "Invalid email address")
+    @Size(max = 100)
+    private String email;
 
     @NotBlank(message = "Username is required")
     @Size(min = 3, max = 100)
@@ -25,5 +34,7 @@ public class RegisterRequest {
     @Pattern(regexp = "^01[0-9]{9}$", message = "Invalid Egyptian phone number")
     private String phone;
 
-    private String role = "PHARMACIST";
+    // Role is only used when registering to an existing pharmacy (pharmacyId provided)
+    // When creating a new pharmacy (pharmacyName provided), the role is forced to ADMIN
+    private String role;
 }

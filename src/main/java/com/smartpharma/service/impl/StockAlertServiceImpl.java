@@ -228,8 +228,8 @@ public class StockAlertServiceImpl implements StockAlertService {
 
             Long totalStock = batchRepository.sumQuantityByProductId(product.getId());
             if (totalStock != null && totalStock <= product.getMinStockLevel()) {
-                String title = totalStock == 0 ? "نفاد المخزون" : "مخزون منخفض";
-                String message = String.format("المنتج '%s' - المخزون الحالي: %d (الحد الأدنى: %d)",
+                String title = totalStock == 0 ? "Out of Stock" : "Low Stock";
+                String message = String.format("Product '%s' - Current stock: %d (Minimum: %d)",
                         product.getName(), totalStock, product.getMinStockLevel());
                 StockAlert.AlertType type = totalStock == 0 ?
                         StockAlert.AlertType.OUT_OF_STOCK : StockAlert.AlertType.LOW_STOCK;
@@ -266,8 +266,8 @@ public class StockAlertServiceImpl implements StockAlertService {
                     }
 
                     long daysSinceExpiry = java.time.temporal.ChronoUnit.DAYS.between(batch.getExpiryDate(), today);
-                    String title = "منتج منتهي الصلاحية";
-                    String message = String.format("المنتج '%s' (دفعة %s) منتهي الصلاحية منذ %d يوم",
+                    String title = "Expired Product";
+                    String message = String.format("Product '%s' (Batch %s) expired %d day(s) ago",
                             product.getName(), batch.getBatchNumber(), daysSinceExpiry);
 
                     StockAlertResponse alert = createAlert(pharmacyId, product.getId(), batch.getId(),
@@ -295,8 +295,8 @@ public class StockAlertServiceImpl implements StockAlertService {
                     }
 
                     long daysUntilExpiry = java.time.temporal.ChronoUnit.DAYS.between(today, batch.getExpiryDate());
-                    String title = "ينتهي قريباً";
-                    String message = String.format("المنتج '%s' (دفعة %s) ينتهي خلال %d يوم",
+                    String title = "Expiring Soon";
+                    String message = String.format("Product '%s' (Batch %s) expires in %d day(s)",
                             product.getName(), batch.getBatchNumber(), daysUntilExpiry);
                     String severity = daysUntilExpiry <= 7 ? "HIGH" : "MEDIUM";
 

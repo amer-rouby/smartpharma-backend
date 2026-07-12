@@ -12,6 +12,7 @@ public class AuthResponse {
     private String fullName;
     private String role;
     private Long pharmacyId;
+    private String pharmacyName;
     private String accessToken;
     private String refreshToken;
     private String tokenType = "Bearer";

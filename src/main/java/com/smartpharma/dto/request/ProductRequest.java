@@ -18,7 +18,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class ProductRequest {
 
-    @NotBlank(message = "اسم المنتج مطلوب")
+    @NotBlank(message = "Product name is required")
     private String name;
 
     private String scientificName;
@@ -36,8 +36,8 @@ public class ProductRequest {
     @Builder.Default
     private Boolean prescriptionRequired = false;
 
-    @NotNull(message = "سعر البيع مطلوب")
-    @Positive(message = "سعر البيع يجب أن يكون أكبر من صفر")
+    @NotNull(message = "Sell price is required")
+    @Positive(message = "Sell price must be greater than zero")
     private BigDecimal sellPrice;
 
     private BigDecimal buyPrice;

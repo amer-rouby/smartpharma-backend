@@ -273,7 +273,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                             try {
                                 return item.getProduct().getCategory();
                             } catch (Exception e) {
-                                return "أخرى";
+                                return "Other";
                             }
                         },
                         Collectors.reducing(BigDecimal.ZERO, SaleItem::getTotalPrice, BigDecimal::add)
@@ -494,7 +494,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         try {
             if (item == null) return null;
 
-            String productName = "منتج غير متاح";
+            String productName = "Product unavailable";
             String productBarcode = null;
             Long productId = null;
             String productCategory = null;
@@ -514,7 +514,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                     if (product.getDeletedAt() == null) {
                         productId = product.getId();
                         productName = product.getName() != null ?
-                                product.getName() : "منتج غير متاح";
+                                product.getName() : "Product unavailable";
                         productBarcode = product.getBarcode();
                         productCategory = product.getCategory();
                     }
@@ -540,7 +540,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
             log.error("Failed to map sale item {} to DTO", item != null ? item.getId() : "unknown", e);
             return SaleTransactionDTO.SaleItemDTO.builder()
                     .id(item != null ? item.getId() : null)
-                    .productName("خطأ في تحميل البيانات")
+                    .productName("Error loading data")
                     .build();
         }
     }

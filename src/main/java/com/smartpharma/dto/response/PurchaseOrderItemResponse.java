@@ -22,28 +22,28 @@ public class PurchaseOrderItemResponse {
     private int pendingQuantity;
 
     public static PurchaseOrderItemResponse fromEntity(com.smartpharma.entity.PurchaseOrderItem item) {
-        String productName = "منتج غير متاح";
+        String productName = "Product unavailable";
         String productBarcode = null;
         Long productId = null;
 
         try {
             if (item.getProduct() != null) {
-                // التحقق لو الـ product محمل أو لأ
+                // Check if product is initialized
                 if (!Hibernate.isInitialized(item.getProduct())) {
-                    // لو مش محمل، نحاول نحمّله
+                    // If not initialized, try to load it
                     Hibernate.initialize(item.getProduct());
                 }
 
                 if (item.getProduct() != null) {
                     productId = item.getProduct().getId();
                     productName = item.getProduct().getName() != null ?
-                            item.getProduct().getName() : "منتج غير متاح";
+                            item.getProduct().getName() : "Product unavailable";
                     productBarcode = item.getProduct().getBarcode();
                 }
             }
         } catch (Exception e) {
-            // لو حصل أي خطأ ( زي EntityNotFoundException)، نستخدم القيم الافتراضية
-            productName = "منتج غير متاح";
+            // If any error occurs (e.g. EntityNotFoundException), use default values
+            productName = "Product unavailable";
         }
 
         return PurchaseOrderItemResponse.builder()

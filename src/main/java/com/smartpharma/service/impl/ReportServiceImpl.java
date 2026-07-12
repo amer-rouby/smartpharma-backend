@@ -114,7 +114,7 @@ public class ReportServiceImpl implements ReportService {
         List<StockReportResponse.StockByCategoryDTO> stockByCategory = categoryData.stream()
                 .filter(Objects::nonNull)
                 .map(row -> StockReportResponse.StockByCategoryDTO.builder()
-                        .categoryName(row[0] != null ? (String) row[0] : "غير مصنف")
+                        .categoryName(row[0] != null ? (String) row[0] : "Uncategorized")
                         .itemCount(row[1] != null ? ((Number) row[1]).longValue() : 0L)
                         .totalValue(row[2] != null ? (BigDecimal) row[2] : BigDecimal.ZERO)
                         .build())
@@ -240,7 +240,7 @@ public class ReportServiceImpl implements ReportService {
                     ExpenseCategory category = (ExpenseCategory) row[0];
                     BigDecimal amount = (BigDecimal) row[1];
                     return FinancialReportResponse.CategoryExpenseDTO.builder()
-                            .category(category != null ? category.getArabicName() : "أخرى")
+                            .category(category != null ? category.getArabicName() : "Other")
                             .amount(amount != null ? amount : BigDecimal.ZERO)
                             .build();
                 })
@@ -261,20 +261,15 @@ public class ReportServiceImpl implements ReportService {
         Long pharmacyId = request.getPharmacyId();
         LocalDate today = LocalDate.now();
 
-        Long totalExpiring = stockBatchRepository.countExpiringBatches(
-                pharmacyId, today.plusDays(90));
-        Long urgent = stockBatchRepository.countExpiringBatches(
-                pharmacyId, today.plusDays(7));
-        Long warning = stockBatchRepository.countExpiringBatches(
-                pharmacyId, today.plusDays(30));
-        Long expired = stockBatchRepository.countExpiredBatches(pharmacyId);
-        Long ok = (totalExpiring != null ? totalExpiring : 0L) - (warning != null ? warning : 0L);
-
-        List<Object[]> expiredData = stockBatchRepository.getExpiredProducts(pharmacyId, LocalDate.now());
+        List<Object[]> expiredData = stockBatchRepository.getExpiredProducts(pharmacyId, today);
         List<Object[]> expiringData = stockBatchRepository.getExpiringProducts(
                 pharmacyId, today.plusDays(90));
 
         List<ExpiryReportResponse.ExpiringProductDTO> expiringProducts = new ArrayList<>();
+        long urgentCount = 0;
+        long warningCount = 0;
+        long okCount = 0;
+        long expiredCount = 0;
 
         if (expiredData != null) {
             for (Object[] row : expiredData) {
@@ -293,6 +288,7 @@ public class ReportServiceImpl implements ReportService {
                         .status("EXPIRED")
                         .estimatedValue(0.0)
                         .build());
+                expiredCount++;
             }
         }
 
@@ -311,10 +307,13 @@ public class ReportServiceImpl implements ReportService {
                 String status;
                 if (daysUntil <= 7) {
                     status = "URGENT";
+                    urgentCount++;
                 } else if (daysUntil <= 30) {
                     status = "WARNING";
+                    warningCount++;
                 } else {
                     status = "OK";
+                    okCount++;
                 }
 
                 expiringProducts.add(ExpiryReportResponse.ExpiringProductDTO.builder()
@@ -333,11 +332,11 @@ public class ReportServiceImpl implements ReportService {
         expiringProducts.sort(Comparator.comparing(ExpiryReportResponse.ExpiringProductDTO::getExpiryDate));
 
         return ExpiryReportResponse.builder()
-                .totalExpiring(totalExpiring != null ? totalExpiring : 0L)
-                .urgentExpiring(urgent != null ? urgent : 0L)
-                .warningExpiring(warning != null ? warning : 0L)
-                .okExpiring(ok != null ? ok : 0L)
-                .expiredCount(expired != null ? expired : 0L)
+                .totalExpiring(urgentCount + warningCount + okCount)
+                .urgentExpiring(urgentCount)
+                .warningExpiring(warningCount)
+                .okExpiring(okCount)
+                .expiredCount(expiredCount)
                 .expiringProducts(expiringProducts)
                 .build();
     }

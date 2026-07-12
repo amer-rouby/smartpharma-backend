@@ -31,11 +31,44 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        Pharmacy pharmacy = pharmacyRepository.findById(request.getPharmacyId())
-                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+        Pharmacy pharmacy;
 
-        if (userRepository.existsByPharmacyIdAndUsername(request.getPharmacyId(), request.getUsername())) {
+        if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
+            // Create new pharmacy with registration
+            if (request.getLicenseNumber() == null || request.getLicenseNumber().isBlank()) {
+                throw new RuntimeException("License number is required for pharmacy registration");
+            }
+
+            pharmacy = Pharmacy.builder()
+                    .name(request.getPharmacyName())
+                    .licenseNumber(request.getLicenseNumber())
+                    .email(request.getEmail())
+                    .phone(request.getPhone())
+                    .subscriptionStatus(Pharmacy.SubscriptionStatus.ACTIVE)
+                    .planType(Pharmacy.PlanType.BASIC)
+                    .build();
+
+            pharmacy = pharmacyRepository.save(pharmacy);
+        } else if (request.getPharmacyId() != null) {
+            // Register user to existing pharmacy
+            pharmacy = pharmacyRepository.findById(request.getPharmacyId())
+                    .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+        } else {
+            throw new RuntimeException("Either pharmacyId or pharmacyName is required for registration");
+        }
+
+        if (userRepository.existsByPharmacyIdAndUsername(pharmacy.getId(), request.getUsername())) {
             throw new RuntimeException("Username already exists in this pharmacy");
+        }
+
+        // Determine role: new pharmacy registration forces ADMIN, existing pharmacy uses provided role or defaults to PHARMACIST
+        String roleName;
+        if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
+            // First user of a new pharmacy is always ADMIN
+            roleName = "ADMIN";
+        } else {
+            // Existing pharmacy: use provided role or default to PHARMACIST
+            roleName = (request.getRole() != null && !request.getRole().isBlank()) ? request.getRole() : "PHARMACIST";
         }
 
         User user = User.builder()
@@ -44,7 +77,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
-                .role(User.UserRole.valueOf(request.getRole()))
+                .role(User.UserRole.valueOf(roleName))
                 .isActive(true)
                 .build();
 
@@ -59,6 +92,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
                 .pharmacyId(pharmacy.getId())
+                .pharmacyName(pharmacy.getName())
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
@@ -92,6 +126,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
                 .pharmacyId(user.getPharmacy().getId())
+                .pharmacyName(user.getPharmacy().getName())
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")

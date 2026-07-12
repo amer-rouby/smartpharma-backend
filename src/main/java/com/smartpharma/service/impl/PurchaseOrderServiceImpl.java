@@ -289,7 +289,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                             .quantity(item.getQuantity())
                             .unitPrice(newBuyPrice)
                             .referenceNumber(order.getOrderNumber())
-                            .reason("استلام طلب شراء: " + order.getOrderNumber())
+                            .reason("Purchase order received: " + order.getOrderNumber())
                             .build();
 
                     stockMovementService.createMovement(movementRequest, userId);

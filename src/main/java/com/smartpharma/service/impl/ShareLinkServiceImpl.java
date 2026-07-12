@@ -73,7 +73,7 @@ public class ShareLinkServiceImpl implements ShareLinkService {
         shareLinkRepository.incrementAccessCount(token);
     }
 
-    // تنظيف الروابط منتهية الصلاحية كل ساعة
+    // Clean up expired share links every hour
     @Scheduled(cron = "0 0 * * * *")
     @Transactional
     public void cleanupExpiredLinks() {

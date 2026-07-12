@@ -286,7 +286,7 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
                     .productName(prediction.getProduct() != null ? prediction.getProduct().getName() : "N/A")
                     .quantity(0)
                     .status("NO_ORDER_NEEDED")
-                    .message("المخزون الحالي كافٍ - لا حاجة لطلب جديد")
+                    .message("Current stock is sufficient - no new order needed")
                     .build();
         }
 
@@ -314,10 +314,10 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
         if (date == null) return BigDecimal.ONE;
         int month = date.getMonthValue();
         Map<String, Map<Integer, BigDecimal>> seasonalityMap = Map.of(
-                "مسكنات", Map.of(12, BigDecimal.valueOf(1.3), 1, BigDecimal.valueOf(1.4), 2, BigDecimal.valueOf(1.2)),
-                "مضادات حيوية", Map.of(10, BigDecimal.valueOf(1.2), 11, BigDecimal.valueOf(1.3), 12, BigDecimal.valueOf(1.4)),
-                "فيتامينات", Map.of(9, BigDecimal.valueOf(1.2), 10, BigDecimal.valueOf(1.3)),
-                "حساسية", Map.of(3, BigDecimal.valueOf(1.3), 4, BigDecimal.valueOf(1.4), 5, BigDecimal.valueOf(1.2))
+                "Painkillers", Map.of(12, BigDecimal.valueOf(1.3), 1, BigDecimal.valueOf(1.4), 2, BigDecimal.valueOf(1.2)),
+                "Antibiotics", Map.of(10, BigDecimal.valueOf(1.2), 11, BigDecimal.valueOf(1.3), 12, BigDecimal.valueOf(1.4)),
+                "Vitamins", Map.of(9, BigDecimal.valueOf(1.2), 10, BigDecimal.valueOf(1.3)),
+                "Allergy", Map.of(3, BigDecimal.valueOf(1.3), 4, BigDecimal.valueOf(1.4), 5, BigDecimal.valueOf(1.2))
         );
         Map<Integer, BigDecimal> monthFactors = seasonalityMap.getOrDefault(category, Map.of());
         return monthFactors.getOrDefault(month, BigDecimal.ONE);

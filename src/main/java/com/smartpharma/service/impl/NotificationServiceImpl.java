@@ -118,8 +118,8 @@ public class NotificationServiceImpl implements NotificationService {
         Long currentStock = stockBatchRepository.sumQuantityByProductId(product.getId());
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(recipient)
-                .title("⚠️ مخزون منخفض")
-                .message("المنتج '" + product.getName() + "' وصل إلى مخزون منخفض: " + currentStock + " وحدة")
+                .title("⚠️ Low Stock Warning")
+                .message("Product '" + product.getName() + "' has reached low stock: " + currentStock + " units")
                 .type(Notification.NotificationType.LOW_STOCK)
                 .priority(Notification.NotificationPriority.HIGH)
                 .relatedEntityType("PRODUCT").relatedEntityId(product.getId()).build());
@@ -133,7 +133,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         // Expired batches
         for (StockBatch batch : stockBatchRepository.findExpiredBatches(pharmacyId, today)) {
-            createExpiryNotification(batch, pharmacyId, "منتهي الصلاحية",
+            createExpiryNotification(batch, pharmacyId, "EXPIRED",
                     Notification.NotificationType.EXPIRED, Notification.NotificationPriority.URGENT);
         }
         // Expiring soon batches
@@ -142,7 +142,7 @@ public class NotificationServiceImpl implements NotificationService {
                     !notificationRepository.existsByRelatedEntityTypeAndRelatedEntityIdAndTypeAndCreatedAtAfter(
                             "STOCK_BATCH", batch.getId(), Notification.NotificationType.EXPIRY_WARNING,
                             LocalDateTime.now().minusHours(24))) {
-                createExpiryNotification(batch, pharmacyId, "ينتهي قريباً",
+                createExpiryNotification(batch, pharmacyId, "EXPIRING_SOON",
                         Notification.NotificationType.EXPIRY_WARNING, Notification.NotificationPriority.MEDIUM);
             }
         }
@@ -153,9 +153,9 @@ public class NotificationServiceImpl implements NotificationService {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
         long days = ChronoUnit.DAYS.between(LocalDate.now(), batch.getExpiryDate());
-        String daysText = days > 0 ? "خلال " + days + " يوم" : "اليوم";
-        String title = type == Notification.NotificationType.EXPIRED ? "❌ منتهي الصلاحية" : "⚠️ ينتهي قريباً";
-        String message = "دفعة '" + batch.getBatchNumber() + "' من المنتج '" + batch.getProduct().getName() + "' " + statusLabel + " (" + daysText + ")";
+        String daysText = days > 0 ? "in " + days + " day(s)" : "today";
+        String title = type == Notification.NotificationType.EXPIRED ? "❌ Expired Product" : "⚠️ Expiring Soon";
+        String message = "Batch '" + batch.getBatchNumber() + "' of product '" + batch.getProduct().getName() + "' " + statusLabel + " (" + daysText + ")";
 
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(null)
