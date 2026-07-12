@@ -9,6 +9,7 @@ import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.UserRepository;
 import com.smartpharma.security.JwtService;
 import com.smartpharma.service.AuthenticationService;
+import com.smartpharma.service.SessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,11 +23,14 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
 
+    private static final int DEFAULT_SESSION_TIMEOUT_MINUTES = 30;
+
     private final UserRepository userRepository;
     private final PharmacyRepository pharmacyRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final SessionService sessionService;
 
     @Override
     @Transactional
@@ -34,7 +38,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         Pharmacy pharmacy;
 
         if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
-            // Create new pharmacy with registration
             if (request.getLicenseNumber() == null || request.getLicenseNumber().isBlank()) {
                 throw new RuntimeException("License number is required for pharmacy registration");
             }
@@ -50,7 +53,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             pharmacy = pharmacyRepository.save(pharmacy);
         } else if (request.getPharmacyId() != null) {
-            // Register user to existing pharmacy
             pharmacy = pharmacyRepository.findById(request.getPharmacyId())
                     .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
         } else {
@@ -61,13 +63,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new RuntimeException("Username already exists in this pharmacy");
         }
 
-        // Determine role: new pharmacy registration forces ADMIN, existing pharmacy uses provided role or defaults to PHARMACIST
         String roleName;
         if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
-            // First user of a new pharmacy is always ADMIN
             roleName = "ADMIN";
         } else {
-            // Existing pharmacy: use provided role or default to PHARMACIST
             roleName = (request.getRole() != null && !request.getRole().isBlank()) ? request.getRole() : "PHARMACIST";
         }
 
@@ -85,6 +84,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         String accessToken = jwtService.generateToken(user, pharmacy.getId());
         String refreshToken = jwtService.generateRefreshToken(user);
+        long expiresInMs = jwtService.extractClaim(accessToken, claims -> claims.getExpiration().getTime());
+
+        // Create session for the new user
+        sessionService.createSession(user, accessToken, DEFAULT_SESSION_TIMEOUT_MINUTES);
 
         return AuthResponse.builder()
                 .userId(user.getId())
@@ -96,7 +99,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .expiresIn(jwtService.extractClaim(accessToken, claims -> claims.getExpiration().getTime()))
+                .expiresIn(expiresInMs)
+                .expiresAt(LocalDateTime.now().plusMinutes(DEFAULT_SESSION_TIMEOUT_MINUTES))
+                .sessionTimeout(DEFAULT_SESSION_TIMEOUT_MINUTES)
+                .warningThreshold(user.getWarningThreshold())
+                .maxExtensions(user.getMaxExtensions())
+                .remainingExtensions(user.getRemainingExtensions())
                 .build();
     }
 
@@ -107,6 +115,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
 
+        // Reload user from database to get fresh data including session_timeout
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
@@ -117,25 +126,39 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
+        // Revoke any existing sessions for this user
+        sessionService.revokeAllUserSessions(user.getId());
+
         String accessToken = jwtService.generateToken(user, user.getPharmacy().getId());
         String refreshToken = jwtService.generateRefreshToken(user);
+        long expiresInMs = jwtService.extractClaim(accessToken, claims -> claims.getExpiration().getTime());
+
+        // Get fresh user data from database to ensure we have the latest session_timeout
+        User freshUser = userRepository.findById(user.getId()).orElse(user);
+        int sessionTimeout = freshUser.getSessionTimeout() != null ? freshUser.getSessionTimeout() : DEFAULT_SESSION_TIMEOUT_MINUTES;
+        sessionService.createSession(freshUser, accessToken, sessionTimeout);
 
         return AuthResponse.builder()
-                .userId(user.getId())
-                .username(user.getUsername())
-                .fullName(user.getFullName())
-                .role(user.getRole().name())
-                .pharmacyId(user.getPharmacy().getId())
-                .pharmacyName(user.getPharmacy().getName())
+                .userId(freshUser.getId())
+                .username(freshUser.getUsername())
+                .fullName(freshUser.getFullName())
+                .role(freshUser.getRole().name())
+                .pharmacyId(freshUser.getPharmacy().getId())
+                .pharmacyName(freshUser.getPharmacy().getName())
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .expiresIn(System.currentTimeMillis() + jwtService.extractClaim(accessToken, claims ->
-                        claims.getExpiration().getTime()))
+                .expiresIn(expiresInMs)
+                .expiresAt(LocalDateTime.now().plusMinutes(sessionTimeout))
+                .sessionTimeout(sessionTimeout)
+                .warningThreshold(freshUser.getWarningThreshold())
+                .maxExtensions(freshUser.getMaxExtensions())
+                .remainingExtensions(freshUser.getRemainingExtensions())
                 .build();
     }
 
     @Override
+    @Transactional
     public AuthResponse refreshToken(String refreshToken) {
         String username = jwtService.extractUsername(refreshToken);
         User user = userRepository.findByUsername(username)
@@ -145,16 +168,44 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new RuntimeException("Invalid refresh token");
         }
 
-        String newAccessToken = jwtService.generateToken(user, user.getPharmacy().getId());
+        // Revoke old sessions and create new one
+        sessionService.revokeAllUserSessions(user.getId());
+
+        // Get fresh user data from database
+        User freshUser = userRepository.findById(user.getId()).orElse(user);
+        int sessionTimeout = freshUser.getSessionTimeout() != null ? freshUser.getSessionTimeout() : DEFAULT_SESSION_TIMEOUT_MINUTES;
+
+        String newAccessToken = jwtService.generateToken(freshUser, freshUser.getPharmacy().getId());
+        long expiresInMs = jwtService.extractClaim(newAccessToken, claims -> claims.getExpiration().getTime());
+
+        // Create new session with user's current timeout setting
+        sessionService.createSession(freshUser, newAccessToken, sessionTimeout);
 
         return AuthResponse.builder()
-                .userId(user.getId())
-                .username(user.getUsername())
+                .userId(freshUser.getId())
+                .username(freshUser.getUsername())
+                .fullName(freshUser.getFullName())
+                .role(freshUser.getRole().name())
+                .pharmacyId(freshUser.getPharmacy().getId())
+                .pharmacyName(freshUser.getPharmacy().getName())
                 .accessToken(newAccessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .expiresIn(System.currentTimeMillis() + jwtService.extractClaim(newAccessToken, claims ->
-                        claims.getExpiration().getTime()))
+                .expiresIn(expiresInMs)
+                .expiresAt(LocalDateTime.now().plusMinutes(sessionTimeout))
+                .sessionTimeout(sessionTimeout)
+                .warningThreshold(freshUser.getWarningThreshold())
+                .maxExtensions(freshUser.getMaxExtensions())
+                .remainingExtensions(freshUser.getRemainingExtensions())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void logout(String accessToken) {
+        if (accessToken != null && accessToken.startsWith("Bearer ")) {
+            accessToken = accessToken.substring(7);
+        }
+        sessionService.revokeSession(accessToken);
     }
 }

@@ -101,9 +101,14 @@ public class SecurityConfig {
                 "Content-Type",
                 "X-Requested-With",
                 "Accept",
-                "Origin"
+                "Origin",
+                "X-User-Active"
         ));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "X-Session-Extended",
+                "X-Remaining-Extensions"
+        ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

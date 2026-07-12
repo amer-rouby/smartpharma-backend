@@ -2,6 +2,8 @@ package com.smartpharma.dto.response;
 
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -17,4 +19,9 @@ public class AuthResponse {
     private String refreshToken;
     private String tokenType = "Bearer";
     private Long expiresIn;
+    private LocalDateTime expiresAt;
+    private Integer sessionTimeout;
+    private Integer warningThreshold;
+    private Integer maxExtensions;
+    private Integer remainingExtensions;
 }
