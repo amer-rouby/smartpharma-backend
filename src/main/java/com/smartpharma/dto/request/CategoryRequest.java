@@ -16,6 +16,10 @@ public class CategoryRequest {
     @NotBlank(message = "Category name is required")
     private String name;
 
+    private String nameAr;
+
+    private String nameEn;
+
     private String description;
 
     private String icon;

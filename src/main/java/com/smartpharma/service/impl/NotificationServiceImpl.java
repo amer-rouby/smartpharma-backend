@@ -9,6 +9,7 @@ import com.smartpharma.entity.StockBatch;
 import com.smartpharma.entity.User;
 import com.smartpharma.repository.*;
 import com.smartpharma.service.NotificationService;
+import com.smartpharma.service.NotificationStreamService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,6 +34,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final StockBatchRepository stockBatchRepository;
     private final PharmacyRepository pharmacyRepository;
     private final UserRepository userRepository;
+    private final NotificationStreamService notificationStreamService;
 
     private static final int EXPIRY_WARNING_DAYS = 30;
 
@@ -49,14 +51,18 @@ public class NotificationServiceImpl implements NotificationService {
         if (notification.getRecipient() == null || notification.getRecipient().getId().equals(userId)) {
             notification.setRead(true);
             notification.setReadAt(LocalDateTime.now());
-            return mapToResponse(notificationRepository.save(notification));
+            NotificationResponse response = mapToResponse(notificationRepository.save(notification));
+            notificationStreamService.notifyChanged(notification.getPharmacy().getId());
+            return response;
         }
         throw new RuntimeException("Unauthorized to mark this notification as read");
     }
 
     @Override @Transactional
     public int markAllAsRead(Long pharmacyId, Long userId) {
-        return notificationRepository.markAllAsReadByUser(pharmacyId, userId);
+        int count = notificationRepository.markAllAsReadByUser(pharmacyId, userId);
+        notificationStreamService.notifyChanged(pharmacyId);
+        return count;
     }
 
     @Override @Transactional(readOnly = true)
@@ -86,7 +92,9 @@ public class NotificationServiceImpl implements NotificationService {
                 .type(request.getType()).priority(request.getPriority())
                 .relatedEntityType(request.getRelatedEntityType())
                 .relatedEntityId(request.getRelatedEntityId()).build();
-        return mapToResponse(notificationRepository.save(notification));
+        NotificationResponse response = mapToResponse(notificationRepository.save(notification));
+        notificationStreamService.notifyCreated(request.getPharmacy().getId(), response);
+        return response;
     }
 
     @Override @Transactional
@@ -95,6 +103,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
         if (notification.getRecipient() == null || notification.getRecipient().getId().equals(userId)) {
             notificationRepository.delete(notification);
+            notificationStreamService.notifyChanged(notification.getPharmacy().getId());
         } else {
             throw new RuntimeException("Unauthorized to delete this notification");
         }

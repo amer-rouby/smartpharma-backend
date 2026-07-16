@@ -44,8 +44,12 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional
     public CategoryResponse createCategory(CategoryRequest request) {
+        String categoryName = resolveCategoryName(request);
+        String nameAr = resolveNameAr(request, categoryName);
+        String nameEn = resolveNameEn(request, categoryName);
+
         // Check if category with same name exists
-        if (categoryRepository.existsByPharmacyIdAndNameIgnoreCase(request.getPharmacyId(), request.getName())) {
+        if (categoryRepository.existsByPharmacyIdAndNameIgnoreCase(request.getPharmacyId(), categoryName)) {
             throw new RuntimeException("Category with this name already exists");
         }
 
@@ -53,7 +57,9 @@ public class CategoryServiceImpl implements CategoryService {
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
 
         Category category = Category.builder()
-                .name(request.getName())
+                .name(categoryName)
+                .nameAr(nameAr)
+                .nameEn(nameEn)
                 .description(request.getDescription())
                 .icon(request.getIcon())
                 .color(request.getColor() != null ? request.getColor() : "#667eea")
@@ -71,14 +77,19 @@ public class CategoryServiceImpl implements CategoryService {
     public CategoryResponse updateCategory(Long id, CategoryRequest request, Long pharmacyId) {
         Category category = categoryRepository.findByIdAndPharmacyId(id, pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
+        String categoryName = resolveCategoryName(request);
+        String nameAr = resolveNameAr(request, categoryName);
+        String nameEn = resolveNameEn(request, categoryName);
 
         // Check if new name conflicts with existing category
-        if (!category.getName().equalsIgnoreCase(request.getName()) &&
-                categoryRepository.existsByPharmacyIdAndNameIgnoreCase(pharmacyId, request.getName())) {
+        if (!category.getName().equalsIgnoreCase(categoryName) &&
+                categoryRepository.existsByPharmacyIdAndNameIgnoreCase(pharmacyId, categoryName)) {
             throw new RuntimeException("Category with this name already exists");
         }
 
-        category.setName(request.getName());
+        category.setName(categoryName);
+        category.setNameAr(nameAr);
+        category.setNameEn(nameEn);
         category.setDescription(request.getDescription());
         category.setIcon(request.getIcon());
         category.setColor(request.getColor() != null ? request.getColor() : category.getColor());
@@ -123,5 +134,36 @@ public class CategoryServiceImpl implements CategoryService {
                 .stream()
                 .map(CategoryResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    private String resolveCategoryName(CategoryRequest request) {
+        String name = cleanText(request.getName());
+        if (name != null) {
+            return name;
+        }
+
+        String nameAr = cleanText(request.getNameAr());
+        if (nameAr != null) {
+            return nameAr;
+        }
+
+        return cleanText(request.getNameEn());
+    }
+
+    private String resolveNameAr(CategoryRequest request, String fallbackName) {
+        String nameAr = cleanText(request.getNameAr());
+        return nameAr != null ? nameAr : fallbackName;
+    }
+
+    private String resolveNameEn(CategoryRequest request, String fallbackName) {
+        String nameEn = cleanText(request.getNameEn());
+        return nameEn != null ? nameEn : fallbackName;
+    }
+
+    private String cleanText(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value.trim();
     }
 }
