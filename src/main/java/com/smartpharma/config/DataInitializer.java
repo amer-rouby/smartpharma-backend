@@ -38,11 +38,11 @@ public class DataInitializer {
             }
 
             Pharmacy pharmacy = Pharmacy.builder()
-                    .name("صيدلية الشفاء النموذجية")
+                    .name("Al Shifa Model Pharmacy")
                     .licenseNumber("PH-2024-001")
                     .email("test@smartpharma.eg")
                     .phone("01012345678")
-                    .address("القاهرة، مدينة نصر، شارع الطيران")
+                    .address("Cairo, Nasr City, Al Tayaran Street")
                     .subscriptionStatus(Pharmacy.SubscriptionStatus.ACTIVE)
                     .planType(Pharmacy.PlanType.PROFESSIONAL)
                     .build();
@@ -52,7 +52,7 @@ public class DataInitializer {
                     .pharmacy(pharmacy)
                     .username("admin")
                     .password(passwordEncoder.encode("admin123"))
-                    .fullName("أحمد محمد")
+                    .fullName("Ahmed Mohamed")
                     .phone("01012345678")
                     .role(User.UserRole.ADMIN)
                     .isActive(true)
@@ -64,7 +64,7 @@ public class DataInitializer {
                     .pharmacy(pharmacy)
                     .username("pharmacist")
                     .password(passwordEncoder.encode("pharm123"))
-                    .fullName("محمد علي")
+                    .fullName("Mohamed Ali")
                     .phone("01098765432")
                     .role(User.UserRole.PHARMACIST)
                     .isActive(true)
@@ -72,16 +72,16 @@ public class DataInitializer {
 
             userRepository.save(pharmacist);
             String[][] productsData = {
-                    {"بنادول إكسترا", "Paracetamol + Caffeine", "1234567890123", "مسكنات", "BOX"},
-                    {"أوجمنت 1 جم", "Amoxicillin + Clavulanic Acid", "1234567890124", "مضادات حيوية", "BOX"},
-                    {"كونكور 5 مجم", "Bisoprolol", "1234567890125", "قلب وأوعية", "BOX"},
-                    {"أوميبرازول 20 مجم", "Omeprazole", "1234567890126", "معدة", "BOX"},
-                    {"فولتارين 50 مجم", "Diclofenac", "1234567890127", "مسكنات", "BOX"},
-                    {"أوجمنت 625 مجم", "Amoxicillin + Clavulanic Acid", "1234567890128", "مضادات حيوية", "BOX"},
-                    {"بانادول أطفال", "Paracetamol Suspension", "1234567890129", "مسكنات أطفال", "BOTTLE"},
-                    {"بروفين 400 مجم", "Ibuprofen", "1234567890130", "مسكنات", "BOX"},
-                    {"زيرتك 10 مجم", "Cetirizine", "1234567890131", "حساسية", "BOX"},
-                    {"أموكسيل 500 مجم", "Amoxicillin", "1234567890132", "مضادات حيوية", "BOX"}
+                    {"Panadol Extra", "Paracetamol + Caffeine", "1234567890123", "Painkillers", "BOX"},
+                    {"Augmentin 1g", "Amoxicillin + Clavulanic Acid", "1234567890124", "Antibiotics", "BOX"},
+                    {"Concor 5mg", "Bisoprolol", "1234567890125", "Cardiovascular", "BOX"},
+                    {"Omeprazole 20mg", "Omeprazole", "1234567890126", "Stomach", "BOX"},
+                    {"Voltaren 50mg", "Diclofenac", "1234567890127", "Painkillers", "BOX"},
+                    {"Augmentin 625mg", "Amoxicillin + Clavulanic Acid", "1234567890128", "Antibiotics", "BOX"},
+                    {"Panadol Children", "Paracetamol Suspension", "1234567890129", "Children Painkillers", "BOTTLE"},
+                    {"Brufen 400mg", "Ibuprofen", "1234567890130", "Painkillers", "BOX"},
+                    {"Zyrtec 10mg", "Cetirizine", "1234567890131", "Allergy", "BOX"},
+                    {"Amoxil 500mg", "Amoxicillin", "1234567890132", "Antibiotics", "BOX"}
             };
 
             for (String[] prodData : productsData) {
@@ -93,7 +93,7 @@ public class DataInitializer {
                         .category(prodData[3])
                         .unitType(prodData[4])
                         .minStockLevel(10)
-                        .prescriptionRequired(prodData[3].contains("مضادات") || prodData[3].contains("قلب"))
+                        .prescriptionRequired(prodData[3].contains("Antibiotics") || prodData[3].contains("Cardiovascular"))
                         .sellPrice(new BigDecimal("25.00"))
                         .buyPrice(new BigDecimal("15.00"))
                         .build();
@@ -109,7 +109,7 @@ public class DataInitializer {
                         .expiryDate(LocalDate.now().plusMonths(18))
                         .buyPrice(new BigDecimal("15.00"))
                         .sellPrice(new BigDecimal("25.00"))
-                        .location("رف-" + (product.getId() % 5 + 1))
+                        .location("Shelf-" + (product.getId() % 5 + 1))
                         .status(StockBatch.BatchStatus.ACTIVE)
                         .build();
 

@@ -9,6 +9,7 @@ import com.smartpharma.entity.StockBatch;
 import com.smartpharma.entity.User;
 import com.smartpharma.repository.*;
 import com.smartpharma.service.NotificationService;
+import com.smartpharma.service.NotificationStreamService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,6 +34,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final StockBatchRepository stockBatchRepository;
     private final PharmacyRepository pharmacyRepository;
     private final UserRepository userRepository;
+    private final NotificationStreamService notificationStreamService;
 
     private static final int EXPIRY_WARNING_DAYS = 30;
 
@@ -49,14 +51,18 @@ public class NotificationServiceImpl implements NotificationService {
         if (notification.getRecipient() == null || notification.getRecipient().getId().equals(userId)) {
             notification.setRead(true);
             notification.setReadAt(LocalDateTime.now());
-            return mapToResponse(notificationRepository.save(notification));
+            NotificationResponse response = mapToResponse(notificationRepository.save(notification));
+            notificationStreamService.notifyChanged(notification.getPharmacy().getId());
+            return response;
         }
         throw new RuntimeException("Unauthorized to mark this notification as read");
     }
 
     @Override @Transactional
     public int markAllAsRead(Long pharmacyId, Long userId) {
-        return notificationRepository.markAllAsReadByUser(pharmacyId, userId);
+        int count = notificationRepository.markAllAsReadByUser(pharmacyId, userId);
+        notificationStreamService.notifyChanged(pharmacyId);
+        return count;
     }
 
     @Override @Transactional(readOnly = true)
@@ -86,7 +92,9 @@ public class NotificationServiceImpl implements NotificationService {
                 .type(request.getType()).priority(request.getPriority())
                 .relatedEntityType(request.getRelatedEntityType())
                 .relatedEntityId(request.getRelatedEntityId()).build();
-        return mapToResponse(notificationRepository.save(notification));
+        NotificationResponse response = mapToResponse(notificationRepository.save(notification));
+        notificationStreamService.notifyCreated(request.getPharmacy().getId(), response);
+        return response;
     }
 
     @Override @Transactional
@@ -95,6 +103,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
         if (notification.getRecipient() == null || notification.getRecipient().getId().equals(userId)) {
             notificationRepository.delete(notification);
+            notificationStreamService.notifyChanged(notification.getPharmacy().getId());
         } else {
             throw new RuntimeException("Unauthorized to delete this notification");
         }
@@ -118,8 +127,8 @@ public class NotificationServiceImpl implements NotificationService {
         Long currentStock = stockBatchRepository.sumQuantityByProductId(product.getId());
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(recipient)
-                .title("⚠️ مخزون منخفض")
-                .message("المنتج '" + product.getName() + "' وصل إلى مخزون منخفض: " + currentStock + " وحدة")
+                .title("⚠️ Low Stock Warning")
+                .message("Product '" + product.getName() + "' has reached low stock: " + currentStock + " units")
                 .type(Notification.NotificationType.LOW_STOCK)
                 .priority(Notification.NotificationPriority.HIGH)
                 .relatedEntityType("PRODUCT").relatedEntityId(product.getId()).build());
@@ -133,7 +142,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         // Expired batches
         for (StockBatch batch : stockBatchRepository.findExpiredBatches(pharmacyId, today)) {
-            createExpiryNotification(batch, pharmacyId, "منتهي الصلاحية",
+            createExpiryNotification(batch, pharmacyId, "EXPIRED",
                     Notification.NotificationType.EXPIRED, Notification.NotificationPriority.URGENT);
         }
         // Expiring soon batches
@@ -142,7 +151,7 @@ public class NotificationServiceImpl implements NotificationService {
                     !notificationRepository.existsByRelatedEntityTypeAndRelatedEntityIdAndTypeAndCreatedAtAfter(
                             "STOCK_BATCH", batch.getId(), Notification.NotificationType.EXPIRY_WARNING,
                             LocalDateTime.now().minusHours(24))) {
-                createExpiryNotification(batch, pharmacyId, "ينتهي قريباً",
+                createExpiryNotification(batch, pharmacyId, "EXPIRING_SOON",
                         Notification.NotificationType.EXPIRY_WARNING, Notification.NotificationPriority.MEDIUM);
             }
         }
@@ -153,9 +162,9 @@ public class NotificationServiceImpl implements NotificationService {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
         long days = ChronoUnit.DAYS.between(LocalDate.now(), batch.getExpiryDate());
-        String daysText = days > 0 ? "خلال " + days + " يوم" : "اليوم";
-        String title = type == Notification.NotificationType.EXPIRED ? "❌ منتهي الصلاحية" : "⚠️ ينتهي قريباً";
-        String message = "دفعة '" + batch.getBatchNumber() + "' من المنتج '" + batch.getProduct().getName() + "' " + statusLabel + " (" + daysText + ")";
+        String daysText = days > 0 ? "in " + days + " day(s)" : "today";
+        String title = type == Notification.NotificationType.EXPIRED ? "❌ Expired Product" : "⚠️ Expiring Soon";
+        String message = "Batch '" + batch.getBatchNumber() + "' of product '" + batch.getProduct().getName() + "' " + statusLabel + " (" + daysText + ")";
 
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(null)

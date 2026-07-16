@@ -4,6 +4,7 @@ import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.StockAlertResponse;
 import com.smartpharma.entity.StockAlert;
 import com.smartpharma.service.StockAlertService;
+import com.smartpharma.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,7 +19,6 @@ import java.util.List;
 @RequestMapping("/api/alerts")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class StockAlertController {
     private final StockAlertService alertService;
 
@@ -65,7 +65,7 @@ public class StockAlertController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Marking alert {} as read by user {}", id, userId);
         alertService.markAsRead(id, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(null, "Alert marked as read"));
@@ -76,7 +76,7 @@ public class StockAlertController {
     public ResponseEntity<ApiResponse<Void>> markAllAsRead(
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Marking all alerts as read for pharmacy {} by user {}", pharmacyId, userId);
         alertService.markAllAsRead(pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(null, "All alerts marked as read"));
@@ -88,7 +88,7 @@ public class StockAlertController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Resolving alert {} by user {}", id, userId);
         alertService.resolveAlert(id, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(null, "Alert resolved"));
@@ -120,15 +120,5 @@ public class StockAlertController {
         log.info("Generating expiry alerts for pharmacy {}", pharmacyId);
         alertService.generateExpiryAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Expiry alerts generated"));
-    }
-
-    private Long extractUserId(UserDetails userDetails) {
-        if (userDetails == null) return null;
-        if (userDetails instanceof com.smartpharma.entity.User user) return user.getId();
-        try {
-            return Long.valueOf(userDetails.getUsername());
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

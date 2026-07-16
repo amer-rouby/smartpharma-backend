@@ -33,12 +33,12 @@ public class BankTransferPaymentGateway extends BasePaymentGateway {
     protected PaymentResponse callGatewayAPI(PaymentRequest request, String referenceNumber) {
         log.info("Processing Bank Transfer payment: {}", referenceNumber);
 
-        // محاكاة الـ Bank Transfer gateway
-        // في الواقع هنا هتتصل بـ الـ Bank API أو تولد رقم حساب للتحويل
+        // Simulate Bank Transfer gateway
+        // In production, this would call the Bank API or generate transfer account details
         try {
-            Thread.sleep(1000); // محاكاة الـ delay
+            Thread.sleep(1000); // Simulate network delay
 
-            // بنك ترانسفير عادة بيكون pending لحد ما المستخدم يحول فعلياً
+            // Bank transfers are typically pending until the user completes the transfer
             return PaymentResponse.builder()
                     .status("PENDING")
                     .message("Bank transfer initiated. Please complete the transfer to the provided account details.")

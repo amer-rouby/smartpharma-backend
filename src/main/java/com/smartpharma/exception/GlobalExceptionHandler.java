@@ -1,5 +1,7 @@
-package exception;
+package com.smartpharma.exception;
 
+import com.smartpharma.exception.MaxExtensionsReachedException;
+import com.smartpharma.exception.SessionExpiredException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,38 @@ import java.util.Map;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+    
+    @ExceptionHandler(SessionExpiredException.class)
+    public ResponseEntity<Map<String, Object>> handleSessionExpiredException(SessionExpiredException ex) {
+        log.error("Session expired: {}", ex.getMessage());
+        Map<String, Object> error = new HashMap<>();
+        error.put("code", "SESSION_EXPIRED");
+        error.put("message", ex.getMessage());
+        error.put("timestamp", LocalDateTime.now().toString());
+        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(MaxExtensionsReachedException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxExtensionsReachedException(MaxExtensionsReachedException ex) {
+        log.error("Max extensions reached: {}", ex.getMessage());
+        Map<String, Object> error = new HashMap<>();
+        error.put("success", false);
+        error.put("code", "MAX_EXTENSIONS_REACHED");
+        error.put("message", ex.getMessage());
+        error.put("data", null);
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex) {
+        log.error("Resource not found: {}", ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {

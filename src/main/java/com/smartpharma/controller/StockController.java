@@ -5,8 +5,8 @@ import com.smartpharma.dto.request.StockBatchRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.StockAdjustmentHistoryDTO;
 import com.smartpharma.dto.response.StockBatchResponse;
-import com.smartpharma.security.JwtService;
 import com.smartpharma.service.StockBatchService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,17 +17,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/stock")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:3000"})
 public class StockController {
 
     private final StockBatchService stockBatchService;
-    private final JwtService jwtService;
 
     @GetMapping("/batches")
     @PreAuthorize("isAuthenticated()")
@@ -64,7 +61,7 @@ public class StockController {
         log.info("POST /api/stock/batches - pharmacyId: {}, product: {}",
                 pharmacyId, request.getProductId());
 
-        Long userId = extractUserId(authentication);
+        Long userId = SecurityUtils.extractUserId(authentication);
         StockBatchResponse batch = stockBatchService.createBatch(request, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(batch, "Batch created successfully"));
     }
@@ -79,7 +76,7 @@ public class StockController {
 
         log.info("PUT /api/stock/batches/{} - pharmacyId: {}", id, pharmacyId);
 
-        Long userId = extractUserId(authentication);
+        Long userId = SecurityUtils.extractUserId(authentication);
         StockBatchResponse batch = stockBatchService.updateBatch(id, request, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(batch, "Batch updated successfully"));
     }
@@ -93,7 +90,7 @@ public class StockController {
 
         log.info("DELETE /api/stock/batches/{} - pharmacyId: {}", id, pharmacyId);
 
-        Long userId = extractUserId(authentication);
+        Long userId = SecurityUtils.extractUserId(authentication);
         stockBatchService.deleteBatch(id, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(null, "Batch deleted successfully"));
     }
@@ -131,7 +128,7 @@ public class StockController {
         log.info("POST /api/stock/batches/{}/adjust - type: {}, quantity: {}",
                 id, request.getType(), request.getQuantity());
 
-        Long userId = extractUserId(authentication);
+        Long userId = SecurityUtils.extractUserId(authentication);
         StockBatchResponse batch = stockBatchService.adjustStock(id, request, userId);
         return ResponseEntity.ok(ApiResponse.success(batch, "Stock adjusted successfully"));
     }
@@ -148,32 +145,4 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(history, "Adjustment history retrieved successfully"));
     }
 
-    private Long extractUserId(Authentication authentication) {
-        if (authentication == null) return null;
-
-        Object details = authentication.getDetails();
-        if (details instanceof Map) {
-            Map<?, ?> detailsMap = (Map<?, ?>) details;
-            Object userIdObj = detailsMap.get("userId");
-            if (userIdObj instanceof Long) {
-                return (Long) userIdObj;
-            }
-            if (userIdObj instanceof Integer) {
-                return ((Integer) userIdObj).longValue();
-            }
-            if (userIdObj instanceof String) {
-                try {
-                    return Long.valueOf((String) userIdObj);
-                } catch (NumberFormatException e) {
-                    return null;
-                }
-            }
-        }
-
-        if (authentication.getPrincipal() instanceof com.smartpharma.entity.User user) {
-            return user.getId();
-        }
-
-        return null;
-    }
 }

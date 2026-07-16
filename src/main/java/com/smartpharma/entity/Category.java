@@ -25,6 +25,12 @@ public class Category {
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Column(name = "name_ar", nullable = false, length = 100)
+    private String nameAr;
+
+    @Column(name = "name_en", length = 100)
+    private String nameEn;
+
     @Column(length = 255)
     private String description;
 

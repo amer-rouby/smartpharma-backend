@@ -1,5 +1,6 @@
 package com.smartpharma.entity;
 
+import com.smartpharma.entity.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -83,9 +84,9 @@ public class SaleTransaction {
     @Builder.Default
     private List<SaleItem> items = new ArrayList<>();
 
-    public enum PaymentMethod {
-        CASH, VISA, INSTAPAY, WALLET, CREDIT, BANK_TRANSFER, FAWRY
-    }
+//    public enum PaymentMethod {
+//        CASH, VISA, INSTAPAY, WALLET, CREDIT, BANK_TRANSFER, FAWRY
+//    }
 
     public void addItem(SaleItem item) {
         items.add(item);

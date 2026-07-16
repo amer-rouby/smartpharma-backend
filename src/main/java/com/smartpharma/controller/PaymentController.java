@@ -3,7 +3,7 @@ package com.smartpharma.controller;
 import com.smartpharma.dto.request.PaymentRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.PaymentResponse;
-import com.smartpharma.service.Payment.PaymentService;
+import com.smartpharma.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:4200")
 public class PaymentController {
 
     private final PaymentService paymentService;
@@ -107,10 +106,14 @@ public class PaymentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<PaymentResponse>>> getPayments(
             @RequestParam Long pharmacyId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String paymentMethod,
+            @RequestParam(required = false) String search,
             Pageable pageable) {
 
         try {
-            Page<PaymentResponse> payments = paymentService.getPaymentsByPharmacy(pharmacyId, pageable);
+            Page<PaymentResponse> payments = paymentService.getPaymentsByPharmacy(
+                    pharmacyId, status, paymentMethod, search, pageable);
             return ResponseEntity.ok(ApiResponse.success(payments, "Payments retrieved successfully"));
         } catch (Exception e) {
             log.error("Get payments failed: {}", e.getMessage(), e);

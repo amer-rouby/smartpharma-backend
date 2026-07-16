@@ -69,6 +69,21 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "warning_threshold")
+    private Integer warningThreshold = 5;
+
+    @Column(name = "max_extensions")
+    private Integer maxExtensions = 3;
+
+    @Column(name = "remaining_extensions")
+    private Integer remainingExtensions = 3;
+
+    @Column(name = "session_extended_count")
+    private Integer sessionExtendedCount = 0;
+
+    @Column(name = "session_timeout")
+    private Integer sessionTimeout = 30;
+
     private LocalDateTime lastLoginAt;
     private LocalDateTime deletedAt;
 

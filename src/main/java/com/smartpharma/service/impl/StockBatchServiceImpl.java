@@ -314,7 +314,7 @@ public class StockBatchServiceImpl implements StockBatchService {
                 return null;
             }
 
-            String productName = "منتج غير متاح";
+            String productName = "Product unavailable";
             String productBarcode = null;
             Long productId = null;
 
@@ -332,7 +332,7 @@ public class StockBatchServiceImpl implements StockBatchService {
                     if (batch.getProduct().getDeletedAt() == null) {
                         productId = batch.getProduct().getId();
                         productName = batch.getProduct().getName() != null ?
-                                batch.getProduct().getName() : "منتج غير متاح";
+                                batch.getProduct().getName() : "Product unavailable";
                         productBarcode = batch.getProduct().getBarcode();
                     }
                 }
@@ -369,14 +369,14 @@ public class StockBatchServiceImpl implements StockBatchService {
                     batch != null ? batch.getId() : "unknown", e.getMessage());
             return StockBatchResponse.builder()
                     .id(batch != null ? batch.getId() : null)
-                    .productName("خطأ في تحميل البيانات")
+                    .productName("Error loading data")
                     .build();
         }
     }
 
     private StockAdjustmentHistoryDTO mapHistoryToDTO(StockAdjustmentHistory history) {
         try {
-            String productName = "منتج غير متاح";
+            String productName = "Product unavailable";
             try {
                 if (history.getBatch() != null && history.getBatch().getProduct() != null) {
                     if (!Hibernate.isInitialized(history.getBatch().getProduct())) {
@@ -384,7 +384,7 @@ public class StockBatchServiceImpl implements StockBatchService {
                     }
                     if (history.getBatch().getProduct().getDeletedAt() == null) {
                         productName = history.getBatch().getProduct().getName() != null ?
-                                history.getBatch().getProduct().getName() : "منتج غير متاح";
+                                history.getBatch().getProduct().getName() : "Product unavailable";
                     }
                 }
             } catch (Exception e) {
@@ -410,7 +410,7 @@ public class StockBatchServiceImpl implements StockBatchService {
             log.error("Failed to map history {} to DTO", history != null ? history.getId() : "unknown", e);
             return StockAdjustmentHistoryDTO.builder()
                     .id(history != null ? history.getId() : null)
-                    .productName("خطأ في تحميل البيانات")
+                    .productName("Error loading data")
                     .build();
         }
     }

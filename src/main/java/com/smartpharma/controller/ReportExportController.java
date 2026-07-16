@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/reports/export")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'PHARMACIST')")
-@CrossOrigin(origins = "http://localhost:4200")
 public class ReportExportController {
 
     private final ReportExportService exportService;
@@ -165,7 +164,7 @@ public class ReportExportController {
                 .body(excelData);
     }
 
-    // ✅ Sales Report Export - PDF (جديد)
+    // ✅ Sales Report Export - PDF
     @GetMapping("/sales/pdf")
     public ResponseEntity<byte[]> exportSalesPdf(
             @RequestParam Long pharmacyId,
@@ -206,7 +205,7 @@ public class ReportExportController {
                 .body(pdfData);
     }
 
-    // ✅ Expiry Report Export - Excel (جديد)
+    // ✅ Expiry Report Export - Excel
     @GetMapping("/expiry/excel")
     public ResponseEntity<byte[]> exportExpiryExcel(@RequestParam Long pharmacyId) {
         ExpiryReportResponse report = reportService.getExpiryReport(
@@ -237,7 +236,7 @@ public class ReportExportController {
                 .body(excelData);
     }
 
-    // ✅ Expiry Report Export - PDF (جديد)
+    // ✅ Expiry Report Export - PDF
     @GetMapping("/expiry/pdf")
     public ResponseEntity<byte[]> exportExpiryPdf(@RequestParam Long pharmacyId) {
         ExpiryReportResponse report = reportService.getExpiryReport(

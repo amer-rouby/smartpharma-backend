@@ -15,6 +15,8 @@ public class CategoryResponse {
 
     private Long id;
     private String name;
+    private String nameAr;
+    private String nameEn;
     private String description;
     private String icon;
     private String color;
@@ -27,6 +29,8 @@ public class CategoryResponse {
         return CategoryResponse.builder()
                 .id(category.getId())
                 .name(category.getName())
+                .nameAr(category.getNameAr())
+                .nameEn(category.getNameEn())
                 .description(category.getDescription())
                 .icon(category.getIcon())
                 .color(category.getColor())

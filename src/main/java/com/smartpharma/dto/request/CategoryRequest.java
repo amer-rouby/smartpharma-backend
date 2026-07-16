@@ -13,8 +13,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CategoryRequest {
 
-    @NotBlank(message = "اسم التصنيف مطلوب")
+    @NotBlank(message = "Category name is required")
     private String name;
+
+    private String nameAr;
+
+    private String nameEn;
 
     private String description;
 
@@ -23,7 +27,7 @@ public class CategoryRequest {
     @Builder.Default
     private String color = "#667eea";
 
-    @NotNull(message = "الصيدلية مطلوبة")
+    @NotNull(message = "Pharmacy is required")
     private Long pharmacyId;
 
     @Builder.Default

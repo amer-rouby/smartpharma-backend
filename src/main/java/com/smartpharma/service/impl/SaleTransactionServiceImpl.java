@@ -5,6 +5,7 @@ import com.smartpharma.dto.request.SaleRequest;
 import com.smartpharma.dto.response.SaleTransactionDTO;
 import com.smartpharma.dto.response.SalesReportResponse;
 import com.smartpharma.entity.*;
+import com.smartpharma.entity.enums.PaymentMethod;
 import com.smartpharma.repository.*;
 import com.smartpharma.service.SaleTransactionService;
 import lombok.RequiredArgsConstructor;
@@ -78,7 +79,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .invoiceNumber(generateInvoiceNumber())
                 .discountAmount(Optional.ofNullable(request.getDiscountAmount()).orElse(BigDecimal.ZERO))
                 .customerPhone(request.getCustomerPhone())
-                .paymentMethod(SaleTransaction.PaymentMethod.valueOf(
+                .paymentMethod(PaymentMethod.valueOf(
                         Optional.ofNullable(request.getPaymentMethod()).orElse("CASH").toUpperCase()))
                 .notes(request.getNotes())
                 .build();
@@ -108,7 +109,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
         Optional.ofNullable(request.getDiscountAmount()).ifPresent(entity::setDiscountAmount);
         Optional.ofNullable(request.getPaymentMethod())
-                .ifPresent(pm -> entity.setPaymentMethod(SaleTransaction.PaymentMethod.valueOf(pm.toUpperCase())));
+                .ifPresent(pm -> entity.setPaymentMethod(PaymentMethod.valueOf(pm.toUpperCase())));
         Optional.ofNullable(request.getCustomerPhone()).ifPresent(entity::setCustomerPhone);
         Optional.ofNullable(request.getNotes()).ifPresent(entity::setNotes);
 
@@ -208,12 +209,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
     @Override
     @Transactional(readOnly = true)
-    public Map<String, Object> getTodaySalesSummary(Long pharmacyId) {
-        return getTodaySales(pharmacyId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Page<SaleTransactionDTO> getSalesByDateRange(Long pharmacyId, LocalDate startDate, LocalDate endDate) {
         log.info("Fetching sales by date range | pharmacyId: {} | {} to {}",
                 pharmacyId, startDate, endDate);
@@ -278,7 +273,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                             try {
                                 return item.getProduct().getCategory();
                             } catch (Exception e) {
-                                return "أخرى";
+                                return "Other";
                             }
                         },
                         Collectors.reducing(BigDecimal.ZERO, SaleItem::getTotalPrice, BigDecimal::add)
@@ -443,7 +438,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         List<Object[]> data = saleTransactionRepository.getRevenueByPaymentMethod(pharmacyId, start, end);
         return data.stream()
                 .collect(Collectors.toMap(
-                        obj -> ((SaleTransaction.PaymentMethod) obj[0]).name(),
+                        obj -> ((PaymentMethod) obj[0]).name(),
                         obj -> (BigDecimal) obj[1],
                         BigDecimal::add,
                         LinkedHashMap::new
@@ -499,7 +494,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         try {
             if (item == null) return null;
 
-            String productName = "منتج غير متاح";
+            String productName = "Product unavailable";
             String productBarcode = null;
             Long productId = null;
             String productCategory = null;
@@ -519,7 +514,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                     if (product.getDeletedAt() == null) {
                         productId = product.getId();
                         productName = product.getName() != null ?
-                                product.getName() : "منتج غير متاح";
+                                product.getName() : "Product unavailable";
                         productBarcode = product.getBarcode();
                         productCategory = product.getCategory();
                     }
@@ -545,7 +540,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
             log.error("Failed to map sale item {} to DTO", item != null ? item.getId() : "unknown", e);
             return SaleTransactionDTO.SaleItemDTO.builder()
                     .id(item != null ? item.getId() : null)
-                    .productName("خطأ في تحميل البيانات")
+                    .productName("Error loading data")
                     .build();
         }
     }

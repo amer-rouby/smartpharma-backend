@@ -9,17 +9,18 @@ import java.math.BigDecimal;
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class PurchaseOrderItemRequest {
 
-    @NotNull(message = "المنتج مطلوب")
+    @NotNull(message = "Product is required")
     private Long productId;
 
-    @NotNull(message = "الكمية مطلوبة")
-    @Min(value = 1, message = "الكمية يجب أن تكون 1 على الأقل")
+    @NotNull(message = "Quantity is required")
+    @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity;
+    private String productName;
 
-    @NotNull(message = "سعر الوحدة مطلوب")
-    @Min(value = 0, message = "سعر الوحدة يجب أن يكون 0 أو أكثر")
+    @NotNull(message = "Unit price is required")
+    @Min(value = 0, message = "Unit price must be 0 or more")
     private BigDecimal unitPrice;
 
-    @Size(max = 500, message = "الملاحظات يجب ألا تتجاوز 500 حرف")
+    @Size(max = 500, message = "Notes must not exceed 500 characters")
     private String notes;
 }

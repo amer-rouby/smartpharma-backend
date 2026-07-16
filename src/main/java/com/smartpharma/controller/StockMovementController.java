@@ -5,6 +5,7 @@ import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.StockMovementResponse;
 import com.smartpharma.dto.response.StockMovementStats;
 import com.smartpharma.service.StockMovementService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,6 @@ import java.time.LocalDateTime;
 @RequestMapping("/api/stock/movements")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class StockMovementController {
 
     private final StockMovementService movementService;
@@ -34,7 +34,7 @@ public class StockMovementController {
             @Valid @RequestBody StockMovementRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        Long userId = extractUserId(userDetails);
+        Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Creating stock movement for user: {}", userId);
 
         StockMovementResponse movement = movementService.createMovement(request, userId);
@@ -98,15 +98,5 @@ public class StockMovementController {
 
         StockMovementStats stats = movementService.getMovementStats(pharmacyId, startDateTime, endDateTime);
         return ResponseEntity.ok(ApiResponse.success(stats));
-    }
-
-    private Long extractUserId(UserDetails userDetails) {
-        if (userDetails == null) return null;
-        if (userDetails instanceof com.smartpharma.entity.User user) return user.getId();
-        try {
-            return Long.valueOf(userDetails.getUsername());
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

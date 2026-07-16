@@ -19,7 +19,6 @@ import java.util.Map;
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class CategoryController {
 
     private final CategoryService categoryService;

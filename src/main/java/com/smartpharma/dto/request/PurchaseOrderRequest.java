@@ -10,29 +10,29 @@ import java.util.List;
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class PurchaseOrderRequest {
 
-    @NotNull(message = "المورد مطلوب")
+    @NotNull(message = "Supplier is required")
     private Long supplierId;
 
-    @NotNull(message = "تاريخ الطلب مطلوب")
+    @NotNull(message = "Order date is required")
     private LocalDate orderDate;
 
     private LocalDate expectedDeliveryDate;
 
-    @Size(max = 20, message = "الأولوية غير صحيحة")
+    @Size(max = 20, message = "Invalid priority value")
     @Builder.Default
     private String priority = "NORMAL";
 
-    @Size(max = 50, message = "شروط الدفع يجب ألا تتجاوز 50 حرف")
+    @Size(max = 50, message = "Payment terms must not exceed 50 characters")
     private String paymentTerms;
 
-    @Size(max = 1000, message = "الملاحظات يجب ألا تتجاوز 1000 حرف")
+    @Size(max = 1000, message = "Notes must not exceed 1000 characters")
     private String notes;
 
-    @Size(max = 50, message = "نوع المصدر غير صحيح")
+    @Size(max = 50, message = "Invalid source type")
     private String sourceType; // MANUAL, PREDICTION, AUTO
 
     private Long sourceId; // predictionId if from prediction
 
-    @NotEmpty(message = "يجب إضافة منتج واحد على الأقل")
+    @NotEmpty(message = "At least one product must be added")
     private List<PurchaseOrderItemRequest> items;
 }

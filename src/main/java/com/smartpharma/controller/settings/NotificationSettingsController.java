@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/settings/notifications")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://localhost:4200")
 public class NotificationSettingsController {
 
     private final NotificationSettingsService notificationSettingsService;

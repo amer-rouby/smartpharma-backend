@@ -33,7 +33,7 @@ public class CashPaymentGateway extends BasePaymentGateway {
     protected PaymentResponse callGatewayAPI(PaymentRequest request, String referenceNumber) {
         log.info("Processing CASH payment: {}", referenceNumber);
 
-        // الدفع النقدي مباشر
+        // Cash payment is immediate
         return PaymentResponse.builder()
                 .status("COMPLETED")
                 .message("Cash payment completed successfully")

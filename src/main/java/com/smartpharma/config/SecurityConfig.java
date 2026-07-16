@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
 
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/notifications/stream").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
 
                         .requestMatchers(
@@ -90,6 +91,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:4200",
+                "http://localhost:3000",
                 "http://localhost:8080"
         ));
         configuration.setAllowedMethods(Arrays.asList(
@@ -100,9 +102,14 @@ public class SecurityConfig {
                 "Content-Type",
                 "X-Requested-With",
                 "Accept",
-                "Origin"
+                "Origin",
+                "X-User-Active"
         ));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "X-Session-Extended",
+                "X-Remaining-Extensions"
+        ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

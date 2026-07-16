@@ -3,7 +3,8 @@ package com.smartpharma.service.impl;
 import com.smartpharma.dto.request.UpdatePredictionDTO;
 import com.smartpharma.dto.response.DemandPredictionResponse;
 import com.smartpharma.dto.response.PurchaseOrderSummaryDTO;
-import com.smartpharma.dto.response.ShareLinkDTO;
+import com.smartpharma.dto.request.CreateShareLinkRequest;
+import com.smartpharma.dto.response.ShareLinkResponse;
 import com.smartpharma.entity.DemandPrediction;
 import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.Product;
@@ -13,6 +14,7 @@ import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.ProductRepository;
 import com.smartpharma.repository.SaleItemRepository;
 import com.smartpharma.service.DemandPredictionService;
+import com.smartpharma.service.ShareLinkService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +40,7 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
     private final ProductRepository productRepository;
     private final PharmacyRepository pharmacyRepository;
     private final SaleItemRepository saleItemRepository;
+    private final ShareLinkService shareLinkService;
 
     private static final int MOVING_AVG_DAYS = 14;
     private static final int DEFAULT_PREDICTION = 10;
@@ -245,20 +248,20 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
 
     @Override
     @Transactional
-    public ShareLinkDTO generateShareLink(Long predictionId, Long pharmacyId, int expiryHours) {
+    public ShareLinkResponse generateShareLink(Long predictionId, Long pharmacyId, Long userId, int expiryHours) {
         DemandPrediction prediction = predictionRepository.findById(predictionId)
                 .orElseThrow(() -> new RuntimeException("Prediction not found"));
         if (!prediction.getPharmacy().getId().equals(pharmacyId)) {
             throw new RuntimeException("Access denied");
         }
-        String token = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        LocalDateTime expiresAt = LocalDateTime.now().plusHours(expiryHours);
-        String shareUrl = "https://smartpharma.app/share/prediction/" + token;
-        return ShareLinkDTO.builder()
-                .shareUrl(shareUrl)
-                .expiresAt(expiresAt)
-                .token(token)
+
+        CreateShareLinkRequest request = CreateShareLinkRequest.builder()
+                .entityType("prediction")
+                .entityId(predictionId)
+                .expiryHours(expiryHours)
                 .build();
+
+        return shareLinkService.createShareLink(request, userId, pharmacyId);
     }
 
     @Override
@@ -283,7 +286,7 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
                     .productName(prediction.getProduct() != null ? prediction.getProduct().getName() : "N/A")
                     .quantity(0)
                     .status("NO_ORDER_NEEDED")
-                    .message("المخزون الحالي كافٍ - لا حاجة لطلب جديد")
+                    .message("Current stock is sufficient - no new order needed")
                     .build();
         }
 
@@ -311,10 +314,10 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
         if (date == null) return BigDecimal.ONE;
         int month = date.getMonthValue();
         Map<String, Map<Integer, BigDecimal>> seasonalityMap = Map.of(
-                "مسكنات", Map.of(12, BigDecimal.valueOf(1.3), 1, BigDecimal.valueOf(1.4), 2, BigDecimal.valueOf(1.2)),
-                "مضادات حيوية", Map.of(10, BigDecimal.valueOf(1.2), 11, BigDecimal.valueOf(1.3), 12, BigDecimal.valueOf(1.4)),
-                "فيتامينات", Map.of(9, BigDecimal.valueOf(1.2), 10, BigDecimal.valueOf(1.3)),
-                "حساسية", Map.of(3, BigDecimal.valueOf(1.3), 4, BigDecimal.valueOf(1.4), 5, BigDecimal.valueOf(1.2))
+                "Painkillers", Map.of(12, BigDecimal.valueOf(1.3), 1, BigDecimal.valueOf(1.4), 2, BigDecimal.valueOf(1.2)),
+                "Antibiotics", Map.of(10, BigDecimal.valueOf(1.2), 11, BigDecimal.valueOf(1.3), 12, BigDecimal.valueOf(1.4)),
+                "Vitamins", Map.of(9, BigDecimal.valueOf(1.2), 10, BigDecimal.valueOf(1.3)),
+                "Allergy", Map.of(3, BigDecimal.valueOf(1.3), 4, BigDecimal.valueOf(1.4), 5, BigDecimal.valueOf(1.2))
         );
         Map<Integer, BigDecimal> monthFactors = seasonalityMap.getOrDefault(category, Map.of());
         return monthFactors.getOrDefault(month, BigDecimal.ONE);

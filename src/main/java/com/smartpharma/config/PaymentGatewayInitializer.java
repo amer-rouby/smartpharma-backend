@@ -1,7 +1,7 @@
 package com.smartpharma.config;
 
 import com.smartpharma.service.Payment.PaymentGateway;
-import com.smartpharma.service.Payment.PaymentService;
+import com.smartpharma.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

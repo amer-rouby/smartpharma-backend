@@ -138,7 +138,7 @@ public class ReportExportService {
         }
     }
 
-    // باقي الـ methods (Excel exports) زي ما هي...
+    // Remaining methods (Excel exports)...
     public byte[] exportSalesReportToExcel(double totalRevenue, long totalOrders, double avgOrder,
                                            List<Map<String, Object>> dailySales, List<Map<String, Object>> topProducts,
                                            Map<String, ?> revenueByPayment) {
@@ -218,7 +218,7 @@ public class ReportExportService {
         }
     }
 
-    // باقي الـ methods (Expenses, Financial, Expiry)...
+    // Remaining methods (Expenses, Financial, Expiry)...
     public byte[] exportExpensesToExcel(List<Map<String, Object>> expenses) {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Expenses");

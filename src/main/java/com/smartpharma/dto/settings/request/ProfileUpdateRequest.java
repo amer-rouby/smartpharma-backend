@@ -16,7 +16,7 @@ public class ProfileUpdateRequest {
     @Size(max = 100)
     private String fullName;
 
-    @Email(message = "البريد الإلكتروني غير صحيح")
+    @Email(message = "Invalid email address")
     @Size(max = 100)
     private String email;
 
