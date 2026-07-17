@@ -4,6 +4,8 @@ import com.smartpharma.dto.request.PurchaseOrderItemRequest;
 import com.smartpharma.dto.request.PurchaseOrderRequest;
 import com.smartpharma.dto.request.StockMovementRequest;
 import com.smartpharma.dto.response.PurchaseOrderResponse;
+import com.smartpharma.dto.response.SendWhatsAppResponse;
+import com.smartpharma.dto.response.WhatsAppMessageResponse;
 import com.smartpharma.entity.*;
 import com.smartpharma.repository.*;
 import com.smartpharma.service.PurchaseOrderService;
@@ -16,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -335,5 +339,193 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private String generateOrderNumber(Long pharmacyId) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         return "PO-" + pharmacyId + "-" + timestamp;
+    }
+
+    @Override
+    @Transactional
+    public SendWhatsAppResponse sendWhatsAppMessage(Long orderId, Long pharmacyId) {
+        log.info("Sending WhatsApp message for orderId: {}, pharmacyId: {}", orderId, pharmacyId);
+
+        PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(orderId, pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Purchase order not found with id: " + orderId));
+
+        Supplier supplier = order.getSupplier();
+        if (supplier == null) {
+            throw new RuntimeException("No supplier assigned to this purchase order");
+        }
+
+        String phone = supplier.getPhone();
+        if (phone == null || phone.isBlank()) {
+            throw new RuntimeException("Supplier has no phone number");
+        }
+
+        // Clean phone number to international format (without +)
+        String cleanPhone = phone.replaceAll("[^0-9]", "");
+        if (cleanPhone.startsWith("002")) {
+            cleanPhone = cleanPhone.substring(3);
+        } else if (cleanPhone.startsWith("00")) {
+            cleanPhone = cleanPhone.substring(2);
+        } else if (cleanPhone.startsWith("+")) {
+            cleanPhone = cleanPhone.substring(1);
+        }
+        if (cleanPhone.startsWith("0")) {
+            cleanPhone = "20" + cleanPhone.substring(1);
+        }
+
+        String message = formatWhatsAppMessage(order);
+
+        // URL-encode the message for wa.me link
+        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
+        String whatsappUrl = "https://wa.me/" + cleanPhone + "?text=" + encodedMessage;
+
+        log.info("WhatsApp Click-to-Chat link generated for order: {} -> phone: {}", order.getOrderNumber(), cleanPhone);
+
+        return SendWhatsAppResponse.builder()
+                .success(true)
+                .messageId("click-to-chat")
+                .whatsAppUrl(whatsappUrl)
+                .phoneNumber(cleanPhone)
+                .encodedMessage(encodedMessage)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WhatsAppMessageResponse generateWhatsAppMessage(Long orderId, Long pharmacyId) {
+        log.info("Generating WhatsApp message for orderId: {}, pharmacyId: {}", orderId, pharmacyId);
+
+        PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(orderId, pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Purchase order not found with id: " + orderId));
+
+        Supplier supplier = order.getSupplier();
+        if (supplier == null) {
+            throw new RuntimeException("No supplier assigned to this purchase order");
+        }
+
+        String phone = supplier.getPhone();
+        if (phone == null || phone.isBlank()) {
+            throw new RuntimeException("Supplier has no phone number");
+        }
+
+        // Clean phone number: keep only digits, ensure international format without +
+        String cleanPhone = phone.replaceAll("[^0-9]", "");
+        if (cleanPhone.startsWith("002")) {
+            cleanPhone = cleanPhone.substring(3);
+        } else if (cleanPhone.startsWith("00")) {
+            cleanPhone = cleanPhone.substring(2);
+        } else if (cleanPhone.startsWith("+")) {
+            cleanPhone = cleanPhone.substring(1);
+        }
+        // If it starts with 0 (Egyptian local format), replace 0 with 20
+        if (cleanPhone.startsWith("0")) {
+            cleanPhone = "20" + cleanPhone.substring(1);
+        }
+
+        String message = formatWhatsAppMessage(order);
+
+        // URL-encode the message for wa.me link
+        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
+        String whatsappUrl = "https://wa.me/" + cleanPhone + "?text=" + encodedMessage;
+
+        log.info("WhatsApp message generated for order: {} -> phone: {}", order.getOrderNumber(), cleanPhone);
+
+        return WhatsAppMessageResponse.builder()
+                .phoneNumber(cleanPhone)
+                .message(message)
+                .encodedMessage(encodedMessage)
+                .whatsAppUrl(whatsappUrl)
+                .orderNumber(order.getOrderNumber())
+                .build();
+    }
+
+    private String formatWhatsAppMessage(PurchaseOrder order) {
+        StringBuilder sb = new StringBuilder();
+
+        // Header
+        sb.append("*📋 طلب شراء جديد*\n");
+        sb.append("*Purchase Order* 🤝\n\n");
+
+        // Pharmacy info (sender)
+        Pharmacy pharmacy = order.getPharmacy();
+        if (pharmacy != null) {
+            sb.append("*🏥 الصيدلية / Pharmacy:* ");
+            sb.append(pharmacy.getName() != null ? pharmacy.getName() : "N/A").append("\n");
+            if (pharmacy.getAddress() != null && !pharmacy.getAddress().isBlank()) {
+                sb.append("*📍 العنوان / Address:* ");
+                sb.append(pharmacy.getAddress()).append("\n");
+            }
+            if (pharmacy.getPhone() != null && !pharmacy.getPhone().isBlank()) {
+                sb.append("*📞 الهاتف / Phone:* ");
+                sb.append(pharmacy.getPhone()).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        // Order details
+        sb.append("*📄 رقم الطلب / Order No:* ");
+        sb.append(order.getOrderNumber()).append("\n");
+        sb.append("*📅 التاريخ / Date:* ");
+        sb.append(order.getOrderDate()).append("\n");
+        sb.append("*🏪 المورد / Supplier:* ");
+        sb.append(order.getSupplier().getName()).append("\n");
+        sb.append("*📊 الحالة / Status:* ");
+        sb.append(order.getStatus()).append("\n");
+        sb.append("*⚠️ الأولوية / Priority:* ");
+        sb.append(order.getPriority()).append("\n");
+
+        if (order.getExpectedDeliveryDate() != null) {
+            sb.append("*📦 تاريخ التسليم المتوقع / Expected Delivery:* ");
+            sb.append(order.getExpectedDeliveryDate()).append("\n");
+        }
+
+        if (order.getPaymentTerms() != null && !order.getPaymentTerms().isBlank()) {
+            sb.append("*💳 شروط الدفع / Payment Terms:* ");
+            sb.append(order.getPaymentTerms()).append("\n");
+        }
+
+        sb.append("\n");
+
+        // Divider
+        sb.append("━━━━━━━━━━━━━━━━━━━━━━\n\n");
+
+        // Items header
+        sb.append("*📦 المنتجات المطلوبة / Order Items*\n\n");
+
+        // Items list
+        int index = 1;
+        for (PurchaseOrderItem item : order.getItems()) {
+            String productName = item.getProduct() != null ? item.getProduct().getName() : "Product unavailable";
+
+            sb.append(index).append(". *").append(productName).append("*\n");
+            sb.append("   _الكمية (Qty):_ ").append(item.getQuantity()).append("\n");
+            sb.append("   _السعر (Price):_ 💰 ").append(item.getUnitPrice()).append(" EGP\n");
+            sb.append("   _الإجمالي (Total):_ 💵 ").append(item.getTotalPrice()).append(" EGP\n");
+
+            if (item.getNotes() != null && !item.getNotes().isBlank()) {
+                sb.append("   _ملاحظات (Notes):_ ").append(item.getNotes()).append("\n");
+            }
+
+            index++;
+        }
+
+        sb.append("\n");
+        sb.append("━━━━━━━━━━━━━━━━━━━━━━\n\n");
+
+        // Total
+        sb.append("*💵 إجمالي الطلب / Total Amount:* *").append(order.getTotalAmount()).append(" EGP*\n\n");
+
+        // Footer
+        sb.append("✅ *يرجى تأكيد الطلب في أقرب وقت*\n");
+        sb.append("📞 *للتواصل مع المورد (Contact Supplier):* ");
+        if (order.getSupplier().getPhone() != null) {
+            sb.append(order.getSupplier().getPhone());
+        }
+        if (order.getSupplier().getEmail() != null) {
+            sb.append(" | ").append(order.getSupplier().getEmail());
+        }
+        sb.append("\n\n");
+        sb.append("_SmartPharma - إدارة الصيدليات الذكية_");
+
+        return sb.toString();
     }
 }

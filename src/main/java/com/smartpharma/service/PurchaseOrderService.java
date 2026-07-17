@@ -2,6 +2,8 @@ package com.smartpharma.service;
 
 import com.smartpharma.dto.request.PurchaseOrderRequest;
 import com.smartpharma.dto.response.PurchaseOrderResponse;
+import com.smartpharma.dto.response.SendWhatsAppResponse;
+import com.smartpharma.dto.response.WhatsAppMessageResponse;
 import org.springframework.data.domain.Page;
 import java.time.LocalDate;
 import java.util.List;
@@ -21,4 +23,6 @@ public interface PurchaseOrderService {
     List<PurchaseOrderResponse> getOrdersByDateRange(Long pharmacyId, LocalDate startDate, LocalDate endDate);
     java.math.BigDecimal getTotalPurchasesAmount(Long pharmacyId, LocalDate startDate, LocalDate endDate);
     PurchaseOrderResponse createFromPrediction(Long predictionId, Long pharmacyId, Long userId);
+    WhatsAppMessageResponse generateWhatsAppMessage(Long orderId, Long pharmacyId);
+    SendWhatsAppResponse sendWhatsAppMessage(Long orderId, Long pharmacyId);
 }
