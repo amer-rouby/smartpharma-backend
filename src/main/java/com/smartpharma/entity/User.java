@@ -24,6 +24,10 @@ public class User implements UserDetails {
     @JoinColumn(name = "pharmacy_id", nullable = false)
     private Pharmacy pharmacy;
 
+    // Globally unique on purpose: login (UserRepository.findByUsername) has no pharmacy
+    // context to disambiguate with, so this must stay a system-wide constraint, not a
+    // per-pharmacy one - see UsernameUniquenessBackfill for how an existing database
+    // that ended up with only a (pharmacy_id, username) constraint gets corrected.
     @Column(nullable = false, unique = true, length = 100)
     private String username;
 

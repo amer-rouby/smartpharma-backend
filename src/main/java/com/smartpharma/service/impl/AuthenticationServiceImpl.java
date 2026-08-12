@@ -63,8 +63,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new RuntimeException("Either pharmacyId or pharmacyName is required for registration");
         }
 
-        if (userRepository.existsByPharmacyIdAndUsername(pharmacy.getId(), request.getUsername())) {
-            throw new RuntimeException("Username already exists in this pharmacy");
+        // Usernames must be globally unique, not just per-pharmacy: login (findByUsername)
+        // has no pharmacy context to disambiguate with, so two pharmacies sharing a
+        // username would make login itself ambiguous/broken for both of them, not just
+        // registration. UserServiceImpl (admin-created users) already checks this
+        // correctly via existsByUsername; registration was checking the wrong scope.
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new RuntimeException("Username already exists");
         }
 
         String roleName;
