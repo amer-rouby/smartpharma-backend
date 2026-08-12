@@ -91,6 +91,16 @@ public class StockBatch {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /**
+     * Optimistic-locking version. Without this, two concurrent sales reading the same
+     * batch's quantityCurrent before either writes back can silently oversell stock
+     * (lost update). Hibernate rejects a stale write with an OptimisticLockException
+     * instead, so the caller can retry against the fresh quantity.
+     */
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     public boolean isExpired() {
         return expiryDate != null && expiryDate.isBefore(LocalDate.now());
     }

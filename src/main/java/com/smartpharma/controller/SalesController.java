@@ -9,6 +9,7 @@ import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -74,8 +75,32 @@ public class SalesController {
 
         Long currentUserId = SecurityUtils.extractUserId(authentication);
 
-        SaleTransactionDTO response = saleTransactionService.createSale(request, currentUserId);
+        SaleTransactionDTO response = createSaleWithRetry(request, currentUserId);
         return ResponseEntity.ok(ApiResponse.success(response, "Sale created successfully"));
+    }
+
+    /**
+     * Two cashiers selling the last units of the same batch at the same time can race:
+     * both read the same quantityCurrent before either writes back. StockBatch now has
+     * an @Version column, so the second writer's transaction fails with an optimistic
+     * lock exception instead of silently overselling. Retrying re-reads the batch with
+     * its now-current quantity, so this resolves itself transparently for the caller in
+     * all but pathological contention.
+     */
+    private SaleTransactionDTO createSaleWithRetry(SaleRequest request, Long currentUserId) {
+        final int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return saleTransactionService.createSale(request, currentUserId);
+            } catch (OptimisticLockingFailureException ex) {
+                if (attempt == maxAttempts) {
+                    log.warn("Sale creation failed after {} attempts due to concurrent stock updates", maxAttempts);
+                    throw new RuntimeException("This item was just sold by another transaction. Please try again.");
+                }
+                log.debug("Concurrent stock update detected, retrying sale creation (attempt {}/{})", attempt, maxAttempts);
+            }
+        }
+        throw new IllegalStateException("unreachable");
     }
 
     @PutMapping("/{id}")
