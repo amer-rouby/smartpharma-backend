@@ -88,10 +88,10 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentResponse refundPayment(String reference, BigDecimal amount, String reason) {
+    public PaymentResponse refundPayment(String reference, Long pharmacyId, BigDecimal amount, String reason) {
         log.info("Processing refund for: {}, amount: {}", reference, amount);
 
-        return paymentRepository.findByReferenceNumber(reference)
+        return paymentRepository.findByReferenceNumberAndPharmacyId(reference, pharmacyId)
                 .map(payment -> {
                     PaymentGateway gateway = paymentGateways.get(payment.getPaymentMethod());
                     if (gateway != null) {
@@ -110,10 +110,10 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentResponse cancelPayment(String reference) {
+    public PaymentResponse cancelPayment(String reference, Long pharmacyId) {
         log.info("Cancelling payment: {}", reference);
 
-        return paymentRepository.findByReferenceNumber(reference)
+        return paymentRepository.findByReferenceNumberAndPharmacyId(reference, pharmacyId)
                 .map(payment -> {
                     PaymentGateway gateway = paymentGateways.get(payment.getPaymentMethod());
                     if (gateway != null) {
@@ -132,10 +132,10 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional(readOnly = true)
-    public PaymentResponse getPaymentByReference(String reference) {
+    public PaymentResponse getPaymentByReference(String reference, Long pharmacyId) {
         log.info("Fetching payment by reference: {}", reference);
 
-        return paymentRepository.findByReferenceNumber(reference)
+        return paymentRepository.findByReferenceNumberAndPharmacyId(reference, pharmacyId)
                 .map(this::mapToResponse)
                 .orElse(PaymentResponse.builder()
                         .status("NOT_FOUND")

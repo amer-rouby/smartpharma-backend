@@ -31,10 +31,10 @@ public class NotificationStreamController {
         }
 
         Long tokenPharmacyId = jwtService.extractPharmacyId(token);
-        if (tokenPharmacyId != null && !tokenPharmacyId.equals(pharmacyId)) {
+        if (tokenPharmacyId == null) {
             return ResponseEntity.status(403).build();
         }
 
-        return ResponseEntity.ok(notificationStreamService.subscribe(pharmacyId));
+        return ResponseEntity.ok(notificationStreamService.subscribe(tokenPharmacyId));
     }
 }

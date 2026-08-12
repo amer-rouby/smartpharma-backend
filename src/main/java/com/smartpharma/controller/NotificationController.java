@@ -35,6 +35,8 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
@@ -50,6 +52,8 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
@@ -64,6 +68,8 @@ public class NotificationController {
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
@@ -96,6 +102,8 @@ public class NotificationController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
@@ -123,6 +131,7 @@ public class NotificationController {
     @PostMapping("/check-alerts")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<Void>> checkAndCreateAlerts(@RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         notificationService.checkAndCreateLowStockAlerts(pharmacyId);
         notificationService.checkAndCreateExpiryAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Alerts checked successfully"));

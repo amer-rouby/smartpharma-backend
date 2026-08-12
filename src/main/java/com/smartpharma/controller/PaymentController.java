@@ -4,6 +4,7 @@ import com.smartpharma.dto.request.PaymentRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.PaymentResponse;
 import com.smartpharma.service.PaymentService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<PaymentResponse>> processPayment(
             @Valid @RequestBody PaymentRequest request) {
 
+        request.setPharmacyId(SecurityUtils.getCurrentPharmacyId());
         log.info("Payment request received: {}", request);
 
         try {
@@ -59,7 +61,7 @@ public class PaymentController {
 
         log.info("Refund request for: {}, amount: {}", reference, amount);
         try {
-            PaymentResponse response = paymentService.refundPayment(reference, amount, reason);
+            PaymentResponse response = paymentService.refundPayment(reference, SecurityUtils.getCurrentPharmacyId(), amount, reason);
             return ResponseEntity.ok(ApiResponse.success(response, "Refund processed successfully"));
         } catch (Exception e) {
             log.error("Refund failed: {}", e.getMessage(), e);
@@ -74,7 +76,7 @@ public class PaymentController {
 
         log.info("Cancel request for: {}", reference);
         try {
-            PaymentResponse response = paymentService.cancelPayment(reference);
+            PaymentResponse response = paymentService.cancelPayment(reference, SecurityUtils.getCurrentPharmacyId());
             return ResponseEntity.ok(ApiResponse.success(response, "Payment cancelled successfully"));
         } catch (Exception e) {
             log.error("Cancellation failed: {}", e.getMessage(), e);
@@ -88,7 +90,7 @@ public class PaymentController {
             @PathVariable String reference) {
 
         try {
-            PaymentResponse response = paymentService.getPaymentByReference(reference);
+            PaymentResponse response = paymentService.getPaymentByReference(reference, SecurityUtils.getCurrentPharmacyId());
 
             if (response == null) {
                 return ResponseEntity.notFound().build();
@@ -111,6 +113,8 @@ public class PaymentController {
             @RequestParam(required = false) String search,
             Pageable pageable) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         try {
             Page<PaymentResponse> payments = paymentService.getPaymentsByPharmacy(
                     pharmacyId, status, paymentMethod, search, pageable);
@@ -126,6 +130,8 @@ public class PaymentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getPaymentStats(
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         try {
             Map<String, Object> stats = paymentService.getPaymentStats(pharmacyId);

@@ -38,6 +38,7 @@ public class PurchaseOrderController {
             @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/purchase-orders - pharmacyId: {}, page: {}, size: {}", pharmacyId, page, size);
         Page<PurchaseOrderResponse> orders = purchaseOrderService.getAllOrders(pharmacyId, page, size);
         return ResponseEntity.ok(ApiResponse.success(orders));
@@ -50,6 +51,7 @@ public class PurchaseOrderController {
             @PathVariable String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/purchase-orders/status/{} - pharmacyId: {}", status, pharmacyId);
         Page<PurchaseOrderResponse> orders = purchaseOrderService.getOrdersByStatus(pharmacyId, status, page, size);
         return ResponseEntity.ok(ApiResponse.success(orders));
@@ -60,6 +62,7 @@ public class PurchaseOrderController {
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> getOrder(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/purchase-orders/{} - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.getOrder(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(order));
@@ -71,6 +74,7 @@ public class PurchaseOrderController {
             @Valid @RequestBody PurchaseOrderRequest request,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders - pharmacyId: {}, userId: {}", pharmacyId, userId);
         PurchaseOrderResponse order = purchaseOrderService.createOrder(request, pharmacyId, userId);
@@ -83,6 +87,7 @@ public class PurchaseOrderController {
             @PathVariable Long predictionId,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders/from-prediction/{} - pharmacyId: {}", predictionId, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.createFromPrediction(predictionId, pharmacyId, userId);
@@ -96,6 +101,7 @@ public class PurchaseOrderController {
             @Valid @RequestBody PurchaseOrderRequest request,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("PUT /api/purchase-orders/{} - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.updateOrder(id, request, pharmacyId, userId);
@@ -108,6 +114,7 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("DELETE /api/purchase-orders/{} - pharmacyId: {}", id, pharmacyId);
         purchaseOrderService.deleteOrder(id, pharmacyId, userId);
@@ -120,6 +127,7 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders/{}/approve - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.approveOrder(id, pharmacyId, userId);
@@ -132,6 +140,7 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders/{}/cancel - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.cancelOrder(id, pharmacyId, userId);
@@ -144,6 +153,7 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/purchase-orders/{}/receive - pharmacyId: {}", id, pharmacyId);
         PurchaseOrderResponse order = purchaseOrderService.receiveOrder(id, pharmacyId, userId);
@@ -153,6 +163,7 @@ public class PurchaseOrderController {
     @GetMapping("/count")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Map<String, Long>>> countOrders(@RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long total = purchaseOrderService.countOrders(pharmacyId);
         Long draft = purchaseOrderService.countOrdersByStatus(pharmacyId, "DRAFT");
         Long pending = purchaseOrderService.countOrdersByStatus(pharmacyId, "PENDING");
@@ -175,6 +186,7 @@ public class PurchaseOrderController {
             @RequestParam Long pharmacyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/purchase-orders/date-range - pharmacyId: {}, start: {}, end: {}", pharmacyId, startDate, endDate);
         List<PurchaseOrderResponse> orders = purchaseOrderService.getOrdersByDateRange(pharmacyId, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success(orders));
@@ -185,6 +197,7 @@ public class PurchaseOrderController {
     public ResponseEntity<ApiResponse<WhatsAppMessageResponse>> generateWhatsAppMessage(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/purchase-orders/{}/whatsapp - pharmacyId: {}", id, pharmacyId);
         WhatsAppMessageResponse response = purchaseOrderService.generateWhatsAppMessage(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -195,6 +208,7 @@ public class PurchaseOrderController {
     public ResponseEntity<ApiResponse<SendWhatsAppResponse>> sendWhatsAppMessage(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("POST /api/purchase-orders/{}/send-whatsapp - pharmacyId: {}", id, pharmacyId);
         SendWhatsAppResponse response = purchaseOrderService.sendWhatsAppMessage(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -206,6 +220,7 @@ public class PurchaseOrderController {
             @RequestParam Long pharmacyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         BigDecimal total = purchaseOrderService.getTotalPurchasesAmount(pharmacyId, startDate, endDate);
         Map<String, Object> response = new HashMap<>();
         response.put("totalAmount", total != null ? total : BigDecimal.ZERO);

@@ -5,6 +5,7 @@ import com.smartpharma.dto.response.*;
 import com.smartpharma.service.ExpenseService;
 import com.smartpharma.service.ReportExportService;
 import com.smartpharma.service.ReportService;
+import com.smartpharma.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -35,6 +36,7 @@ public class ReportExportController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size
     ) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Page<ExpenseResponse> expensesPage = expenseService.getExpenses(pharmacyId, PageRequest.of(page, size));
 
         List<Map<String, Object>> expenses = expensesPage.getContent().stream().map(exp -> {
@@ -61,6 +63,7 @@ public class ReportExportController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size
     ) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Page<ExpenseResponse> expensesPage = expenseService.getExpenses(pharmacyId, PageRequest.of(page, size));
 
         List<Map<String, Object>> expenses = expensesPage.getContent().stream().map(exp -> {
@@ -87,6 +90,7 @@ public class ReportExportController {
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate
     ) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : LocalDate.now().minusDays(30).atStartOfDay();
         LocalDateTime end = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.now();
 
@@ -130,6 +134,7 @@ public class ReportExportController {
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate
     ) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         SalesReportResponse report = reportService.getSalesReport(
                 ReportRequest.builder().pharmacyId(pharmacyId).startDate(startDate).endDate(endDate).build());
 
@@ -171,6 +176,7 @@ public class ReportExportController {
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate
     ) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         SalesReportResponse report = reportService.getSalesReport(
                 ReportRequest.builder().pharmacyId(pharmacyId).startDate(startDate).endDate(endDate).build());
 
@@ -208,6 +214,7 @@ public class ReportExportController {
     // ✅ Expiry Report Export - Excel
     @GetMapping("/expiry/excel")
     public ResponseEntity<byte[]> exportExpiryExcel(@RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         ExpiryReportResponse report = reportService.getExpiryReport(
                 ReportRequest.builder().pharmacyId(pharmacyId).build());
 
@@ -239,6 +246,7 @@ public class ReportExportController {
     // ✅ Expiry Report Export - PDF
     @GetMapping("/expiry/pdf")
     public ResponseEntity<byte[]> exportExpiryPdf(@RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         ExpiryReportResponse report = reportService.getExpiryReport(
                 ReportRequest.builder().pharmacyId(pharmacyId).build());
 

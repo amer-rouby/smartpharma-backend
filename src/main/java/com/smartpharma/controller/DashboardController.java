@@ -5,6 +5,7 @@ package com.smartpharma.controller;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.DashboardResponse;
 import com.smartpharma.service.DashboardService;
+import com.smartpharma.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,8 @@ public class DashboardController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
     public ResponseEntity<ApiResponse<DashboardResponse>> getDashboardStats(
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/dashboard/stats - pharmacyId: {}", pharmacyId);
 

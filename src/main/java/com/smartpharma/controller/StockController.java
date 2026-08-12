@@ -33,6 +33,8 @@ public class StockController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("GET /api/stock/batches - pharmacyId: {}, page: {}, size: {}", pharmacyId, page, size);
 
         Page<StockBatchResponse> batches = stockBatchService.getAllBatches(pharmacyId, page, size);
@@ -44,6 +46,8 @@ public class StockController {
     public ResponseEntity<ApiResponse<StockBatchResponse>> getBatch(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/stock/batches/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -57,6 +61,8 @@ public class StockController {
             @Valid @RequestBody StockBatchRequest request,
             @RequestParam Long pharmacyId,
             Authentication authentication) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("POST /api/stock/batches - pharmacyId: {}, product: {}",
                 pharmacyId, request.getProductId());
@@ -74,6 +80,8 @@ public class StockController {
             @RequestParam Long pharmacyId,
             Authentication authentication) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("PUT /api/stock/batches/{} - pharmacyId: {}", id, pharmacyId);
 
         Long userId = SecurityUtils.extractUserId(authentication);
@@ -88,6 +96,8 @@ public class StockController {
             @RequestParam Long pharmacyId,
             Authentication authentication) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("DELETE /api/stock/batches/{} - pharmacyId: {}", id, pharmacyId);
 
         Long userId = SecurityUtils.extractUserId(authentication);
@@ -101,6 +111,8 @@ public class StockController {
             @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "30") int days) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("GET /api/stock/expiring - pharmacyId: {}, days: {}", pharmacyId, days);
 
         List<StockBatchResponse> batches = stockBatchService.getExpiringBatches(pharmacyId, days);
@@ -111,6 +123,8 @@ public class StockController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<StockBatchResponse>>> getExpiredBatches(
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/stock/expired - pharmacyId: {}", pharmacyId);
 
@@ -138,6 +152,8 @@ public class StockController {
     public ResponseEntity<ApiResponse<List<StockAdjustmentHistoryDTO>>> getAdjustmentHistory(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/stock/batches/{}/adjustments - pharmacyId: {}", id, pharmacyId);
 

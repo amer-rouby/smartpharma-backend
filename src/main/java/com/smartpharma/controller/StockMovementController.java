@@ -35,9 +35,10 @@ public class StockMovementController {
             @AuthenticationPrincipal UserDetails userDetails) {
 
         Long userId = SecurityUtils.extractUserId(userDetails);
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Creating stock movement for user: {}", userId);
 
-        StockMovementResponse movement = movementService.createMovement(request, userId);
+        StockMovementResponse movement = movementService.createMovement(request, userId, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(movement, "Movement created successfully"));
     }
 
@@ -48,6 +49,7 @@ public class StockMovementController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting movements for pharmacy: {}", pharmacyId);
 
         Page<StockMovementResponse> movements = movementService.getMovementsByPharmacy(pharmacyId, page, size);
@@ -61,9 +63,10 @@ public class StockMovementController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting movements for batch: {}", batchId);
 
-        Page<StockMovementResponse> movements = movementService.getMovementsByBatch(batchId, page, size);
+        Page<StockMovementResponse> movements = movementService.getMovementsByBatch(batchId, pharmacyId, page, size);
         return ResponseEntity.ok(ApiResponse.success(movements));
     }
 
@@ -75,6 +78,8 @@ public class StockMovementController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("Getting movements for pharmacy: {} from {} to {}", pharmacyId, startDate, endDate);
 
@@ -88,6 +93,8 @@ public class StockMovementController {
             @RequestParam Long pharmacyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("Getting movement stats for pharmacy: {} from {} to {}", pharmacyId, startDate, endDate);
 
