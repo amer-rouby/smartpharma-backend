@@ -154,6 +154,27 @@ public class SecuritySettingsServiceImpl implements SecuritySettingsService {
         log.info("Account unlocked for userId: {}", userId);
     }
 
+    @Override
+    @Transactional
+    public Long getRemainingLockMinutesIfLocked(Long userId) {
+        SecuritySettings settings = securitySettingsRepository.findByUserId(userId).orElse(null);
+        if (settings == null || !Boolean.TRUE.equals(settings.getAccountLocked())) {
+            return null;
+        }
+
+        LocalDateTime lockedUntil = settings.getAccountLockedUntil();
+        if (lockedUntil == null || !lockedUntil.isAfter(LocalDateTime.now())) {
+            // Lock has expired (or has no expiry set) - auto-unlock instead of blocking forever.
+            settings.setAccountLocked(false);
+            settings.setAccountLockedUntil(null);
+            settings.setFailedLoginAttempts(0);
+            securitySettingsRepository.save(settings);
+            return null;
+        }
+
+        return java.time.Duration.between(LocalDateTime.now(), lockedUntil).toMinutes() + 1;
+    }
+
     private SecuritySettings createDefaultSettings(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
