@@ -19,4 +19,10 @@ public interface SecuritySettingsService {
     void lockAccount(Long userId);
 
     void unlockAccount(Long userId);
+
+    /**
+     * Returns remaining lock time in minutes if the account is currently locked,
+     * or null if it isn't (auto-unlocking it first if a previous lock has expired).
+     */
+    Long getRemainingLockMinutesIfLocked(Long userId);
 }

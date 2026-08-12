@@ -30,6 +30,16 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
     }
 
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountLockedException(AccountLockedException ex) {
+        log.warn("Login blocked - account locked: {}", ex.getMessage());
+        Map<String, Object> error = new HashMap<>();
+        error.put("code", "ACCOUNT_LOCKED");
+        error.put("message", ex.getMessage());
+        error.put("timestamp", LocalDateTime.now().toString());
+        return new ResponseEntity<>(error, HttpStatus.LOCKED);
+    }
+
     @ExceptionHandler(MaxExtensionsReachedException.class)
     public ResponseEntity<Map<String, Object>> handleMaxExtensionsReachedException(MaxExtensionsReachedException ex) {
         log.error("Max extensions reached: {}", ex.getMessage());

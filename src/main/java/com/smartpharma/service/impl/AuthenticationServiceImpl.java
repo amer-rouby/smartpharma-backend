@@ -5,13 +5,16 @@ import com.smartpharma.dto.request.RegisterRequest;
 import com.smartpharma.dto.response.AuthResponse;
 import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.User;
+import com.smartpharma.exception.AccountLockedException;
 import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.UserRepository;
 import com.smartpharma.security.JwtService;
 import com.smartpharma.service.AuthenticationService;
 import com.smartpharma.service.SessionService;
+import com.smartpharma.service.settings.SecuritySettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final SessionService sessionService;
+    private final SecuritySettingsService securitySettingsService;
 
     @Override
     @Transactional
@@ -111,9 +115,27 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-        );
+        User existingUser = userRepository.findByUsername(request.getUsername()).orElse(null);
+
+        if (existingUser != null) {
+            Long remainingLockMinutes = securitySettingsService.getRemainingLockMinutesIfLocked(existingUser.getId());
+            if (remainingLockMinutes != null) {
+                throw new AccountLockedException(
+                        "Account is locked due to too many failed login attempts. Try again in "
+                                + remainingLockMinutes + " minute(s).");
+            }
+        }
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+            );
+        } catch (AuthenticationException ex) {
+            if (existingUser != null) {
+                securitySettingsService.incrementFailedLoginAttempts(existingUser.getId());
+            }
+            throw ex;
+        }
 
         // Reload user from database to get fresh data including session_timeout
         User user = userRepository.findByUsername(request.getUsername())
@@ -122,6 +144,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (!user.getIsActive()) {
             throw new RuntimeException("User account is deactivated");
         }
+
+        securitySettingsService.resetFailedLoginAttempts(user.getId());
 
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
