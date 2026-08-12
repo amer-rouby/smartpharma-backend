@@ -43,10 +43,7 @@ public class ShareLinkServiceImpl implements ShareLinkService {
 
         ShareLink saved = shareLinkRepository.save(shareLink);
 
-        String shareUrl = String.format("%s/share/%s/%s",
-                baseUrl,
-                saved.getEntityType().toLowerCase(),
-                saved.getToken());
+        String shareUrl = buildShareUrl(saved);
 
         log.info("Share link created: token={}, entityType={}, entityId={}, expiresAt={}",
                 saved.getToken(), saved.getEntityType(), saved.getEntityId(), saved.getExpiresAt());
@@ -71,6 +68,14 @@ public class ShareLinkServiceImpl implements ShareLinkService {
     @Transactional
     public void incrementAccessCount(String token) {
         shareLinkRepository.incrementAccessCount(token);
+    }
+
+    @Override
+    public String buildShareUrl(ShareLink shareLink) {
+        return String.format("%s/share/%s/%s",
+                baseUrl,
+                shareLink.getEntityType().toLowerCase(),
+                shareLink.getToken());
     }
 
     // Clean up expired share links every hour

@@ -14,4 +14,7 @@ public class ShareLinkResponse {
     private LocalDateTime expiresAt;
     private String entityType;
     private Long entityId;
+    /** The actual shared entity payload (e.g. a DemandPredictionResponse), null if this
+     * entityType isn't wired up for sharing yet. */
+    private Object data;
 }

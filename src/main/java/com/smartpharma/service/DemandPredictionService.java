@@ -19,6 +19,8 @@ public interface DemandPredictionService {
 
     Page<DemandPredictionResponse> getPredictions(Long pharmacyId, int page, int size);
 
+    DemandPredictionResponse getPredictionById(Long predictionId, Long pharmacyId);
+
     void updatePredictionWithActual(Long predictionId, Integer actualQuantity);
 
     Map<String, Object> getAccuracyStats(Long pharmacyId);
