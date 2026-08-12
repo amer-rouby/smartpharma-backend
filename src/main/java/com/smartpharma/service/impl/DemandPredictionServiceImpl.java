@@ -123,6 +123,18 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public DemandPredictionResponse getPredictionById(Long predictionId, Long pharmacyId) {
+        DemandPrediction prediction = predictionRepository.findById(predictionId)
+                .orElseThrow(() -> new RuntimeException("Prediction not found: " + predictionId));
+        if (!prediction.getPharmacy().getId().equals(pharmacyId)) {
+            throw new RuntimeException("Access denied: Prediction does not belong to this pharmacy");
+        }
+        Long prodId = prediction.getProduct() != null ? prediction.getProduct().getId() : null;
+        return DemandPredictionResponse.fromEntity(prediction, getCurrentStock(prodId));
+    }
+
+    @Override
     @Transactional
     public void updatePredictionWithActual(Long predictionId, Integer actualQuantity) {
         DemandPrediction prediction = predictionRepository.findById(predictionId)

@@ -13,4 +13,6 @@ public interface ShareLinkService {
     void incrementAccessCount(String token);
 
     void cleanupExpiredLinks();
+
+    String buildShareUrl(ShareLink shareLink);
 }
