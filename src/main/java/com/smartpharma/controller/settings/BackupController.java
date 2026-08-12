@@ -4,6 +4,7 @@ import com.smartpharma.dto.settings.request.BackupRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.settings.response.BackupResponse;
 import com.smartpharma.service.settings.BackupService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +27,9 @@ public class BackupController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<BackupResponse>> createBackup(
-            @Valid @RequestBody BackupRequest request,
-            @RequestParam Long userId) {
+            @Valid @RequestBody BackupRequest request) {
 
+        Long userId = SecurityUtils.getCurrentUserId();
         log.info("Creating backup for userId: {}", userId);
 
         BackupResponse backup = backupService.createBackup(request, userId);
@@ -79,9 +80,13 @@ public class BackupController {
         byte[] backupData = backupService.downloadBackup(id);
         BackupResponse backup = backupService.getBackupById(id);
 
+        String extension = backup.getFilePath() != null && backup.getFilePath().contains(".")
+                ? backup.getFilePath().substring(backup.getFilePath().lastIndexOf('.'))
+                : ".dump";
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        headers.setContentDispositionFormData("attachment", backup.getBackupName() + ".sql");
+        headers.setContentDispositionFormData("attachment", backup.getBackupName() + extension);
 
         return ResponseEntity.ok()
                 .headers(headers)
