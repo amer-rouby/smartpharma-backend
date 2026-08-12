@@ -17,6 +17,9 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     @Query("SELECT s FROM Session s JOIN FETCH s.user WHERE s.token = :token")
     Optional<Session> findByToken(String token);
 
+    @Query("SELECT s FROM Session s JOIN FETCH s.user WHERE s.token = :token")
+    Optional<Session> findByTokenWithUser(@Param("token") String token);
+
     @Modifying
     @Query("UPDATE Session s SET s.revoked = true WHERE s.user.id = :userId")
     void revokeAllByUserId(@Param("userId") Long userId);
