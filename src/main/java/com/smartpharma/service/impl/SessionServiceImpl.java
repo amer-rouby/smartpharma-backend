@@ -9,6 +9,8 @@ import com.smartpharma.repository.SessionRepository;
 import com.smartpharma.repository.UserRepository;
 import com.smartpharma.service.SessionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SessionServiceImpl implements SessionService {
 
     private static final List<Integer> ALLOWED_TIMEOUTS = Arrays.asList(15, 30, 60, 120, 240);
@@ -94,8 +97,12 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional
+    @Scheduled(cron = "0 15 * * * *") // every hour, offset from the other hourly jobs
     public void cleanupExpiredSessions() {
+        // Was defined but never wired to @Scheduled, so the sessions table grew
+        // unbounded forever - every authenticated request does a lookup against it.
         sessionRepository.cleanupExpiredSessions(LocalDateTime.now());
+        log.debug("Expired/revoked session cleanup run completed");
     }
 
     @Override
