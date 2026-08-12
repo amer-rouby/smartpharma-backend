@@ -4,8 +4,8 @@ import com.smartpharma.dto.request.ExpenseRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.ExpenseResponse;
 import com.smartpharma.dto.response.ExpenseSummaryResponse;
-import com.smartpharma.entity.User;
 import com.smartpharma.service.ExpenseService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -13,7 +13,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -29,20 +28,10 @@ public class ExpenseController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<ExpenseResponse>> createExpense(
-            @RequestBody @Valid ExpenseRequest request,
-            @RequestAttribute(value = "userId", required = false) Long userId) {
+            @RequestBody @Valid ExpenseRequest request) {
 
-        Long effectiveUserId = userId;
-        if (effectiveUserId == null) {
-            var authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.getPrincipal() instanceof User) {
-                effectiveUserId = ((User) authentication.getPrincipal()).getId();
-            }
-        }
-
-        if (effectiveUserId == null) {
-            effectiveUserId = 1L;
-        }
+        request.setPharmacyId(SecurityUtils.getCurrentPharmacyId());
+        Long effectiveUserId = SecurityUtils.getCurrentUserId();
 
         ExpenseResponse response = expenseService.createExpense(request, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(response, "Expense created successfully"));
@@ -55,6 +44,8 @@ public class ExpenseController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "expenseDate") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Sort sort = sortDir.equalsIgnoreCase("asc")
                 ? Sort.by(sortBy).ascending()
@@ -70,6 +61,7 @@ public class ExpenseController {
     public ResponseEntity<ApiResponse<ExpenseResponse>> getExpense(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         ExpenseResponse response = expenseService.getExpense(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -78,8 +70,9 @@ public class ExpenseController {
     public ResponseEntity<ApiResponse<ExpenseResponse>> updateExpense(
             @PathVariable Long id,
             @RequestBody @Valid ExpenseRequest request,
-            @RequestParam Long pharmacyId,
-            @RequestAttribute("userId") Long userId) {
+            @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long userId = SecurityUtils.getCurrentUserId();
         ExpenseResponse response = expenseService.updateExpense(id, request, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(response, "Expense updated successfully"));
     }
@@ -88,6 +81,7 @@ public class ExpenseController {
     public ResponseEntity<ApiResponse<Void>> deleteExpense(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         expenseService.deleteExpense(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Expense deleted successfully"));
     }
@@ -98,6 +92,8 @@ public class ExpenseController {
             @RequestParam String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Page<ExpenseResponse> results = expenseService.searchExpenses(
                 pharmacyId, query, PageRequest.of(page, size));
@@ -112,6 +108,8 @@ public class ExpenseController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         Page<ExpenseResponse> results = expenseService.getExpensesByCategory(
                 pharmacyId, category, PageRequest.of(page, size));
 
@@ -123,6 +121,8 @@ public class ExpenseController {
             @RequestParam Long pharmacyId,
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : LocalDate.now().minusDays(30).atStartOfDay();
         LocalDateTime end = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.now();

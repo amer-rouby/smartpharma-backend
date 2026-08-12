@@ -4,6 +4,7 @@ import com.smartpharma.dto.request.ProductRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.ProductResponse;
 import com.smartpharma.service.ProductService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,8 @@ public class ProductController {
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts(
             @RequestParam Long pharmacyId) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("GET /api/products - pharmacyId: {}", pharmacyId);
 
         List<ProductResponse> products = productService.getAllProducts(pharmacyId);
@@ -45,6 +48,8 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<Map<String, Long>>> getProductsCount(
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/products/count - pharmacyId: {}", pharmacyId);
 
@@ -64,6 +69,8 @@ public class ProductController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("GET /api/products/{} - pharmacyId: {}", id, pharmacyId);
 
         ProductResponse product = productService.getProduct(id, pharmacyId);
@@ -77,6 +84,8 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             @Valid @RequestBody ProductRequest request,
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("POST /api/products - pharmacyId: {}, productName: {}",
                 pharmacyId, request.getName());
@@ -94,6 +103,8 @@ public class ProductController {
             @Valid @RequestBody ProductRequest request,
             @RequestParam Long pharmacyId) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("PUT /api/products/{} - pharmacyId: {}", id, pharmacyId);
 
         ProductResponse product = productService.updateProduct(id, request, pharmacyId);
@@ -107,6 +118,8 @@ public class ProductController {
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("DELETE /api/products/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -122,6 +135,8 @@ public class ProductController {
             @RequestParam Long pharmacyId,
             @RequestParam String query) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("GET /api/products/search - pharmacyId: {}, query: '{}'", pharmacyId, query);
 
         List<ProductResponse> products = productService.searchProducts(pharmacyId, query);
@@ -134,6 +149,8 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStockProducts(
             @RequestParam Long pharmacyId) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/products/low-stock - pharmacyId: {}", pharmacyId);
 

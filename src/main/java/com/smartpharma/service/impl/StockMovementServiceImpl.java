@@ -32,7 +32,23 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Override
     @Transactional
-    public StockMovementResponse createMovement(StockMovementRequest request, Long userId) {
+    public StockMovementResponse createMovement(StockMovementRequest request, Long userId, Long pharmacyId) {
+        StockBatch batch = batchRepository.findById(request.getBatchId())
+                .orElseThrow(() -> new RuntimeException("Batch not found: " + request.getBatchId()));
+
+        if (batch.getPharmacy() == null || !batch.getPharmacy().getId().equals(pharmacyId)) {
+            throw new RuntimeException("Batch not found: " + request.getBatchId());
+        }
+
+        return createMovementInternal(request, userId);
+    }
+
+    /**
+     * Trusted internal path used by other server-side services (sales, purchase
+     * receiving, stock adjustments) that have already resolved and validated the
+     * batch/pharmacy themselves. Not exposed directly to controllers.
+     */
+    private StockMovementResponse createMovementInternal(StockMovementRequest request, Long userId) {
         StockBatch batch = batchRepository.findById(request.getBatchId())
                 .orElseThrow(() -> new RuntimeException("Batch not found: " + request.getBatchId()));
 
@@ -98,9 +114,9 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<StockMovementResponse> getMovementsByBatch(Long batchId, int page, int size) {
+    public Page<StockMovementResponse> getMovementsByBatch(Long batchId, Long pharmacyId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return movementRepository.findByBatchId(batchId, pageable)
+        return movementRepository.findByBatchIdAndPharmacyId(batchId, pharmacyId, pageable)
                 .map(StockMovementResponse::fromEntity);
     }
 
@@ -157,7 +173,7 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .unitPrice(unitPrice)
                 .referenceNumber(reference)
                 .build();
-        createMovement(request, userId);
+        createMovementInternal(request, userId);
     }
 
     @Override
@@ -170,7 +186,7 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .reason(reason)
                 .referenceNumber(reference)
                 .build();
-        createMovement(request, userId);
+        createMovementInternal(request, userId);
     }
 
     @Override
@@ -182,7 +198,7 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .quantity(quantityAfter)
                 .reason(reason)
                 .build();
-        createMovement(request, userId);
+        createMovementInternal(request, userId);
     }
 
     @Override
@@ -194,6 +210,6 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .quantity(quantity)
                 .reason("Product expired")
                 .build();
-        createMovement(request, userId);
+        createMovementInternal(request, userId);
     }
 }

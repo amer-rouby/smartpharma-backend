@@ -4,6 +4,7 @@ import com.smartpharma.dto.request.CategoryRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.CategoryResponse;
 import com.smartpharma.service.CategoryService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class CategoryController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories(
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories - pharmacyId: {}", pharmacyId);
 
@@ -38,6 +40,7 @@ public class CategoryController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<Map<String, Long>>> getCategoriesCount(
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/count - pharmacyId: {}", pharmacyId);
 
@@ -53,6 +56,7 @@ public class CategoryController {
     public ResponseEntity<ApiResponse<CategoryResponse>> getCategory(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -64,6 +68,7 @@ public class CategoryController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
             @Valid @RequestBody CategoryRequest request) {
+        request.setPharmacyId(SecurityUtils.getCurrentPharmacyId());
 
         log.info("POST /api/categories - pharmacyId: {}, categoryName: {}",
                 request.getPharmacyId(), request.getName());
@@ -78,6 +83,8 @@ public class CategoryController {
             @PathVariable Long id,
             @Valid @RequestBody CategoryRequest request,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        request.setPharmacyId(pharmacyId);
 
         log.info("PUT /api/categories/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -90,6 +97,7 @@ public class CategoryController {
     public ResponseEntity<ApiResponse<Void>> deleteCategory(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("DELETE /api/categories/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -102,6 +110,7 @@ public class CategoryController {
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> searchCategories(
             @RequestParam Long pharmacyId,
             @RequestParam String query) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/search - pharmacyId: {}, query: '{}'", pharmacyId, query);
 
@@ -113,6 +122,7 @@ public class CategoryController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getActiveCategories(
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/active - pharmacyId: {}", pharmacyId);
 

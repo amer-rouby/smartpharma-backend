@@ -38,6 +38,7 @@ public class DemandPredictionController {
             @RequestParam Long pharmacyId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate forDate,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         try {
             Long userId = SecurityUtils.extractUserId(userDetails);
             if (userId == null) {
@@ -59,6 +60,7 @@ public class DemandPredictionController {
     public ResponseEntity<ApiResponse<List<DemandPredictionResponse>>> getUpcomingPredictions(
             @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "7") int daysAhead) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         try {
             log.info("Getting upcoming predictions for pharmacy: {}, days: {}", pharmacyId, daysAhead);
             List<DemandPredictionResponse> predictions = predictionService.getUpcomingPredictions(pharmacyId, daysAhead);
@@ -76,6 +78,7 @@ public class DemandPredictionController {
             @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         try {
             log.info("Getting predictions for pharmacy: {}, page: {}, size: {}", pharmacyId, page, size);
             Page<DemandPredictionResponse> predictions = predictionService.getPredictions(pharmacyId, page, size);
@@ -91,6 +94,7 @@ public class DemandPredictionController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAccuracyStats(
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         try {
             log.info("Getting accuracy stats for pharmacy: {}", pharmacyId);
             Map<String, Object> stats = predictionService.getAccuracyStats(pharmacyId);
@@ -243,10 +247,6 @@ public class DemandPredictionController {
 
             if (pharmacyId == null || userId == null) {
                 return ResponseEntity.status(401).body(ApiResponse.error("Invalid authentication"));
-            }
-
-            if (requestBody != null && requestBody.containsKey("pharmacyId")) {
-                pharmacyId = Long.parseLong(requestBody.get("pharmacyId").toString());
             }
 
             log.info("Creating purchase order from prediction: {}, pharmacy: {}, user: {}",

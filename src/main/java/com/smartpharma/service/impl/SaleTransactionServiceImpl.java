@@ -36,6 +36,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     private final PharmacyRepository pharmacyRepository;
     private final StockBatchRepository stockBatchRepository;
     private final SaleItemRepository saleItemRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -70,12 +71,18 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         log.info("Creating new sale | pharmacyId: {} | items: {} | userId: {}",
                 request.getPharmacyId(), request.getItems().size(), currentUserId);
 
+        if (currentUserId == null) {
+            throw new RuntimeException("Cannot create sale: no authenticated user could be resolved");
+        }
+
         Pharmacy pharmacy = pharmacyRepository.findById(request.getPharmacyId())
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found: " + request.getPharmacyId()));
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserId));
 
         SaleTransaction sale = SaleTransaction.builder()
                 .pharmacy(pharmacy)
-                .user(null)
+                .user(user)
                 .invoiceNumber(generateInvoiceNumber())
                 .discountAmount(Optional.ofNullable(request.getDiscountAmount()).orElse(BigDecimal.ZERO))
                 .customerPhone(request.getCustomerPhone())

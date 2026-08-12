@@ -13,11 +13,11 @@ public interface PaymentService {
 
     PaymentResponse processPayment(PaymentRequest request);
 
-    PaymentResponse refundPayment(String reference, BigDecimal amount, String reason);
+    PaymentResponse refundPayment(String reference, Long pharmacyId, BigDecimal amount, String reason);
 
-    PaymentResponse cancelPayment(String reference);
+    PaymentResponse cancelPayment(String reference, Long pharmacyId);
 
-    PaymentResponse getPaymentByReference(String reference);
+    PaymentResponse getPaymentByReference(String reference, Long pharmacyId);
 
     Page<PaymentResponse> getPaymentsByPharmacy(Long pharmacyId, String status, String paymentMethod, String search, Pageable pageable);
 

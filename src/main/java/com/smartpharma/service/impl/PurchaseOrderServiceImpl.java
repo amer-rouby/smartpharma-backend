@@ -296,7 +296,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                             .reason("Purchase order received: " + order.getOrderNumber())
                             .build();
 
-                    stockMovementService.createMovement(movementRequest, userId);
+                    stockMovementService.createMovement(movementRequest, userId, pharmacyId);
                     log.info("Stock movement created for received order: batchId={}, quantity={}",
                             batch.getId(), item.getQuantity());
                 } catch (Exception e) {

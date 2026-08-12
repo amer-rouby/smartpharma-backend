@@ -4,6 +4,7 @@ import com.smartpharma.dto.settings.request.PharmacySettingsRequest;
 import com.smartpharma.dto.settings.response.PharmacySettingsResponse;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.service.settings.PharmacySettingsService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,8 @@ public class PharmacySettingsController {
     public ResponseEntity<ApiResponse<PharmacySettingsResponse>> getPharmacySettings(
             @RequestParam Long pharmacyId) {
 
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
         log.info("GET /api/settings/pharmacy - pharmacyId: {}", pharmacyId);
 
         PharmacySettingsResponse settings = pharmacySettingsService.getSettings(pharmacyId);
@@ -35,6 +38,8 @@ public class PharmacySettingsController {
     public ResponseEntity<ApiResponse<PharmacySettingsResponse>> updatePharmacySettings(
             @RequestParam Long pharmacyId,
             @Valid @RequestBody PharmacySettingsRequest request) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("PUT /api/settings/pharmacy - pharmacyId: {}", pharmacyId);
 

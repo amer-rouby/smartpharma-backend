@@ -17,6 +17,8 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
 
     Page<StockMovement> findByBatchId(Long batchId, Pageable pageable);
 
+    Page<StockMovement> findByBatchIdAndPharmacyId(Long batchId, Long pharmacyId, Pageable pageable);
+
     Page<StockMovement> findByPharmacyId(Long pharmacyId, Pageable pageable);
 
     @Query("""

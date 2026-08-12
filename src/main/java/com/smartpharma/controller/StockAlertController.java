@@ -28,6 +28,7 @@ public class StockAlertController {
             @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting alerts for pharmacy: {}, page: {}, size: {}", pharmacyId, page, size);
 
         alertService.generateLowStockAlerts(pharmacyId);
@@ -41,6 +42,7 @@ public class StockAlertController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<AlertStatsResponse>> getAlertStats(
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting alert stats for pharmacy: {}", pharmacyId);
 
         alertService.generateLowStockAlerts(pharmacyId);
@@ -54,6 +56,7 @@ public class StockAlertController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<StockAlertResponse>>> getActiveAlerts(
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting active alerts for pharmacy: {}", pharmacyId);
         List<StockAlertResponse> alerts = alertService.getActiveAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(alerts));
@@ -65,6 +68,7 @@ public class StockAlertController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Marking alert {} as read by user {}", id, userId);
         alertService.markAsRead(id, pharmacyId, userId);
@@ -76,6 +80,7 @@ public class StockAlertController {
     public ResponseEntity<ApiResponse<Void>> markAllAsRead(
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Marking all alerts as read for pharmacy {} by user {}", pharmacyId, userId);
         alertService.markAllAsRead(pharmacyId, userId);
@@ -88,6 +93,7 @@ public class StockAlertController {
             @PathVariable Long id,
             @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Resolving alert {} by user {}", id, userId);
         alertService.resolveAlert(id, pharmacyId, userId);
@@ -99,6 +105,7 @@ public class StockAlertController {
     public ResponseEntity<ApiResponse<Void>> deleteAlert(
             @PathVariable Long id,
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Deleting alert {} for pharmacy {}", id, pharmacyId);
         alertService.deleteAlert(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Alert deleted"));
@@ -108,6 +115,7 @@ public class StockAlertController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> generateLowStockAlerts(
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Generating low stock alerts for pharmacy {}", pharmacyId);
         alertService.generateLowStockAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Low stock alerts generated"));
@@ -117,6 +125,7 @@ public class StockAlertController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> generateExpiryAlerts(
             @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Generating expiry alerts for pharmacy {}", pharmacyId);
         alertService.generateExpiryAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Expiry alerts generated"));
