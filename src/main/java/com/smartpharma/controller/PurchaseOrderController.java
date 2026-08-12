@@ -3,6 +3,8 @@ package com.smartpharma.controller;
 import com.smartpharma.dto.request.PurchaseOrderRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.PurchaseOrderResponse;
+import com.smartpharma.dto.response.SendWhatsAppResponse;
+import com.smartpharma.dto.response.WhatsAppMessageResponse;
 import com.smartpharma.service.PurchaseOrderService;
 import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
@@ -176,6 +178,26 @@ public class PurchaseOrderController {
         log.info("GET /api/purchase-orders/date-range - pharmacyId: {}, start: {}, end: {}", pharmacyId, startDate, endDate);
         List<PurchaseOrderResponse> orders = purchaseOrderService.getOrdersByDateRange(pharmacyId, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success(orders));
+    }
+
+    @GetMapping("/{id}/whatsapp")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<WhatsAppMessageResponse>> generateWhatsAppMessage(
+            @PathVariable Long id,
+            @RequestParam Long pharmacyId) {
+        log.info("GET /api/purchase-orders/{}/whatsapp - pharmacyId: {}", id, pharmacyId);
+        WhatsAppMessageResponse response = purchaseOrderService.generateWhatsAppMessage(id, pharmacyId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/{id}/send-whatsapp")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<SendWhatsAppResponse>> sendWhatsAppMessage(
+            @PathVariable Long id,
+            @RequestParam Long pharmacyId) {
+        log.info("POST /api/purchase-orders/{}/send-whatsapp - pharmacyId: {}", id, pharmacyId);
+        SendWhatsAppResponse response = purchaseOrderService.sendWhatsAppMessage(id, pharmacyId);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/total-amount")

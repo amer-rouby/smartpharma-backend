@@ -1,11 +1,13 @@
 package com.smartpharma.security;
 
-import com.smartpharma.service.SessionService;
+import com.smartpharma.entity.Session;
+import com.smartpharma.service.SessionValidationService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,13 +19,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
-    private final SessionService sessionService;
+    private final SessionValidationService sessionValidationService;
 
     @Override
     protected void doFilterInternal(
@@ -33,17 +36,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
+        final String jwt = authHeader.substring(7);
 
-        // Validate session on the backend
-        var session = sessionService.validateSession(jwt);
+        // Validate session and update last activity in a single transaction
+        // This reduces database connection usage from 3 queries to 1
+        Session session = sessionValidationService.validateAndRefreshSession(jwt);
         if (session == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
@@ -51,9 +54,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             response.getWriter().write(json);
             return;
         }
-
-        // Update last activity time
-        sessionService.updateLastActivity(jwt);
 
         String userEmail = jwtService.extractUsername(jwt);
 
