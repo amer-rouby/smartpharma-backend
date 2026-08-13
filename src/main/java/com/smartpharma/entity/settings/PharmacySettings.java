@@ -76,6 +76,10 @@ public class PharmacySettings {
     @Builder.Default
     private Boolean expiryAlerts = true;
 
+    @Column(length = 255)
+    @Builder.Default
+    private String enabledPaymentMethods = "CASH,VISA,MASTERCARD,INSTAPAY,FAWRY,WALLET,BANK_TRANSFER";
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

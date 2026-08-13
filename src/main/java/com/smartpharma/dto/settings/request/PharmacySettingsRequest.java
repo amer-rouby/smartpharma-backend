@@ -67,4 +67,7 @@ public class PharmacySettingsRequest {
 
     @Builder.Default
     private Boolean expiryAlerts = true;
+
+    @Size(max = 255)
+    private String enabledPaymentMethods;
 }

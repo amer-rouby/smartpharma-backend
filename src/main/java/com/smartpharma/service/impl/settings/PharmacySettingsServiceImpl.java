@@ -53,6 +53,9 @@ public class PharmacySettingsServiceImpl implements PharmacySettingsService {
         settings.setSmsNotifications(request.getSmsNotifications());
         settings.setLowStockAlerts(request.getLowStockAlerts());
         settings.setExpiryAlerts(request.getExpiryAlerts());
+        if (request.getEnabledPaymentMethods() != null && !request.getEnabledPaymentMethods().isBlank()) {
+            settings.setEnabledPaymentMethods(request.getEnabledPaymentMethods());
+        }
 
         if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
             Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)

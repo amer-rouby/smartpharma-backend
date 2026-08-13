@@ -86,13 +86,17 @@ public class ProductServiceImpl implements ProductService {
                     ? request.getBuyPrice()
                     : request.getSellPrice();
 
+            LocalDate expiryDate = request.getExpiryDate() != null
+                    ? request.getExpiryDate()
+                    : LocalDate.now().plusMonths(24);
+
             StockBatch batch = StockBatch.builder()
                     .product(product)
                     .pharmacy(pharmacy)
                     .batchNumber("BATCH-" + product.getId() + "-" + System.currentTimeMillis())
                     .quantityInitial(request.getInitialStock())
                     .quantityCurrent(request.getInitialStock())
-                    .expiryDate(LocalDate.now().plusMonths(24))
+                    .expiryDate(expiryDate)
                     .buyPrice(effectiveBuyPrice)
                     .sellPrice(request.getSellPrice())
                     .location("Shelf-1")

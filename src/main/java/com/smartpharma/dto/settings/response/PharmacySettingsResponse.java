@@ -32,6 +32,7 @@ public class PharmacySettingsResponse {
     private Boolean smsNotifications;
     private Boolean lowStockAlerts;
     private Boolean expiryAlerts;
+    private String enabledPaymentMethods;
     private LocalDateTime updatedAt;
 
     public static PharmacySettingsResponse fromEntity(PharmacySettings settings, String pharmacyName) {
@@ -54,6 +55,7 @@ public class PharmacySettingsResponse {
                 .smsNotifications(settings.getSmsNotifications())
                 .lowStockAlerts(settings.getLowStockAlerts())
                 .expiryAlerts(settings.getExpiryAlerts())
+                .enabledPaymentMethods(settings.getEnabledPaymentMethods())
                 .updatedAt(settings.getUpdatedAt())
                 .build();
     }
