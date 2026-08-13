@@ -25,6 +25,10 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     void revokeAllByUserId(@Param("userId") Long userId);
 
     @Modifying
+    @Query("DELETE FROM Session s WHERE s.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
+
+    @Modifying
     @Query("UPDATE Session s SET s.revoked = true WHERE s.token = :token")
     void revokeByToken(@Param("token") String token);
 

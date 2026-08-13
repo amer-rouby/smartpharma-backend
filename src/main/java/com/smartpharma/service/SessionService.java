@@ -18,6 +18,10 @@ public interface SessionService {
 
     void revokeAllUserSessions(Long userId);
 
+    /** Hard-deletes (not just revokes) every session row for a user - needed before a
+     * user row itself can be deleted, since sessions.user_id is a FK. */
+    void deleteAllUserSessions(Long userId);
+
     void updateLastActivity(String token);
 
     void cleanupExpiredSessions();
