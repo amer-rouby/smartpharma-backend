@@ -9,6 +9,12 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class AuthResponse {
+    /** True when the username/password were correct but a TOTP code is still needed.
+     * When true, accessToken/refreshToken are absent and twoFactorTempToken must be
+     * submitted (with the code) to /api/auth/2fa/login to actually complete login. */
+    private Boolean twoFactorRequired;
+    private String twoFactorTempToken;
+
     private Long userId;
     private String username;
     private String fullName;

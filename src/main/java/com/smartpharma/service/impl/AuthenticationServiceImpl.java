@@ -9,6 +9,7 @@ import com.smartpharma.exception.AccountLockedException;
 import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.UserRepository;
 import com.smartpharma.security.JwtService;
+import com.smartpharma.security.TwoFactorPendingLoginStore;
 import com.smartpharma.service.AuthenticationService;
 import com.smartpharma.service.SessionService;
 import com.smartpharma.service.settings.SecuritySettingsService;
@@ -35,6 +36,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final SessionService sessionService;
     private final SecuritySettingsService securitySettingsService;
+    private final TwoFactorPendingLoginStore twoFactorPendingLoginStore;
 
     @Override
     @Transactional
@@ -150,8 +152,61 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new RuntimeException("User account is deactivated");
         }
 
-        securitySettingsService.resetFailedLoginAttempts(user.getId());
+        if (securitySettingsService.isTwoFactorEnabled(user.getId())) {
+            // Password was correct, but that's only the first factor - don't reset the
+            // failed-attempt counter or issue any real token yet. The pending token is
+            // opaque and single-purpose (see TwoFactorPendingLoginStore); it cannot be
+            // used to call any other authenticated endpoint.
+            String tempToken = twoFactorPendingLoginStore.issue(user.getId());
+            return AuthResponse.builder()
+                    .twoFactorRequired(true)
+                    .twoFactorTempToken(tempToken)
+                    .build();
+        }
 
+        securitySettingsService.resetFailedLoginAttempts(user.getId());
+        return completeLogin(user);
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse completeTwoFactorLogin(String tempToken, String code) {
+        Long userId = twoFactorPendingLoginStore.peek(tempToken);
+        if (userId == null) {
+            throw new RuntimeException("Two-factor login request expired or invalid - please log in again");
+        }
+
+        Long remainingLockMinutes = securitySettingsService.getRemainingLockMinutesIfLocked(userId);
+        if (remainingLockMinutes != null) {
+            twoFactorPendingLoginStore.invalidate(tempToken);
+            throw new AccountLockedException(
+                    "Account is locked due to too many failed attempts. Try again in "
+                            + remainingLockMinutes + " minute(s).");
+        }
+
+        if (!securitySettingsService.verifyTwoFactorCode(userId, code)) {
+            securitySettingsService.incrementFailedLoginAttempts(userId);
+            // Deliberately NOT invalidating the token here - a mistyped code shouldn't
+            // force the user back through username+password too, only exhausting the
+            // account-lockout attempt count (or the token's own TTL) should.
+            throw new RuntimeException("Invalid two-factor code");
+        }
+
+        twoFactorPendingLoginStore.invalidate(tempToken);
+        securitySettingsService.resetFailedLoginAttempts(userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+        if (!user.getIsActive()) {
+            throw new RuntimeException("User account is deactivated");
+        }
+
+        return completeLogin(user);
+    }
+
+    /** Shared tail end of both the plain and two-factor login paths: attribute the
+     * login, revoke old sessions, issue tokens, create the new session. */
+    private AuthResponse completeLogin(User user) {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 

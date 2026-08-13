@@ -10,6 +10,9 @@ public interface AuthenticationService {
 
     AuthResponse login(LoginRequest request);
 
+    /** Second step of login when the first step returned twoFactorRequired=true. */
+    AuthResponse completeTwoFactorLogin(String tempToken, String code);
+
     AuthResponse refreshToken(String refreshToken);
 
     void logout(String accessToken);

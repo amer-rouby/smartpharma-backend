@@ -31,6 +31,11 @@ public class SecuritySettings {
     @Builder.Default
     private Boolean twoFactorEnabled = false;
 
+    /** Base32 TOTP secret. Set as soon as setup starts, but twoFactorEnabled stays
+     * false until the user proves they can generate a valid code with it. */
+    @Column(name = "two_factor_secret", length = 64)
+    private String twoFactorSecret;
+
     @Column(name = "session_timeout_minutes")
     @Builder.Default
     private Integer sessionTimeoutMinutes = 30;
