@@ -64,6 +64,9 @@ public class SaleTransaction {
     @Column(name = "notes", length = 500)
     private String notes;
 
+    @Column(name = "prescription_image_url", length = 255)
+    private String prescriptionImageUrl;
+
     @Column(name = "transaction_date", nullable = false)
     @Builder.Default
     private LocalDateTime transactionDate = LocalDateTime.now();

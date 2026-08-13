@@ -86,15 +86,24 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .invoiceNumber(generateInvoiceNumber())
                 .discountAmount(Optional.ofNullable(request.getDiscountAmount()).orElse(BigDecimal.ZERO))
                 .customerPhone(request.getCustomerPhone())
+                .prescriptionImageUrl(request.getPrescriptionImageUrl())
                 .paymentMethod(PaymentMethod.valueOf(
                         Optional.ofNullable(request.getPaymentMethod()).orElse("CASH").toUpperCase()))
                 .notes(request.getNotes())
                 .build();
 
         List<SaleItem> saleItems = new ArrayList<>();
+        boolean requiresPrescription = false;
         for (SaleItemRequest itemRequest : request.getItems()) {
             SaleItem saleItem = processSaleItem(itemRequest, sale);
             saleItems.add(saleItem);
+            if (Boolean.TRUE.equals(saleItem.getProduct().getPrescriptionRequired())) {
+                requiresPrescription = true;
+            }
+        }
+
+        if (requiresPrescription && (request.getPrescriptionImageUrl() == null || request.getPrescriptionImageUrl().isBlank())) {
+            throw new RuntimeException("This sale contains a prescription-only product - a prescription image is required");
         }
 
         sale.setItems(saleItems);
@@ -487,6 +496,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .paymentMethod(sale.getPaymentMethod() != null ? sale.getPaymentMethod().name() : null)
                 .customerPhone(sale.getCustomerPhone())
                 .notes(sale.getNotes())
+                .prescriptionImageUrl(sale.getPrescriptionImageUrl())
                 .transactionDate(sale.getTransactionDate())
                 .pharmacyId(sale.getPharmacy().getId())
                 .pharmacyName(sale.getPharmacy().getName())

@@ -25,6 +25,8 @@ public class SaleRequest {
 
     private String customerPhone;
 
+    private String prescriptionImageUrl;
+
     private String paymentMethod = "CASH";
 
     @DecimalMin(value = "0", message = "Discount cannot be negative")
