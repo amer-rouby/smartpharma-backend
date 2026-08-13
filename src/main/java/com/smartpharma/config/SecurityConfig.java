@@ -51,6 +51,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/notifications/stream").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        // Platform-operator-only endpoints (whole-database backup/restore).
+                        // Deliberately outside the normal JWT/role system - see PlatformAdminAuth,
+                        // which enforces its own separate secret on every request here.
+                        .requestMatchers("/api/platform/**").permitAll()
                         // Public "someone clicked a share link" read - no auth by design.
                         // Creating a link (POST /api/share) still requires isAuthenticated().
                         .requestMatchers(HttpMethod.GET, "/api/share/*").permitAll()

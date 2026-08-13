@@ -42,6 +42,20 @@ public class BackupRecord {
     @Column(name = "created_by")
     private Long createdBy;
 
+    /**
+     * NULL = a whole-database (PLATFORM scope) backup, covering every pharmacy - only
+     * ever created/restored via the platform-operator API key, never by a pharmacy's
+     * own ADMIN. Non-null = a PHARMACY-scope backup, a JSON export of just that
+     * pharmacy's own data, self-service for that pharmacy's ADMIN.
+     */
+    @Column(name = "pharmacy_id")
+    private Long pharmacyId;
+
+    /** "PLATFORM" or "PHARMACY" - see pharmacyId. */
+    @Column(name = "scope", length = 20)
+    @Builder.Default
+    private String scope = "PLATFORM";
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

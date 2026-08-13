@@ -22,6 +22,8 @@ public class BackupResponse {
     private String status;
     private String description;
     private Long createdBy;
+    private Long pharmacyId;
+    private String scope;
     private LocalDateTime createdAt;
     private LocalDateTime restoredAt;
 
@@ -35,6 +37,8 @@ public class BackupResponse {
                 .status(backup.getStatus())
                 .description(backup.getDescription())
                 .createdBy(backup.getCreatedBy())
+                .pharmacyId(backup.getPharmacyId())
+                .scope(backup.getScope())
                 .createdAt(backup.getCreatedAt())
                 .restoredAt(backup.getRestoredAt())
                 .build();
