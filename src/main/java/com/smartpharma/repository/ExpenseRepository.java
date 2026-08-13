@@ -19,6 +19,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     Page<Expense> findByPharmacyIdAndDeletedAtIsNull(Long pharmacyId, Pageable pageable);
 
+    List<Expense> findByPharmacyIdAndDeletedAtIsNull(Long pharmacyId);
+
     Optional<Expense> findByIdAndPharmacyIdAndDeletedAtIsNull(Long id, Long pharmacyId);
 
     List<Expense> findByPharmacyIdAndExpenseDateBetweenAndDeletedAtIsNull(

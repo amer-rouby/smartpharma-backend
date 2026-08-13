@@ -17,6 +17,8 @@ import java.util.List;
 @Repository
 public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
 
+    List<StockBatch> findByPharmacyId(Long pharmacyId);
+
     Page<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status, Pageable pageable);
 
     List<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status);

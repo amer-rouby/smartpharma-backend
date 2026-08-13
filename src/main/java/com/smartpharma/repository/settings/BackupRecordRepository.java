@@ -18,5 +18,7 @@ public interface BackupRecordRepository extends JpaRepository<BackupRecord, Long
     @Query("SELECT br FROM BackupRecord br WHERE br.status = 'COMPLETED' ORDER BY br.createdAt DESC")
     List<BackupRecord> findCompletedBackups();
 
+    List<BackupRecord> findByPharmacyIdOrderByCreatedAtDesc(Long pharmacyId);
+
     long count();
 }
