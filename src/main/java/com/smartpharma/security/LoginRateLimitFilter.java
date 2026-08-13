@@ -31,7 +31,8 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        boolean isRateLimited = path.endsWith("/api/auth/login") || path.endsWith("/api/auth/register");
+        boolean isRateLimited = path.endsWith("/api/auth/login") || path.endsWith("/api/auth/register")
+                || path.endsWith("/api/auth/2fa/login");
 
         if (isRateLimited && !rateLimiter.tryAcquire(resolveClientIp(request))) {
             response.setStatus(429);

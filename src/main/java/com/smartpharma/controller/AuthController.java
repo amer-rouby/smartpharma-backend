@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -29,6 +31,13 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authenticationService.login(request));
+    }
+
+    @PostMapping("/2fa/login")
+    public ResponseEntity<AuthResponse> completeTwoFactorLogin(@RequestBody Map<String, String> body) {
+        AuthResponse response = authenticationService.completeTwoFactorLogin(
+                body.get("tempToken"), body.get("code"));
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/refresh")
