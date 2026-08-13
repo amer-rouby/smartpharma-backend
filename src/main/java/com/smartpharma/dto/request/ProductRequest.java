@@ -1,6 +1,7 @@
 package com.smartpharma.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -10,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Map;
 
 @Data
@@ -45,4 +47,7 @@ public class ProductRequest {
     private Map<String, Object> extraAttributes;
     @JsonProperty("initialStock")
     private Integer initialStock;
+
+    @Future(message = "Expiry date must be in the future")
+    private LocalDate expiryDate;
 }
