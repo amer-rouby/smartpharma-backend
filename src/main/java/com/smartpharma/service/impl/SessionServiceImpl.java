@@ -91,6 +91,12 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional
+    public void deleteAllUserSessions(Long userId) {
+        sessionRepository.deleteByUserId(userId);
+    }
+
+    @Override
+    @Transactional
     public void updateLastActivity(String token) {
         sessionRepository.updateLastActivity(token, LocalDateTime.now());
     }
