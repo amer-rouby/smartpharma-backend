@@ -1,6 +1,8 @@
 package com.smartpharma.repository;
 
 import com.smartpharma.entity.Category;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -47,4 +49,15 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     @Query("SELECT c FROM Category c WHERE c.pharmacy.id = :pharmacyId AND c.isActive = true AND c.deletedAt IS NULL")
     List<Category> findActiveByPharmacyId(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+            SELECT c FROM Category c
+            WHERE c.pharmacy.id = :pharmacyId
+            AND c.deletedAt IS NULL
+            AND (:search IS NULL OR :search = '' OR
+                LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(c.nameAr) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(c.nameEn) LIKE LOWER(CONCAT('%', :search, '%')))
+            """)
+    Page<Category> searchAndFilter(@Param("pharmacyId") Long pharmacyId, @Param("search") String search, Pageable pageable);
 }
