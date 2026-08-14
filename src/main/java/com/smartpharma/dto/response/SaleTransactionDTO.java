@@ -26,6 +26,8 @@ public class SaleTransactionDTO {
     // ADD THIS LINE HERE
     private String notes;
 
+    private String prescriptionImageUrl;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime transactionDate;
 
