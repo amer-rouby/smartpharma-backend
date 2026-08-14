@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Uploads (prescriptions are sensitive medical documents - never commit them) ###
+uploads/prescriptions/
