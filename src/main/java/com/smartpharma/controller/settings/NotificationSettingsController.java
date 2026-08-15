@@ -5,6 +5,7 @@ import com.smartpharma.dto.settings.request.NotificationSettingsRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.settings.response.NotificationSettingsResponse;
 import com.smartpharma.service.settings.NotificationSettingsService;
+import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,9 +23,8 @@ public class NotificationSettingsController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<NotificationSettingsResponse>> getNotificationSettings(
-            @RequestParam Long userId) {
-
+    public ResponseEntity<ApiResponse<NotificationSettingsResponse>> getNotificationSettings() {
+        Long userId = SecurityUtils.getCurrentUserId();
         log.info("GET /api/settings/notifications - userId: {}", userId);
 
         NotificationSettingsResponse settings = notificationSettingsService.getSettings(userId);
@@ -34,9 +34,8 @@ public class NotificationSettingsController {
     @PutMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<NotificationSettingsResponse>> updateNotificationSettings(
-            @RequestParam Long userId,
             @Valid @RequestBody NotificationSettingsRequest request) {
-
+        Long userId = SecurityUtils.getCurrentUserId();
         log.info("PUT /api/settings/notifications - userId: {}", userId);
 
         NotificationSettingsResponse settings = notificationSettingsService.updateSettings(userId, request);
