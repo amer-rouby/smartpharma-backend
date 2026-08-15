@@ -70,9 +70,12 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override @Transactional
-    public NotificationResponse markAsRead(Long notificationId, Long userId) {
+    public NotificationResponse markAsRead(Long notificationId, Long userId, Long pharmacyId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
+        if (!notification.getPharmacy().getId().equals(pharmacyId)) {
+            throw new RuntimeException("Notification not found");
+        }
         if (notification.getRecipient() == null || notification.getRecipient().getId().equals(userId)) {
             notification.setRead(true);
             notification.setReadAt(LocalDateTime.now());
@@ -243,9 +246,12 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override @Transactional
-    public void deleteNotification(Long id, Long userId) {
+    public void deleteNotification(Long id, Long userId, Long pharmacyId) {
         Notification notification = notificationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
+        if (!notification.getPharmacy().getId().equals(pharmacyId)) {
+            throw new RuntimeException("Notification not found");
+        }
         if (notification.getRecipient() == null || notification.getRecipient().getId().equals(userId)) {
             notificationRepository.delete(notification);
             notificationStreamService.notifyChanged(notification.getPharmacy().getId());

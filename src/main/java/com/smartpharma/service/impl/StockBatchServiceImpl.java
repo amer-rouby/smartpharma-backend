@@ -224,7 +224,7 @@ public class StockBatchServiceImpl implements StockBatchService {
 
     @Override
     @Transactional
-    public StockBatchResponse adjustStock(Long batchId, StockAdjustmentRequest request, Long userId) {
+    public StockBatchResponse adjustStock(Long batchId, StockAdjustmentRequest request, Long userId, Long pharmacyId) {
         log.info("Adjusting stock for batch: {}, type: {}, quantity: {}, user: {}",
                 batchId, request.getType(), request.getQuantity(), userId);
 
@@ -234,6 +234,10 @@ public class StockBatchServiceImpl implements StockBatchService {
 
         StockBatch batch = stockBatchRepository.findById(batchId)
                 .orElseThrow(() -> new RuntimeException("Batch not found with id: " + batchId));
+
+        if (!batch.getPharmacy().getId().equals(pharmacyId)) {
+            throw new RuntimeException("Batch not found with id: " + batchId);
+        }
 
         Integer currentQuantity = batch.getQuantityCurrent();
         Integer adjustmentQuantity = request.getQuantity();

@@ -91,7 +91,8 @@ public class NotificationController {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }
 
-        NotificationResponse notification = notificationService.markAsRead(id, userId);
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        NotificationResponse notification = notificationService.markAsRead(id, userId, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(notification, "Notification marked as read"));
     }
 
@@ -124,7 +125,8 @@ public class NotificationController {
             return ResponseEntity.status(401).body(ApiResponse.error("Invalid token"));
         }
 
-        notificationService.deleteNotification(id, userId);
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        notificationService.deleteNotification(id, userId, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Notification deleted"));
     }
 

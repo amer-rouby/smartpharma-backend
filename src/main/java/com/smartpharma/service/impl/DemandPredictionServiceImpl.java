@@ -136,9 +136,12 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
 
     @Override
     @Transactional
-    public void updatePredictionWithActual(Long predictionId, Integer actualQuantity) {
+    public void updatePredictionWithActual(Long predictionId, Integer actualQuantity, Long pharmacyId) {
         DemandPrediction prediction = predictionRepository.findById(predictionId)
                 .orElseThrow(() -> new RuntimeException("Prediction not found: " + predictionId));
+        if (!prediction.getPharmacy().getId().equals(pharmacyId)) {
+            throw new RuntimeException("Prediction not found: " + predictionId);
+        }
         prediction.setActualQuantity(actualQuantity);
         if (prediction.getPredictedQuantity() != null && prediction.getPredictedQuantity() > 0) {
             int error = Math.abs(actualQuantity - prediction.getPredictedQuantity());

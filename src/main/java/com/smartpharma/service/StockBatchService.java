@@ -15,6 +15,6 @@ public interface StockBatchService {
     void deleteBatch(Long id, Long pharmacyId, Long userId);
     List<StockBatchResponse> getExpiringBatches(Long pharmacyId, int days);
     List<StockBatchResponse> getExpiredBatches(Long pharmacyId);
-    StockBatchResponse adjustStock(Long batchId, StockAdjustmentRequest request, Long userId);
+    StockBatchResponse adjustStock(Long batchId, StockAdjustmentRequest request, Long userId, Long pharmacyId);
     List<StockAdjustmentHistoryDTO> getAdjustmentHistory(Long batchId, Long pharmacyId);
 }

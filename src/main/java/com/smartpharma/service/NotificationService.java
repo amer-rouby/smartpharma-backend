@@ -9,7 +9,7 @@ import java.util.List;
 public interface NotificationService {
 
     NotificationResponse createNotification(NotificationRequest request);
-    NotificationResponse markAsRead(Long notificationId, Long userId);
+    NotificationResponse markAsRead(Long notificationId, Long userId, Long pharmacyId);
 
     int markAllAsRead(Long pharmacyId, Long userId);
 
@@ -17,7 +17,7 @@ public interface NotificationService {
     List<NotificationResponse> getUnreadNotifications(Long pharmacyId, Long userId);
     Long getUnreadCount(Long pharmacyId, Long userId);
 
-    void deleteNotification(Long notificationId, Long userId);
+    void deleteNotification(Long notificationId, Long userId, Long pharmacyId);
 
     void checkAndCreateLowStockAlerts(Long pharmacyId);
     void checkAndCreateExpiryAlerts(Long pharmacyId);

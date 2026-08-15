@@ -143,7 +143,8 @@ public class StockController {
                 id, request.getType(), request.getQuantity());
 
         Long userId = SecurityUtils.extractUserId(authentication);
-        StockBatchResponse batch = stockBatchService.adjustStock(id, request, userId);
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        StockBatchResponse batch = stockBatchService.adjustStock(id, request, userId, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(batch, "Stock adjusted successfully"));
     }
 

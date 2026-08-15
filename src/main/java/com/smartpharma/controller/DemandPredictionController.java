@@ -117,8 +117,9 @@ public class DemandPredictionController {
             if (userId == null) {
                 return ResponseEntity.status(401).body(ApiResponse.error("Invalid authentication"));
             }
+            Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
             log.info("Updating actual quantity for prediction: {}, actual: {}, user: {}", id, actualQuantity, userId);
-            predictionService.updatePredictionWithActual(id, actualQuantity);
+            predictionService.updatePredictionWithActual(id, actualQuantity, pharmacyId);
             return ResponseEntity.ok(ApiResponse.success(null, "Actual quantity updated"));
         } catch (Exception e) {
             log.error("Error updating actual quantity", e);
