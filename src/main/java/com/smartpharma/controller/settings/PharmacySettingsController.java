@@ -20,8 +20,12 @@ public class PharmacySettingsController {
 
     private final PharmacySettingsService pharmacySettingsService;
 
+    // Read-only pharmacy info (name, address, currency, etc.) needed on every screen
+    // that formats money or prints an invoice - POS, sales history, sale details - not
+    // just the settings screen itself, so any authenticated role can read it. Only
+    // updatePharmacySettings() below is the sensitive operation and stays ADMIN-only.
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER', 'VIEWER')")
     public ResponseEntity<ApiResponse<PharmacySettingsResponse>> getPharmacySettings(
             @RequestParam Long pharmacyId) {
 
