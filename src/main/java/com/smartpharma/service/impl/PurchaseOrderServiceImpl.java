@@ -75,6 +75,10 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         Supplier supplier = supplierRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(request.getSupplierId(), pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Supplier not found"));
 
+        if (!supplier.isActive()) {
+            throw new RuntimeException("Cannot create a purchase order for a blocked or inactive supplier: " + supplier.getName());
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -158,6 +162,10 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         Supplier supplier = supplierRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(request.getSupplierId(), pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Supplier not found"));
+
+        if (!supplier.isActive()) {
+            throw new RuntimeException("Cannot assign a blocked or inactive supplier: " + supplier.getName());
+        }
 
         order.setSupplier(supplier);
         order.setOrderDate(request.getOrderDate());

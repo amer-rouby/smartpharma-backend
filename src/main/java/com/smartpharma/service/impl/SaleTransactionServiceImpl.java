@@ -7,6 +7,7 @@ import com.smartpharma.dto.response.SalesReportResponse;
 import com.smartpharma.entity.*;
 import com.smartpharma.entity.enums.PaymentMethod;
 import com.smartpharma.repository.*;
+import com.smartpharma.repository.settings.PharmacySettingsRepository;
 import com.smartpharma.service.NotificationService;
 import com.smartpharma.service.SaleTransactionService;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     private final SaleItemRepository saleItemRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final PharmacySettingsRepository pharmacySettingsRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -82,6 +84,9 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserId));
 
+        String paymentMethodValue = Optional.ofNullable(request.getPaymentMethod()).orElse("CASH").toUpperCase();
+        validatePaymentMethodEnabled(request.getPharmacyId(), paymentMethodValue);
+
         SaleTransaction sale = SaleTransaction.builder()
                 .pharmacy(pharmacy)
                 .user(user)
@@ -89,8 +94,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .discountAmount(Optional.ofNullable(request.getDiscountAmount()).orElse(BigDecimal.ZERO))
                 .customerPhone(request.getCustomerPhone())
                 .prescriptionImageUrl(request.getPrescriptionImageUrl())
-                .paymentMethod(PaymentMethod.valueOf(
-                        Optional.ofNullable(request.getPaymentMethod()).orElse("CASH").toUpperCase()))
+                .paymentMethod(PaymentMethod.valueOf(paymentMethodValue))
                 .notes(request.getNotes())
                 .build();
 
@@ -120,6 +124,24 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
             log.warn("Failed to create sale notification for sale {}: {}", savedSale.getId(), e.getMessage());
         }
         return mapToDTO(savedSale);
+    }
+
+    /** The POS UI already hides disabled payment-method buttons, but that's cosmetic
+     * only - without this check, any payment method could still be submitted directly
+     * via the API regardless of what the pharmacy has disabled in settings. */
+    private void validatePaymentMethodEnabled(Long pharmacyId, String paymentMethodValue) {
+        String enabled = pharmacySettingsRepository.findByPharmacyId(pharmacyId)
+                .map(s -> s.getEnabledPaymentMethods())
+                .orElse(null);
+        if (enabled == null || enabled.isBlank()) {
+            return;
+        }
+        List<String> enabledMethods = Arrays.stream(enabled.split(","))
+                .map(String::trim).map(String::toUpperCase).filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+        if (!enabledMethods.contains(paymentMethodValue)) {
+            throw new RuntimeException("Payment method '" + paymentMethodValue + "' is not enabled for this pharmacy");
+        }
     }
 
     @Override
