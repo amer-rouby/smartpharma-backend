@@ -56,6 +56,12 @@ public class PharmacySettingsServiceImpl implements PharmacySettingsService {
         if (request.getEnabledPaymentMethods() != null && !request.getEnabledPaymentMethods().isBlank()) {
             settings.setEnabledPaymentMethods(request.getEnabledPaymentMethods());
         }
+        if (request.getLargeSaleThreshold() != null) {
+            settings.setLargeSaleThreshold(request.getLargeSaleThreshold());
+        }
+        if (request.getLargeExpenseThreshold() != null) {
+            settings.setLargeExpenseThreshold(request.getLargeExpenseThreshold());
+        }
 
         if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
             Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)

@@ -32,6 +32,16 @@ public class Notification {
     @Column(columnDefinition = "TEXT")
     private String message;
 
+    // title/message above are Arabic (this app's default/primary language); these are
+    // the English counterparts, computed once at creation time alongside them so a
+    // single stored row can serve viewers in either language without redoing the
+    // interpolation (product names, amounts, etc.) at read time.
+    @Column(name = "title_en")
+    private String titleEn;
+
+    @Column(name = "message_en", columnDefinition = "TEXT")
+    private String messageEn;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private NotificationType type;
@@ -57,7 +67,8 @@ public class Notification {
     private LocalDateTime readAt;
 
     public enum NotificationType {
-        LOW_STOCK, EXPIRY_WARNING, EXPIRED, SALE_COMPLETED, EXPENSE_ADDED, SYSTEM
+        LOW_STOCK, OUT_OF_STOCK, EXPIRY_WARNING, EXPIRED, SALE_COMPLETED, LARGE_SALE,
+        EXPENSE_ADDED, LARGE_EXPENSE, BACKUP_REMINDER, SECURITY_ALERT, SYSTEM
     }
 
     public enum NotificationPriority {
