@@ -2,6 +2,7 @@ package com.smartpharma.service;
 
 import com.smartpharma.dto.request.PurchaseOrderRequest;
 import com.smartpharma.dto.response.PurchaseOrderResponse;
+import com.smartpharma.dto.response.SendEmailResponse;
 import com.smartpharma.dto.response.SendWhatsAppResponse;
 import com.smartpharma.dto.response.WhatsAppMessageResponse;
 import org.springframework.data.domain.Page;
@@ -25,4 +26,5 @@ public interface PurchaseOrderService {
     PurchaseOrderResponse createFromPrediction(Long predictionId, Long pharmacyId, Long userId);
     WhatsAppMessageResponse generateWhatsAppMessage(Long orderId, Long pharmacyId);
     SendWhatsAppResponse sendWhatsAppMessage(Long orderId, Long pharmacyId);
+    SendEmailResponse sendPurchaseOrderEmail(Long orderId, Long pharmacyId);
 }

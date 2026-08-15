@@ -4,10 +4,13 @@ import com.smartpharma.dto.request.PurchaseOrderItemRequest;
 import com.smartpharma.dto.request.PurchaseOrderRequest;
 import com.smartpharma.dto.request.StockMovementRequest;
 import com.smartpharma.dto.response.PurchaseOrderResponse;
+import com.smartpharma.dto.response.SendEmailResponse;
 import com.smartpharma.dto.response.SendWhatsAppResponse;
 import com.smartpharma.dto.response.WhatsAppMessageResponse;
 import com.smartpharma.entity.*;
 import com.smartpharma.repository.*;
+import com.smartpharma.service.EmailService;
+import com.smartpharma.service.PurchaseOrderPdfService;
 import com.smartpharma.service.PurchaseOrderService;
 import com.smartpharma.service.StockMovementService;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final UserRepository userRepository;
     private final StockBatchRepository stockBatchRepository;
     private final StockMovementService stockMovementService;
+    private final EmailService emailService;
+    private final PurchaseOrderPdfService purchaseOrderPdfService;
 
     @Override
     @Transactional(readOnly = true)
@@ -525,6 +530,66 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         }
         sb.append("\n\n");
         sb.append("_SmartPharma - إدارة الصيدليات الذكية_");
+
+        return sb.toString();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SendEmailResponse sendPurchaseOrderEmail(Long orderId, Long pharmacyId) {
+        log.info("Sending purchase order email for orderId: {}, pharmacyId: {}", orderId, pharmacyId);
+
+        PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(orderId, pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Purchase order not found with id: " + orderId));
+
+        Supplier supplier = order.getSupplier();
+        if (supplier == null) {
+            throw new RuntimeException("No supplier assigned to this purchase order");
+        }
+
+        String email = supplier.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Supplier has no email address on file");
+        }
+
+        String subject = "Purchase Order " + order.getOrderNumber()
+                + (order.getPharmacy() != null ? " - " + order.getPharmacy().getName() : "");
+        String body = formatPurchaseOrderEmailShortBody(order);
+        byte[] pdf = purchaseOrderPdfService.generatePdf(order);
+        String filename = order.getOrderNumber() + ".pdf";
+
+        emailService.sendEmailWithAttachment(email, subject, body, pdf, filename, "application/pdf");
+
+        log.info("Purchase order email sent for order: {} -> {}", order.getOrderNumber(), email);
+
+        return SendEmailResponse.builder()
+                .success(true)
+                .recipientEmail(email)
+                .message("Email sent successfully")
+                .build();
+    }
+
+    // The detailed order content now lives in the attached PDF (PurchaseOrderPdfService) -
+    // the email body is just a short cover note pointing at it, not a second copy of
+    // every line item in plain text.
+    private String formatPurchaseOrderEmailShortBody(PurchaseOrder order) {
+        Pharmacy pharmacy = order.getPharmacy();
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("Dear ").append(order.getSupplier().getName()).append(",\n\n");
+        sb.append("Please find attached Purchase Order ").append(order.getOrderNumber())
+                .append(" (total: ").append(String.format("%.2f", order.getTotalAmount())).append(" EGP).\n\n");
+        sb.append("Please confirm this order at your earliest convenience.\n\n");
+
+        if (pharmacy != null) {
+            sb.append("Best regards,\n");
+            sb.append(pharmacy.getName() != null ? pharmacy.getName() : "SmartPharma");
+            if (pharmacy.getPhone() != null && !pharmacy.getPhone().isBlank()) {
+                sb.append("\n").append(pharmacy.getPhone());
+            }
+        } else {
+            sb.append("Best regards,\nSmartPharma");
+        }
 
         return sb.toString();
     }

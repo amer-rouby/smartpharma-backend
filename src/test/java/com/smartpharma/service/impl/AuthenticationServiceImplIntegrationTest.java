@@ -85,7 +85,7 @@ class AuthenticationServiceImplIntegrationTest {
 
     @Test
     void login_withWrongPassword_actuallyPersistsTheFailedAttempt() {
-        LoginRequest badLogin = new LoginRequest(user.getUsername(), "WrongPassword123!");
+        LoginRequest badLogin = new LoginRequest(user.getUsername(), "WrongPassword123!", false);
 
         assertThatThrownBy(() -> authenticationService.login(badLogin))
                 .isInstanceOf(Exception.class);
@@ -99,7 +99,7 @@ class AuthenticationServiceImplIntegrationTest {
 
     @Test
     void login_fiveWrongPasswords_locksTheAccount() {
-        LoginRequest badLogin = new LoginRequest(user.getUsername(), "WrongPassword123!");
+        LoginRequest badLogin = new LoginRequest(user.getUsername(), "WrongPassword123!", false);
 
         for (int i = 0; i < 5; i++) {
             assertThatThrownBy(() -> authenticationService.login(badLogin));
@@ -113,13 +113,13 @@ class AuthenticationServiceImplIntegrationTest {
 
     @Test
     void login_withCorrectPassword_resetsAnyPriorFailedAttempts() {
-        LoginRequest badLogin = new LoginRequest(user.getUsername(), "WrongPassword123!");
+        LoginRequest badLogin = new LoginRequest(user.getUsername(), "WrongPassword123!", false);
         assertThatThrownBy(() -> authenticationService.login(badLogin));
 
         SecuritySettings afterFailure = securitySettingsRepository.findByUserId(user.getId()).orElseThrow();
         assertThat(afterFailure.getFailedLoginAttempts()).isEqualTo(1);
 
-        LoginRequest goodLogin = new LoginRequest(user.getUsername(), "CorrectPassword123!");
+        LoginRequest goodLogin = new LoginRequest(user.getUsername(), "CorrectPassword123!", false);
         authenticationService.login(goodLogin);
 
         SecuritySettings afterSuccess = securitySettingsRepository.findByUserId(user.getId()).orElseThrow();

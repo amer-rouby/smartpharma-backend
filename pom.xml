@@ -39,6 +39,20 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+		<!-- Renders purchase-order PDFs via a real headless browser instead of the
+		     openpdf library below - openpdf's Arabic text shaping (letter joining) is
+		     a legacy, incomplete implementation that produces disconnected, unreadable
+		     glyphs; a real browser engine renders Arabic exactly as well as it already
+		     does everywhere else in this app (every screen's UI, all frontend prints). -->
+		<dependency>
+			<groupId>com.microsoft.playwright</groupId>
+			<artifactId>playwright</artifactId>
+			<version>1.62.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 		<dependency>

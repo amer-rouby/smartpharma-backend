@@ -3,6 +3,7 @@ package com.smartpharma.controller;
 import com.smartpharma.dto.request.PurchaseOrderRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.PurchaseOrderResponse;
+import com.smartpharma.dto.response.SendEmailResponse;
 import com.smartpharma.dto.response.SendWhatsAppResponse;
 import com.smartpharma.dto.response.WhatsAppMessageResponse;
 import com.smartpharma.service.PurchaseOrderService;
@@ -211,6 +212,17 @@ public class PurchaseOrderController {
         pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("POST /api/purchase-orders/{}/send-whatsapp - pharmacyId: {}", id, pharmacyId);
         SendWhatsAppResponse response = purchaseOrderService.sendWhatsAppMessage(id, pharmacyId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/{id}/send-email")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<SendEmailResponse>> sendPurchaseOrderEmail(
+            @PathVariable Long id,
+            @RequestParam Long pharmacyId) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        log.info("POST /api/purchase-orders/{}/send-email - pharmacyId: {}", id, pharmacyId);
+        SendEmailResponse response = purchaseOrderService.sendPurchaseOrderEmail(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

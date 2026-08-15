@@ -10,7 +10,7 @@ class TwoFactorPendingLoginStoreTest {
 
     @Test
     void issueThenPeek_returnsTheSameUserIdWithoutConsuming() {
-        String token = store.issue(42L);
+        String token = store.issue(42L, false);
 
         assertThat(store.peek(token)).isEqualTo(42L);
         // peek() must NOT consume - this is the exact bug found and fixed while
@@ -23,7 +23,7 @@ class TwoFactorPendingLoginStoreTest {
 
     @Test
     void invalidate_preventsFurtherUse() {
-        String token = store.issue(42L);
+        String token = store.issue(42L, false);
         assertThat(store.peek(token)).isEqualTo(42L);
 
         store.invalidate(token);
@@ -43,8 +43,8 @@ class TwoFactorPendingLoginStoreTest {
 
     @Test
     void issue_producesDifferentTokensEachTime() {
-        String tokenA = store.issue(1L);
-        String tokenB = store.issue(1L);
+        String tokenA = store.issue(1L, false);
+        String tokenB = store.issue(1L, false);
 
         assertThat(tokenA).isNotEqualTo(tokenB);
         // Both remain independently valid until explicitly invalidated.
@@ -54,8 +54,8 @@ class TwoFactorPendingLoginStoreTest {
 
     @Test
     void invalidate_ofOneTokenDoesNotAffectAnotherForTheSameUser() {
-        String tokenA = store.issue(7L);
-        String tokenB = store.issue(7L);
+        String tokenA = store.issue(7L, false);
+        String tokenB = store.issue(7L, false);
 
         store.invalidate(tokenA);
 
