@@ -14,6 +14,7 @@ public class NotificationSettingsRequest {
     private Boolean emailNotifications;
     private Boolean smsNotifications;
     private Boolean pushNotifications;
+    private String preferredLanguage;
     private Boolean soundEnabled;
     private Boolean vibrationEnabled;
     private Boolean quietHoursEnabled;

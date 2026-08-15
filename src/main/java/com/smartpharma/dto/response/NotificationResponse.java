@@ -14,6 +14,8 @@ public class NotificationResponse {
     private Long id;
     private String title;
     private String message;
+    private String titleEn;
+    private String messageEn;
     private String type;
     private String priority;
     private boolean read;

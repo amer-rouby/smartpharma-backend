@@ -18,6 +18,8 @@ public class NotificationRequest {
     private User recipient;
     private String title;
     private String message;
+    private String titleEn;
+    private String messageEn;
     private Notification.NotificationType type;
     private Notification.NotificationPriority priority;
     private String relatedEntityType;

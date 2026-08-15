@@ -32,6 +32,16 @@ public class Notification {
     @Column(columnDefinition = "TEXT")
     private String message;
 
+    // title/message above are Arabic (this app's default/primary language); these are
+    // the English counterparts, computed once at creation time alongside them so a
+    // single stored row can serve viewers in either language without redoing the
+    // interpolation (product names, amounts, etc.) at read time.
+    @Column(name = "title_en")
+    private String titleEn;
+
+    @Column(name = "message_en", columnDefinition = "TEXT")
+    private String messageEn;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private NotificationType type;

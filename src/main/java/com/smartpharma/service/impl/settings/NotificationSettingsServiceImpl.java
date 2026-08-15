@@ -45,6 +45,9 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
         if (request.getPushNotifications() != null) {
             settings.setPushNotifications(request.getPushNotifications());
         }
+        if (request.getPreferredLanguage() != null && !request.getPreferredLanguage().isBlank()) {
+            settings.setPreferredLanguage(request.getPreferredLanguage());
+        }
         if (request.getSoundEnabled() != null) {
             settings.setSoundEnabled(request.getSoundEnabled());
         }
@@ -117,6 +120,7 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
                 .emailNotifications(true)
                 .smsNotifications(false)
                 .pushNotifications(true)
+                .preferredLanguage("ar")
                 .soundEnabled(true)
                 .vibrationEnabled(true)
                 .quietHoursEnabled(false)

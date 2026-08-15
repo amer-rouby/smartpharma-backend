@@ -129,6 +129,7 @@ public class NotificationServiceImpl implements NotificationService {
         Notification notification = Notification.builder()
                 .pharmacy(request.getPharmacy()).recipient(request.getRecipient())
                 .title(request.getTitle()).message(request.getMessage())
+                .titleEn(request.getTitleEn()).messageEn(request.getMessageEn())
                 .type(request.getType()).priority(request.getPriority())
                 .relatedEntityType(request.getRelatedEntityType())
                 .relatedEntityId(request.getRelatedEntityId()).build();
@@ -166,7 +167,10 @@ public class NotificationServiceImpl implements NotificationService {
                 if (isWithinQuietHours(settings)) {
                     continue;
                 }
-                emailService.sendPlainTextEmail(user.getEmail(), notification.getTitle(), notification.getMessage());
+                boolean english = "en".equalsIgnoreCase(settings.getPreferredLanguage());
+                String subject = english && notification.getTitleEn() != null ? notification.getTitleEn() : notification.getTitle();
+                String body = english && notification.getMessageEn() != null ? notification.getMessageEn() : notification.getMessage();
+                emailService.sendPlainTextEmail(user.getEmail(), subject, body);
             } catch (Exception e) {
                 log.warn("Failed to email notification {} to userId {}: {}", notification.getId(), user.getId(), e.getMessage());
             }
@@ -182,6 +186,7 @@ public class NotificationServiceImpl implements NotificationService {
         return notificationSettingsRepository.findByUserId(userId)
                 .orElseGet(() -> NotificationSettings.builder()
                         .emailNotifications(true).smsNotifications(false).pushNotifications(true)
+                        .preferredLanguage("ar")
                         .soundEnabled(true).vibrationEnabled(true)
                         .quietHoursEnabled(false).quietHoursStart("22:00").quietHoursEnd("08:00")
                         .notifyLowStock(true).notifyOutOfStock(true)
@@ -275,8 +280,12 @@ public class NotificationServiceImpl implements NotificationService {
         boolean outOfStock = type == Notification.NotificationType.OUT_OF_STOCK;
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(recipient)
-                .title(outOfStock ? "❌ Out of Stock" : "⚠️ Low Stock Warning")
+                .title(outOfStock ? "❌ نفاد المخزون" : "⚠️ تنبيه مخزون منخفض")
                 .message(outOfStock
+                        ? "نفد مخزون المنتج '" + product.getName() + "' تماماً"
+                        : "وصل مخزون المنتج '" + product.getName() + "' إلى مستوى منخفض: " + stock + " وحدة")
+                .titleEn(outOfStock ? "❌ Out of Stock" : "⚠️ Low Stock Warning")
+                .messageEn(outOfStock
                         ? "Product '" + product.getName() + "' is out of stock"
                         : "Product '" + product.getName() + "' has reached low stock: " + stock + " units")
                 .type(type)
@@ -311,14 +320,23 @@ public class NotificationServiceImpl implements NotificationService {
                                           Notification.NotificationType type, Notification.NotificationPriority priority) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+        boolean expired = type == Notification.NotificationType.EXPIRED;
         long days = ChronoUnit.DAYS.between(LocalDate.now(), batch.getExpiryDate());
-        String daysText = days > 0 ? "in " + days + " day(s)" : "today";
-        String title = type == Notification.NotificationType.EXPIRED ? "❌ Expired Product" : "⚠️ Expiring Soon";
-        String message = "Batch '" + batch.getBatchNumber() + "' of product '" + batch.getProduct().getName() + "' " + statusLabel + " (" + daysText + ")";
+
+        String daysTextAr = days > 0 ? "خلال " + days + " يوم" : "اليوم";
+        String statusLabelAr = expired ? "منتهية الصلاحية" : "قريبة من انتهاء الصلاحية";
+        String titleAr = expired ? "❌ منتج منتهي الصلاحية" : "⚠️ صلاحية قريبة";
+        String messageAr = "دفعة '" + batch.getBatchNumber() + "' من المنتج '" + batch.getProduct().getName() + "' " + statusLabelAr + " (" + daysTextAr + ")";
+
+        String daysTextEn = days > 0 ? "in " + days + " day(s)" : "today";
+        String titleEn = expired ? "❌ Expired Product" : "⚠️ Expiring Soon";
+        String messageEn = "Batch '" + batch.getBatchNumber() + "' of product '" + batch.getProduct().getName() + "' " + statusLabel + " (" + daysTextEn + ")";
 
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(null)
-                .title(title).message(message).type(type).priority(priority)
+                .title(titleAr).message(messageAr)
+                .titleEn(titleEn).messageEn(messageEn)
+                .type(type).priority(priority)
                 .relatedEntityType("STOCK_BATCH").relatedEntityId(batch.getId()).build());
     }
 
@@ -333,8 +351,10 @@ public class NotificationServiceImpl implements NotificationService {
 
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(null)
-                .title(large ? "💰 Large Sale" : "🛒 New Sale")
-                .message((large ? "A large sale was completed: " : "A sale was completed: ") + totalAmount + " " + currency)
+                .title(large ? "💰 عملية بيع كبيرة" : "🛒 عملية بيع جديدة")
+                .message((large ? "تمت عملية بيع كبيرة بقيمة: " : "تمت عملية بيع بقيمة: ") + totalAmount + " " + currency)
+                .titleEn(large ? "💰 Large Sale" : "🛒 New Sale")
+                .messageEn((large ? "A large sale was completed: " : "A sale was completed: ") + totalAmount + " " + currency)
                 .type(large ? Notification.NotificationType.LARGE_SALE : Notification.NotificationType.SALE_COMPLETED)
                 .priority(large ? Notification.NotificationPriority.HIGH : Notification.NotificationPriority.LOW)
                 .relatedEntityType("SALE").relatedEntityId(saleId).build());
@@ -351,8 +371,10 @@ public class NotificationServiceImpl implements NotificationService {
 
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(null)
-                .title(large ? "💸 Large Expense" : "🧾 New Expense")
-                .message((large ? "A large expense was recorded: " : "An expense was recorded: ") + amount + " " + currency)
+                .title(large ? "💸 مصروف كبير" : "🧾 مصروف جديد")
+                .message((large ? "تم تسجيل مصروف كبير بقيمة: " : "تم تسجيل مصروف بقيمة: ") + amount + " " + currency)
+                .titleEn(large ? "💸 Large Expense" : "🧾 New Expense")
+                .messageEn((large ? "A large expense was recorded: " : "An expense was recorded: ") + amount + " " + currency)
                 .type(large ? Notification.NotificationType.LARGE_EXPENSE : Notification.NotificationType.EXPENSE_ADDED)
                 .priority(large ? Notification.NotificationPriority.HIGH : Notification.NotificationPriority.LOW)
                 .relatedEntityType("EXPENSE").relatedEntityId(expenseId).build());
@@ -365,7 +387,8 @@ public class NotificationServiceImpl implements NotificationService {
             return;
         }
         Pharmacy pharmacy = lockedOutUser.getPharmacy();
-        String message = "Account '" + lockedOutUser.getUsername() + "' was locked after too many failed login attempts";
+        String messageAr = "تم قفل الحساب '" + lockedOutUser.getUsername() + "' بعد عدة محاولات دخول فاشلة";
+        String messageEn = "Account '" + lockedOutUser.getUsername() + "' was locked after too many failed login attempts";
 
         // The affected user should know their own account got locked, and admins should
         // know so they can investigate/unlock it - each as its own recipient-targeted
@@ -373,7 +396,8 @@ public class NotificationServiceImpl implements NotificationService {
         // relatedEntityId and trip each other's dedup check otherwise).
         saveNotificationDirect(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(lockedOutUser)
-                .title("🔒 Account Locked").message(message)
+                .title("🔒 تم قفل الحساب").message(messageAr)
+                .titleEn("🔒 Account Locked").messageEn(messageEn)
                 .type(Notification.NotificationType.SECURITY_ALERT).priority(Notification.NotificationPriority.URGENT)
                 .relatedEntityType("USER").relatedEntityId(lockedOutUser.getId()).build());
 
@@ -381,7 +405,8 @@ public class NotificationServiceImpl implements NotificationService {
             if (admin.getRole() == User.UserRole.ADMIN && !admin.getId().equals(lockedOutUser.getId())) {
                 saveNotificationDirect(NotificationRequest.builder()
                         .pharmacy(pharmacy).recipient(admin)
-                        .title("🔒 Account Locked").message(message)
+                        .title("🔒 تم قفل الحساب").message(messageAr)
+                        .titleEn("🔒 Account Locked").messageEn(messageEn)
                         .type(Notification.NotificationType.SECURITY_ALERT).priority(Notification.NotificationPriority.URGENT)
                         .relatedEntityType("USER").relatedEntityId(lockedOutUser.getId()).build());
             }
@@ -412,7 +437,10 @@ public class NotificationServiceImpl implements NotificationService {
         if (pharmacy == null) {
             return;
         }
-        String message = lastCompleted == null
+        String messageAr = lastCompleted == null
+                ? "لم يتم عمل نسخة احتياطية لهذه الصيدلية من قبل - يُنصح بعمل نسخة احتياطية"
+                : "مر أكثر من " + BACKUP_REMINDER_STALE_DAYS + " أيام منذ آخر نسخة احتياطية - يُنصح بعمل نسخة جديدة";
+        String messageEn = lastCompleted == null
                 ? "This pharmacy has never been backed up - consider running a backup"
                 : "The last backup was over " + BACKUP_REMINDER_STALE_DAYS + " days ago - consider running a new one";
 
@@ -420,7 +448,8 @@ public class NotificationServiceImpl implements NotificationService {
             if (admin.getRole() == User.UserRole.ADMIN) {
                 saveNotificationDirect(NotificationRequest.builder()
                         .pharmacy(pharmacy).recipient(admin)
-                        .title("🗄️ Backup Reminder").message(message)
+                        .title("🗄️ تذكير بالنسخ الاحتياطي").message(messageAr)
+                        .titleEn("🗄️ Backup Reminder").messageEn(messageEn)
                         .type(Notification.NotificationType.BACKUP_REMINDER).priority(Notification.NotificationPriority.MEDIUM)
                         .relatedEntityType("PHARMACY").relatedEntityId(pharmacyId).build());
             }
@@ -444,6 +473,7 @@ public class NotificationServiceImpl implements NotificationService {
     private NotificationResponse mapToResponse(Notification n) {
         return NotificationResponse.builder()
                 .id(n.getId()).title(n.getTitle()).message(n.getMessage())
+                .titleEn(n.getTitleEn()).messageEn(n.getMessageEn())
                 .type(n.getType() != null ? n.getType().name() : "SYSTEM")
                 .priority(n.getPriority() != null ? n.getPriority().name() : "LOW")
                 .read(n.isRead())

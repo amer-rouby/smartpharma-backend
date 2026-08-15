@@ -39,6 +39,14 @@ public class NotificationSettings {
     @Builder.Default
     private Boolean pushNotifications = true;
 
+    // "ar" or "en" - which language emailed notifications are sent in for this user.
+    // Independent of the live browser language shown for the bell (which the frontend
+    // renders directly in whatever language is currently selected) since email is sent
+    // asynchronously, often with no active browser session to read a language from.
+    @Column(name = "preferred_language", length = 5)
+    @Builder.Default
+    private String preferredLanguage = "ar";
+
     @Column(name = "sound_enabled")
     @Builder.Default
     private Boolean soundEnabled = true;

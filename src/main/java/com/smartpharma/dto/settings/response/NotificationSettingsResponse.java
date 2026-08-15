@@ -19,6 +19,7 @@ public class NotificationSettingsResponse {
     private Boolean emailNotifications;
     private Boolean smsNotifications;
     private Boolean pushNotifications;
+    private String preferredLanguage;
     private Boolean soundEnabled;
     private Boolean vibrationEnabled;
     private Boolean quietHoursEnabled;
@@ -51,6 +52,7 @@ public class NotificationSettingsResponse {
                 .emailNotifications(settings.getEmailNotifications())
                 .smsNotifications(settings.getSmsNotifications())
                 .pushNotifications(settings.getPushNotifications())
+                .preferredLanguage(settings.getPreferredLanguage())
                 .soundEnabled(settings.getSoundEnabled())
                 .vibrationEnabled(settings.getVibrationEnabled())
                 .quietHoursEnabled(settings.getQuietHoursEnabled())
