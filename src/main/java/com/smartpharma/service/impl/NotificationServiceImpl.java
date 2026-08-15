@@ -7,7 +7,13 @@ import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.Product;
 import com.smartpharma.entity.StockBatch;
 import com.smartpharma.entity.User;
+import com.smartpharma.entity.settings.BackupRecord;
+import com.smartpharma.entity.settings.NotificationSettings;
 import com.smartpharma.repository.*;
+import com.smartpharma.repository.settings.BackupRecordRepository;
+import com.smartpharma.repository.settings.NotificationSettingsRepository;
+import com.smartpharma.repository.settings.PharmacySettingsRepository;
+import com.smartpharma.service.EmailService;
 import com.smartpharma.service.NotificationService;
 import com.smartpharma.service.NotificationStreamService;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +24,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,13 +44,29 @@ public class NotificationServiceImpl implements NotificationService {
     private final PharmacyRepository pharmacyRepository;
     private final UserRepository userRepository;
     private final NotificationStreamService notificationStreamService;
+    private final NotificationSettingsRepository notificationSettingsRepository;
+    private final PharmacySettingsRepository pharmacySettingsRepository;
+    private final BackupRecordRepository backupRecordRepository;
+    private final EmailService emailService;
 
     private static final int EXPIRY_WARNING_DAYS = 30;
+    private static final int BACKUP_REMINDER_STALE_DAYS = 7;
 
     @Override @Transactional(readOnly = true)
     public Page<NotificationResponse> getUserNotifications(Long pharmacyId, Long userId, int page, int size) {
-        return notificationRepository.findByPharmacyIdAndRecipientId(pharmacyId, userId, PageRequest.of(page, size))
-                .map(this::mapToResponse);
+        NotificationSettings settings = resolveSettings(userId);
+        Page<Notification> pageResult = notificationRepository.findByPharmacyIdAndRecipientId(
+                pharmacyId, userId, PageRequest.of(page, size));
+        // Filtered in-memory rather than in the query itself, since "which types this
+        // user wants to see" is per-user preference data, not something worth pushing
+        // into a dynamic JPQL predicate. totalElements stays pre-filter, so a page can
+        // come back with fewer rows than requested when a user has muted some types -
+        // an acceptable trade-off for a low-volume internal notification list.
+        List<NotificationResponse> filtered = pageResult.getContent().stream()
+                .filter(n -> isVisibleToUser(n, settings))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+        return new org.springframework.data.domain.PageImpl<>(filtered, pageResult.getPageable(), pageResult.getTotalElements());
     }
 
     @Override @Transactional
@@ -67,18 +92,24 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override @Transactional(readOnly = true)
     public List<NotificationResponse> getUnreadNotifications(Long pharmacyId, Long userId) {
+        NotificationSettings settings = resolveSettings(userId);
         return notificationRepository.findByPharmacyIdAndRecipientIdAndReadFalseOrderByCreatedAtDesc(pharmacyId, userId)
-                .stream().map(this::mapToResponse).collect(Collectors.toList());
+                .stream()
+                .filter(n -> isVisibleToUser(n, settings))
+                .map(this::mapToResponse).collect(Collectors.toList());
     }
 
     @Override @Transactional(readOnly = true)
     public Long getUnreadCount(Long pharmacyId, Long userId) {
-        return notificationRepository.countUnreadByUser(pharmacyId, userId);
+        return (long) getUnreadNotifications(pharmacyId, userId).size();
     }
 
     @Override @Transactional
     public NotificationResponse createNotification(NotificationRequest request) {
-        // Prevent duplicate notifications within 24h
+        // Prevent duplicate notifications within 24h. Keyed only by (entityType, entityId,
+        // type) - fine for the single-row broadcast notifications this guards (recipient
+        // == null, one row serves the whole pharmacy), but NOT safe for fanning the same
+        // event out to several individual recipients - use saveNotificationDirect for that.
         if (request.getRelatedEntityType() != null && request.getRelatedEntityId() != null) {
             if (notificationRepository.existsByRelatedEntityTypeAndRelatedEntityIdAndTypeAndCreatedAtAfter(
                     request.getRelatedEntityType(), request.getRelatedEntityId(), request.getType(),
@@ -86,6 +117,15 @@ public class NotificationServiceImpl implements NotificationService {
                 return null;
             }
         }
+        return saveNotificationDirect(request);
+    }
+
+    /** Saves + broadcasts + emails a notification with no dedup check - the caller is
+     * responsible for not calling this redundantly. Needed when the same event fans out
+     * to multiple individual recipients (e.g. a lockout notifying the user AND every
+     * admin), since createNotification's dedup key doesn't consider the recipient and
+     * would silently drop every row after the first for the same related entity. */
+    private NotificationResponse saveNotificationDirect(NotificationRequest request) {
         Notification notification = Notification.builder()
                 .pharmacy(request.getPharmacy()).recipient(request.getRecipient())
                 .title(request.getTitle()).message(request.getMessage())
@@ -94,7 +134,107 @@ public class NotificationServiceImpl implements NotificationService {
                 .relatedEntityId(request.getRelatedEntityId()).build();
         NotificationResponse response = mapToResponse(notificationRepository.save(notification));
         notificationStreamService.notifyCreated(request.getPharmacy().getId(), response);
+        dispatchEmailForNotification(notification);
         return response;
+    }
+
+    /**
+     * Emails every eligible recipient for a just-created notification, respecting
+     * each user's own emailNotifications/notify* toggles and quiet hours. A broadcast
+     * notification (recipient == null) fans out to every active user in the pharmacy
+     * individually, since "who wants an email" is a per-user choice, not a pharmacy-wide
+     * one. Never allowed to fail the notification itself - SMTP problems are logged and
+     * swallowed, exactly like the rest of this method's best-effort alert checks.
+     */
+    private void dispatchEmailForNotification(Notification notification) {
+        List<User> recipients = notification.getRecipient() != null
+                ? List.of(notification.getRecipient())
+                : userRepository.findActiveByPharmacyId(notification.getPharmacy().getId());
+
+        for (User user : recipients) {
+            try {
+                if (user.getEmail() == null || user.getEmail().isBlank()) {
+                    continue;
+                }
+                NotificationSettings settings = resolveSettings(user.getId());
+                if (!Boolean.TRUE.equals(settings.getEmailNotifications())) {
+                    continue;
+                }
+                if (!isTypeEnabledForUser(settings, notification.getType())) {
+                    continue;
+                }
+                if (isWithinQuietHours(settings)) {
+                    continue;
+                }
+                emailService.sendPlainTextEmail(user.getEmail(), notification.getTitle(), notification.getMessage());
+            } catch (Exception e) {
+                log.warn("Failed to email notification {} to userId {}: {}", notification.getId(), user.getId(), e.getMessage());
+            }
+        }
+    }
+
+    /** Loads a user's saved NotificationSettings, or the same defaults
+     * NotificationSettingsServiceImpl would create for them on first visit - without
+     * writing a row, since this runs from background checks and shouldn't have the
+     * side effect of silently creating settings rows for users who never opened the
+     * settings screen. */
+    private NotificationSettings resolveSettings(Long userId) {
+        return notificationSettingsRepository.findByUserId(userId)
+                .orElseGet(() -> NotificationSettings.builder()
+                        .emailNotifications(true).smsNotifications(false).pushNotifications(true)
+                        .soundEnabled(true).vibrationEnabled(true)
+                        .quietHoursEnabled(false).quietHoursStart("22:00").quietHoursEnd("08:00")
+                        .notifyLowStock(true).notifyOutOfStock(true)
+                        .notifyExpiryWarning(true).notifyExpiredProducts(true)
+                        .notifyNewSale(false).notifyLargeSale(true).notifyRefund(true)
+                        .notifyNewExpense(true).notifyLargeExpense(true)
+                        .notifySystemUpdates(true).notifyBackupReminder(true).notifySecurityAlerts(true)
+                        .build());
+    }
+
+    private boolean isVisibleToUser(Notification notification, NotificationSettings settings) {
+        if (!Boolean.TRUE.equals(settings.getPushNotifications())) {
+            return false;
+        }
+        return isTypeEnabledForUser(settings, notification.getType());
+    }
+
+    private boolean isTypeEnabledForUser(NotificationSettings settings, Notification.NotificationType type) {
+        return switch (type) {
+            case LOW_STOCK -> Boolean.TRUE.equals(settings.getNotifyLowStock());
+            case OUT_OF_STOCK -> Boolean.TRUE.equals(settings.getNotifyOutOfStock());
+            case EXPIRY_WARNING -> Boolean.TRUE.equals(settings.getNotifyExpiryWarning());
+            case EXPIRED -> Boolean.TRUE.equals(settings.getNotifyExpiredProducts());
+            case SALE_COMPLETED -> Boolean.TRUE.equals(settings.getNotifyNewSale());
+            case LARGE_SALE -> Boolean.TRUE.equals(settings.getNotifyLargeSale());
+            case EXPENSE_ADDED -> Boolean.TRUE.equals(settings.getNotifyNewExpense());
+            case LARGE_EXPENSE -> Boolean.TRUE.equals(settings.getNotifyLargeExpense());
+            case BACKUP_REMINDER -> Boolean.TRUE.equals(settings.getNotifyBackupReminder());
+            case SECURITY_ALERT -> Boolean.TRUE.equals(settings.getNotifySecurityAlerts());
+            case SYSTEM -> true;
+        };
+    }
+
+    /** quietHoursStart/End are "HH:mm" strings and may wrap past midnight (e.g.
+     * 22:00-08:00), so this can't just compare start &lt;= now &lt;= end. */
+    private boolean isWithinQuietHours(NotificationSettings settings) {
+        if (!Boolean.TRUE.equals(settings.getQuietHoursEnabled())) {
+            return false;
+        }
+        try {
+            LocalTime start = LocalTime.parse(settings.getQuietHoursStart());
+            LocalTime end = LocalTime.parse(settings.getQuietHoursEnd());
+            LocalTime now = LocalTime.now();
+            if (start.equals(end)) {
+                return false;
+            }
+            if (start.isBefore(end)) {
+                return !now.isBefore(start) && now.isBefore(end);
+            }
+            return !now.isBefore(start) || now.isBefore(end);
+        } catch (DateTimeParseException | NullPointerException e) {
+            return false;
+        }
     }
 
     @Override @Transactional
@@ -113,24 +253,34 @@ public class NotificationServiceImpl implements NotificationService {
     public void checkAndCreateLowStockAlerts(Long pharmacyId) {
         log.info("Checking low stock alerts for pharmacy: {}", pharmacyId);
         for (Product product : productRepository.findLowStockProducts(pharmacyId)) {
+            Long currentStock = stockBatchRepository.sumQuantityByProductId(product.getId());
+            // Zero stock and "running low" are different urgency levels with their own
+            // toggle (notifyOutOfStock vs notifyLowStock) - findLowStockProducts already
+            // covers both (stock <= minStockLevel includes stock == 0), split them here.
+            Notification.NotificationType type = (currentStock == null || currentStock <= 0)
+                    ? Notification.NotificationType.OUT_OF_STOCK
+                    : Notification.NotificationType.LOW_STOCK;
             if (!notificationRepository.existsByRelatedEntityTypeAndRelatedEntityIdAndTypeAndCreatedAtAfter(
-                    "PRODUCT", product.getId(), Notification.NotificationType.LOW_STOCK,
-                    LocalDateTime.now().minusHours(24))) {
-                createLowStockNotification(product, pharmacyId, null);
+                    "PRODUCT", product.getId(), type, LocalDateTime.now().minusHours(24))) {
+                createLowStockNotification(product, pharmacyId, currentStock, type, null);
             }
         }
     }
 
-    private void createLowStockNotification(Product product, Long pharmacyId, User recipient) {
+    private void createLowStockNotification(Product product, Long pharmacyId, Long currentStock,
+                                              Notification.NotificationType type, User recipient) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
-        Long currentStock = stockBatchRepository.sumQuantityByProductId(product.getId());
+        long stock = currentStock == null ? 0 : currentStock;
+        boolean outOfStock = type == Notification.NotificationType.OUT_OF_STOCK;
         createNotification(NotificationRequest.builder()
                 .pharmacy(pharmacy).recipient(recipient)
-                .title("⚠️ Low Stock Warning")
-                .message("Product '" + product.getName() + "' has reached low stock: " + currentStock + " units")
-                .type(Notification.NotificationType.LOW_STOCK)
-                .priority(Notification.NotificationPriority.HIGH)
+                .title(outOfStock ? "❌ Out of Stock" : "⚠️ Low Stock Warning")
+                .message(outOfStock
+                        ? "Product '" + product.getName() + "' is out of stock"
+                        : "Product '" + product.getName() + "' has reached low stock: " + stock + " units")
+                .type(type)
+                .priority(outOfStock ? Notification.NotificationPriority.URGENT : Notification.NotificationPriority.HIGH)
                 .relatedEntityType("PRODUCT").relatedEntityId(product.getId()).build());
     }
 
@@ -172,6 +322,111 @@ public class NotificationServiceImpl implements NotificationService {
                 .relatedEntityType("STOCK_BATCH").relatedEntityId(batch.getId()).build());
     }
 
+    @Override @Transactional
+    public void notifySaleCompleted(Long pharmacyId, Long saleId, BigDecimal totalAmount) {
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+        var pharmacySettings = pharmacySettingsRepository.findByPharmacyId(pharmacyId);
+        BigDecimal threshold = pharmacySettings.map(s -> s.getLargeSaleThreshold()).orElse(BigDecimal.valueOf(5000));
+        String currency = pharmacySettings.map(s -> s.getCurrency()).orElse("EGP");
+        boolean large = totalAmount != null && threshold != null && totalAmount.compareTo(threshold) >= 0;
+
+        createNotification(NotificationRequest.builder()
+                .pharmacy(pharmacy).recipient(null)
+                .title(large ? "💰 Large Sale" : "🛒 New Sale")
+                .message((large ? "A large sale was completed: " : "A sale was completed: ") + totalAmount + " " + currency)
+                .type(large ? Notification.NotificationType.LARGE_SALE : Notification.NotificationType.SALE_COMPLETED)
+                .priority(large ? Notification.NotificationPriority.HIGH : Notification.NotificationPriority.LOW)
+                .relatedEntityType("SALE").relatedEntityId(saleId).build());
+    }
+
+    @Override @Transactional
+    public void notifyExpenseAdded(Long pharmacyId, Long expenseId, BigDecimal amount) {
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+        var pharmacySettings = pharmacySettingsRepository.findByPharmacyId(pharmacyId);
+        BigDecimal threshold = pharmacySettings.map(s -> s.getLargeExpenseThreshold()).orElse(BigDecimal.valueOf(2000));
+        String currency = pharmacySettings.map(s -> s.getCurrency()).orElse("EGP");
+        boolean large = amount != null && threshold != null && amount.compareTo(threshold) >= 0;
+
+        createNotification(NotificationRequest.builder()
+                .pharmacy(pharmacy).recipient(null)
+                .title(large ? "💸 Large Expense" : "🧾 New Expense")
+                .message((large ? "A large expense was recorded: " : "An expense was recorded: ") + amount + " " + currency)
+                .type(large ? Notification.NotificationType.LARGE_EXPENSE : Notification.NotificationType.EXPENSE_ADDED)
+                .priority(large ? Notification.NotificationPriority.HIGH : Notification.NotificationPriority.LOW)
+                .relatedEntityType("EXPENSE").relatedEntityId(expenseId).build());
+    }
+
+    @Override @Transactional
+    public void notifySecurityAlert(Long lockedOutUserId) {
+        User lockedOutUser = userRepository.findById(lockedOutUserId).orElse(null);
+        if (lockedOutUser == null || lockedOutUser.getPharmacy() == null) {
+            return;
+        }
+        Pharmacy pharmacy = lockedOutUser.getPharmacy();
+        String message = "Account '" + lockedOutUser.getUsername() + "' was locked after too many failed login attempts";
+
+        // The affected user should know their own account got locked, and admins should
+        // know so they can investigate/unlock it - each as its own recipient-targeted
+        // row (saveNotificationDirect, not createNotification: they'd all share the same
+        // relatedEntityId and trip each other's dedup check otherwise).
+        saveNotificationDirect(NotificationRequest.builder()
+                .pharmacy(pharmacy).recipient(lockedOutUser)
+                .title("🔒 Account Locked").message(message)
+                .type(Notification.NotificationType.SECURITY_ALERT).priority(Notification.NotificationPriority.URGENT)
+                .relatedEntityType("USER").relatedEntityId(lockedOutUser.getId()).build());
+
+        for (User admin : userRepository.findActiveByPharmacyId(pharmacy.getId())) {
+            if (admin.getRole() == User.UserRole.ADMIN && !admin.getId().equals(lockedOutUser.getId())) {
+                saveNotificationDirect(NotificationRequest.builder()
+                        .pharmacy(pharmacy).recipient(admin)
+                        .title("🔒 Account Locked").message(message)
+                        .type(Notification.NotificationType.SECURITY_ALERT).priority(Notification.NotificationPriority.URGENT)
+                        .relatedEntityType("USER").relatedEntityId(lockedOutUser.getId()).build());
+            }
+        }
+    }
+
+    @Override @Transactional
+    public void checkAndCreateBackupReminders(Long pharmacyId) {
+        List<BackupRecord> recent = backupRecordRepository.findByPharmacyIdOrderByCreatedAtDesc(pharmacyId);
+        LocalDateTime lastCompleted = recent.stream()
+                .filter(b -> "COMPLETED".equalsIgnoreCase(b.getStatus()))
+                .map(BackupRecord::getCreatedAt)
+                .findFirst().orElse(null);
+
+        boolean stale = lastCompleted == null || lastCompleted.isBefore(LocalDateTime.now().minusDays(BACKUP_REMINDER_STALE_DAYS));
+        if (!stale) {
+            return;
+        }
+        // Dedupe key is the pharmacy itself (there's no per-backup entity id to key
+        // against for "no backup happened"), so relatedEntityId is the pharmacyId.
+        if (notificationRepository.existsByRelatedEntityTypeAndRelatedEntityIdAndTypeAndCreatedAtAfter(
+                "PHARMACY", pharmacyId, Notification.NotificationType.BACKUP_REMINDER,
+                LocalDateTime.now().minusDays(BACKUP_REMINDER_STALE_DAYS))) {
+            return;
+        }
+
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId).orElse(null);
+        if (pharmacy == null) {
+            return;
+        }
+        String message = lastCompleted == null
+                ? "This pharmacy has never been backed up - consider running a backup"
+                : "The last backup was over " + BACKUP_REMINDER_STALE_DAYS + " days ago - consider running a new one";
+
+        for (User admin : userRepository.findActiveByPharmacyId(pharmacyId)) {
+            if (admin.getRole() == User.UserRole.ADMIN) {
+                saveNotificationDirect(NotificationRequest.builder()
+                        .pharmacy(pharmacy).recipient(admin)
+                        .title("🗄️ Backup Reminder").message(message)
+                        .type(Notification.NotificationType.BACKUP_REMINDER).priority(Notification.NotificationPriority.MEDIUM)
+                        .relatedEntityType("PHARMACY").relatedEntityId(pharmacyId).build());
+            }
+        }
+    }
+
     @Scheduled(cron = "0 0 * * * *") @Transactional
     public void runScheduledAlerts() {
         log.info("Running scheduled notification checks...");
@@ -179,6 +434,7 @@ public class NotificationServiceImpl implements NotificationService {
             try {
                 checkAndCreateLowStockAlerts(pharmacy.getId());
                 checkAndCreateExpiryAlerts(pharmacy.getId());
+                checkAndCreateBackupReminders(pharmacy.getId());
             } catch (Exception e) {
                 log.error("Error running alerts for pharmacy {}: {}", pharmacy.getId(), e.getMessage());
             }

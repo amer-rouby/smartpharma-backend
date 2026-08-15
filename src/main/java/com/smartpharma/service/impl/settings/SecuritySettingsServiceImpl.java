@@ -8,6 +8,7 @@ import com.smartpharma.entity.User;
 import com.smartpharma.repository.settings.SecuritySettingsRepository;
 import com.smartpharma.repository.UserRepository;
 import com.smartpharma.security.TotpService;
+import com.smartpharma.service.NotificationService;
 import com.smartpharma.service.settings.SecuritySettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class SecuritySettingsServiceImpl implements SecuritySettingsService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TotpService totpService;
+    private final NotificationService notificationService;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCK_TIME_MINUTES = 30;
@@ -234,6 +236,11 @@ public class SecuritySettingsServiceImpl implements SecuritySettingsService {
         securitySettingsRepository.save(settings);
 
         log.warn("Account locked for userId: {} until: {}", userId, settings.getAccountLockedUntil());
+        try {
+            notificationService.notifySecurityAlert(userId);
+        } catch (Exception e) {
+            log.warn("Failed to create security alert notification for userId {}: {}", userId, e.getMessage());
+        }
     }
 
     @Override

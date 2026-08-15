@@ -57,7 +57,8 @@ public class Notification {
     private LocalDateTime readAt;
 
     public enum NotificationType {
-        LOW_STOCK, EXPIRY_WARNING, EXPIRED, SALE_COMPLETED, EXPENSE_ADDED, SYSTEM
+        LOW_STOCK, OUT_OF_STOCK, EXPIRY_WARNING, EXPIRED, SALE_COMPLETED, LARGE_SALE,
+        EXPENSE_ADDED, LARGE_EXPENSE, BACKUP_REMINDER, SECURITY_ALERT, SYSTEM
     }
 
     public enum NotificationPriority {

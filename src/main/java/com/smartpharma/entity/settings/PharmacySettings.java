@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -79,6 +80,17 @@ public class PharmacySettings {
     @Column(length = 255)
     @Builder.Default
     private String enabledPaymentMethods = "CASH,VISA,MASTERCARD,INSTAPAY,FAWRY,WALLET,BANK_TRANSFER";
+
+    // What counts as a "large" sale/expense for the notifyLargeSale/notifyLargeExpense
+    // per-user alert preferences - admin-configured per pharmacy since what's "large"
+    // varies a lot between a small and a busy pharmacy.
+    @Column(precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal largeSaleThreshold = BigDecimal.valueOf(5000);
+
+    @Column(precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal largeExpenseThreshold = BigDecimal.valueOf(2000);
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

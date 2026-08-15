@@ -7,6 +7,7 @@ import com.smartpharma.dto.response.SalesReportResponse;
 import com.smartpharma.entity.*;
 import com.smartpharma.entity.enums.PaymentMethod;
 import com.smartpharma.repository.*;
+import com.smartpharma.service.NotificationService;
 import com.smartpharma.service.SaleTransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     private final StockBatchRepository stockBatchRepository;
     private final SaleItemRepository saleItemRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -112,6 +114,11 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         SaleTransaction savedSale = saleTransactionRepository.save(sale);
         log.info("Sale created successfully | id: {} | total: {} | items: {}",
                 savedSale.getId(), savedSale.getTotalAmount(), savedSale.getItems().size());
+        try {
+            notificationService.notifySaleCompleted(pharmacy.getId(), savedSale.getId(), savedSale.getTotalAmount());
+        } catch (Exception e) {
+            log.warn("Failed to create sale notification for sale {}: {}", savedSale.getId(), e.getMessage());
+        }
         return mapToDTO(savedSale);
     }
 

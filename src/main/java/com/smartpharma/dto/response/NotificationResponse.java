@@ -27,10 +27,13 @@ public class NotificationResponse {
 
         return switch (type) {
             case "LOW_STOCK" -> "inventory_2";
+            case "OUT_OF_STOCK" -> "remove_shopping_cart";
             case "EXPIRY_WARNING" -> "warning";
             case "EXPIRED" -> "error";
-            case "SALE_COMPLETED" -> "check_circle";
-            case "EXPENSE_ADDED" -> "receipt_long";
+            case "SALE_COMPLETED", "LARGE_SALE" -> "check_circle";
+            case "EXPENSE_ADDED", "LARGE_EXPENSE" -> "receipt_long";
+            case "BACKUP_REMINDER" -> "backup";
+            case "SECURITY_ALERT" -> "gpp_maybe";
             case "SYSTEM" -> "info";
             default -> "notifications";
         };

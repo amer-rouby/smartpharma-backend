@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -33,6 +34,8 @@ public class PharmacySettingsResponse {
     private Boolean lowStockAlerts;
     private Boolean expiryAlerts;
     private String enabledPaymentMethods;
+    private BigDecimal largeSaleThreshold;
+    private BigDecimal largeExpenseThreshold;
     private LocalDateTime updatedAt;
 
     public static PharmacySettingsResponse fromEntity(PharmacySettings settings, String pharmacyName) {
@@ -56,6 +59,8 @@ public class PharmacySettingsResponse {
                 .lowStockAlerts(settings.getLowStockAlerts())
                 .expiryAlerts(settings.getExpiryAlerts())
                 .enabledPaymentMethods(settings.getEnabledPaymentMethods())
+                .largeSaleThreshold(settings.getLargeSaleThreshold())
+                .largeExpenseThreshold(settings.getLargeExpenseThreshold())
                 .updatedAt(settings.getUpdatedAt())
                 .build();
     }

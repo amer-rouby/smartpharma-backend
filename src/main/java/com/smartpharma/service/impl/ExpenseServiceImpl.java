@@ -12,7 +12,9 @@ import com.smartpharma.repository.ExpenseRepository;
 import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.UserRepository;
 import com.smartpharma.service.ExpenseService;
+import com.smartpharma.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,11 +28,13 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class ExpenseServiceImpl implements ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final PharmacyRepository pharmacyRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     public ExpenseResponse createExpense(ExpenseRequest request, Long userId) {
@@ -54,6 +58,11 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .build();
 
         Expense saved = expenseRepository.save(expense);
+        try {
+            notificationService.notifyExpenseAdded(pharmacy.getId(), saved.getId(), saved.getAmount());
+        } catch (Exception e) {
+            log.warn("Failed to create expense notification for expense {}: {}", saved.getId(), e.getMessage());
+        }
         return mapToResponse(saved);
     }
 

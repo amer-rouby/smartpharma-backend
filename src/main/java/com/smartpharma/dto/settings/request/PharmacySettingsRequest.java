@@ -8,6 +8,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -70,4 +72,10 @@ public class PharmacySettingsRequest {
 
     @Size(max = 255)
     private String enabledPaymentMethods;
+
+    @Builder.Default
+    private BigDecimal largeSaleThreshold = BigDecimal.valueOf(5000);
+
+    @Builder.Default
+    private BigDecimal largeExpenseThreshold = BigDecimal.valueOf(2000);
 }
