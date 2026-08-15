@@ -12,6 +12,11 @@ public interface SessionService {
 
     Session createSession(User user, String token, int sessionTimeoutMinutes);
 
+    /** rememberMe=true issues a long-lived session (weeks) without overwriting the
+     * user's normal sessionTimeoutMinutes preference, which stays intact for the
+     * next login that doesn't check the box. */
+    Session createSession(User user, String token, int sessionTimeoutMinutes, boolean rememberMe);
+
     Session validateSession(String token);
 
     void revokeSession(String token);

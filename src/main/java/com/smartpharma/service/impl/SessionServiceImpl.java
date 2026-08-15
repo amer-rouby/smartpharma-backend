@@ -26,6 +26,7 @@ public class SessionServiceImpl implements SessionService {
 
     private static final List<Integer> ALLOWED_TIMEOUTS = Arrays.asList(15, 30, 60, 120, 240);
     private static final int DEFAULT_TIMEOUT_MINUTES = 30;
+    private static final int REMEMBER_ME_TIMEOUT_MINUTES = 43200; // 30 days
 
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
@@ -33,23 +34,32 @@ public class SessionServiceImpl implements SessionService {
     @Override
     @Transactional
     public Session createSession(User user, String token, int sessionTimeoutMinutes) {
-        int timeout = ALLOWED_TIMEOUTS.contains(sessionTimeoutMinutes)
+        return createSession(user, token, sessionTimeoutMinutes, false);
+    }
+
+    @Override
+    @Transactional
+    public Session createSession(User user, String token, int sessionTimeoutMinutes, boolean rememberMe) {
+        int baseline = ALLOWED_TIMEOUTS.contains(sessionTimeoutMinutes)
                 ? sessionTimeoutMinutes
                 : DEFAULT_TIMEOUT_MINUTES;
+        int effective = rememberMe ? REMEMBER_ME_TIMEOUT_MINUTES : baseline;
 
         int maxExtensions = user.getMaxExtensions() != null ? user.getMaxExtensions() : 3;
         user.setMaxExtensions(maxExtensions);
         user.setRemainingExtensions(maxExtensions);
         user.setSessionExtendedCount(0);
         user.setWarningThreshold(user.getWarningThreshold() != null ? user.getWarningThreshold() : 5);
-        user.setSessionTimeout(timeout);
+        // Only the normal baseline is persisted onto the user - a remember-me session
+        // must not silently become everyone's new default timeout on their next login.
+        user.setSessionTimeout(baseline);
         userRepository.save(user);
 
         Session session = Session.builder()
                 .user(user)
                 .token(token)
-                .sessionTimeoutMinutes(timeout)
-                .expiresAt(LocalDateTime.now().plusMinutes(timeout))
+                .sessionTimeoutMinutes(effective)
+                .expiresAt(LocalDateTime.now().plusMinutes(effective))
                 .revoked(false)
                 .build();
 

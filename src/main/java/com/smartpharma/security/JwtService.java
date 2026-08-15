@@ -52,6 +52,13 @@ public class JwtService {
     }
 
     public String generateToken(UserDetails userDetails, Long pharmacyId) {
+        return generateToken(userDetails, pharmacyId, jwtExpiration);
+    }
+
+    /** Lets callers (e.g. "remember me" login) override the default expiration -
+     * otherwise a long-lived Session row is pointless once the JWT itself expires
+     * in jwt.expiration ms and every request starts getting rejected by the filter. */
+    public String generateToken(UserDetails userDetails, Long pharmacyId, long customExpirationMs) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("pharmacyId", pharmacyId);
 
@@ -62,7 +69,7 @@ public class JwtService {
             }
         }
 
-        return buildToken(claims, userDetails, jwtExpiration);
+        return buildToken(claims, userDetails, customExpirationMs);
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
