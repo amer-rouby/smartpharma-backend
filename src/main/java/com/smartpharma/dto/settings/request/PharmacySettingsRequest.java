@@ -58,18 +58,6 @@ public class PharmacySettingsRequest {
     @Builder.Default
     private String timeFormat = "24h";
 
-    @Builder.Default
-    private Boolean emailNotifications = true;
-
-    @Builder.Default
-    private Boolean smsNotifications = false;
-
-    @Builder.Default
-    private Boolean lowStockAlerts = true;
-
-    @Builder.Default
-    private Boolean expiryAlerts = true;
-
     @Size(max = 255)
     private String enabledPaymentMethods;
 

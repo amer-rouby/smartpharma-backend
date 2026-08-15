@@ -29,10 +29,6 @@ public class PharmacySettingsResponse {
     private String timezone;
     private String dateFormat;
     private String timeFormat;
-    private Boolean emailNotifications;
-    private Boolean smsNotifications;
-    private Boolean lowStockAlerts;
-    private Boolean expiryAlerts;
     private String enabledPaymentMethods;
     private BigDecimal largeSaleThreshold;
     private BigDecimal largeExpenseThreshold;
@@ -54,10 +50,6 @@ public class PharmacySettingsResponse {
                 .timezone(settings.getTimezone())
                 .dateFormat(settings.getDateFormat())
                 .timeFormat(settings.getTimeFormat())
-                .emailNotifications(settings.getEmailNotifications())
-                .smsNotifications(settings.getSmsNotifications())
-                .lowStockAlerts(settings.getLowStockAlerts())
-                .expiryAlerts(settings.getExpiryAlerts())
                 .enabledPaymentMethods(settings.getEnabledPaymentMethods())
                 .largeSaleThreshold(settings.getLargeSaleThreshold())
                 .largeExpenseThreshold(settings.getLargeExpenseThreshold())

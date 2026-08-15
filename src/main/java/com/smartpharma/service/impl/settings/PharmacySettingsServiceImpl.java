@@ -49,10 +49,6 @@ public class PharmacySettingsServiceImpl implements PharmacySettingsService {
         settings.setTimezone(request.getTimezone());
         settings.setDateFormat(request.getDateFormat());
         settings.setTimeFormat(request.getTimeFormat());
-        settings.setEmailNotifications(request.getEmailNotifications());
-        settings.setSmsNotifications(request.getSmsNotifications());
-        settings.setLowStockAlerts(request.getLowStockAlerts());
-        settings.setExpiryAlerts(request.getExpiryAlerts());
         if (request.getEnabledPaymentMethods() != null && !request.getEnabledPaymentMethods().isBlank()) {
             settings.setEnabledPaymentMethods(request.getEnabledPaymentMethods());
         }
@@ -88,10 +84,6 @@ public class PharmacySettingsServiceImpl implements PharmacySettingsService {
                 .timezone("Africa/Cairo")
                 .dateFormat("dd/MM/yyyy")
                 .timeFormat("24h")
-                .emailNotifications(true)
-                .smsNotifications(false)
-                .lowStockAlerts(true)
-                .expiryAlerts(true)
                 .build();
     }
 }

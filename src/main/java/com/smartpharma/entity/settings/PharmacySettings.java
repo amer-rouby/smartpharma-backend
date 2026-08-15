@@ -65,18 +65,6 @@ public class PharmacySettings {
     @Builder.Default
     private String timeFormat = "24h";
 
-    @Builder.Default
-    private Boolean emailNotifications = true;
-
-    @Builder.Default
-    private Boolean smsNotifications = false;
-
-    @Builder.Default
-    private Boolean lowStockAlerts = true;
-
-    @Builder.Default
-    private Boolean expiryAlerts = true;
-
     @Column(length = 255)
     @Builder.Default
     private String enabledPaymentMethods = "CASH,VISA,MASTERCARD,INSTAPAY,FAWRY,WALLET,BANK_TRANSFER";
