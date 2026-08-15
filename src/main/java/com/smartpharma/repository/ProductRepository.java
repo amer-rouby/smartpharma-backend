@@ -21,6 +21,17 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p WHERE p.pharmacy.id = :pharmacyId AND p.deletedAt IS NULL")
     Page<Product> findByPharmacyId(@Param("pharmacyId") Long pharmacyId, Pageable pageable);
 
+    @Query("""
+        SELECT p FROM Product p WHERE p.pharmacy.id = :pharmacyId AND p.deletedAt IS NULL
+        AND (:search IS NULL OR :search = '' OR
+            LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
+            LOWER(p.barcode) LIKE LOWER(CONCAT('%', :search, '%')) OR
+            LOWER(p.scientificName) LIKE LOWER(CONCAT('%', :search, '%')))
+        AND (:category IS NULL OR :category = '' OR p.category = :category)
+        """)
+    Page<Product> searchAndFilter(@Param("pharmacyId") Long pharmacyId, @Param("search") String search,
+                                   @Param("category") String category, Pageable pageable);
+
     @Query("SELECT p FROM Product p WHERE p.id = :id AND p.pharmacy.id = :pharmacyId AND p.deletedAt IS NULL")
     Optional<Product> findByIdAndPharmacyId(@Param("id") Long id, @Param("pharmacyId") Long pharmacyId);
 

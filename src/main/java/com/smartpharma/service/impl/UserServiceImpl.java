@@ -46,6 +46,10 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponse createUser(UserRequest request) {
+        if (request.getUsername() != null) {
+            request.setUsername(request.getUsername().trim());
+        }
+
         // Check if username exists
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new RuntimeException("Username already exists");
@@ -80,6 +84,10 @@ public class UserServiceImpl implements UserService {
     public UserResponse updateUser(Long id, UserRequest request, Long pharmacyId) {
         User user = userRepository.findByIdAndPharmacyId(id, pharmacyId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (request.getUsername() != null) {
+            request.setUsername(request.getUsername().trim());
+        }
 
         // Check if new username conflicts
         if (!user.getUsername().equals(request.getUsername()) &&

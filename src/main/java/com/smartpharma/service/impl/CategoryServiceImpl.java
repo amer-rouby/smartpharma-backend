@@ -9,6 +9,10 @@ import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +35,15 @@ public class CategoryServiceImpl implements CategoryService {
                 .stream()
                 .map(CategoryResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CategoryResponse> getCategoriesPage(Long pharmacyId, int page, int size, String search) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                Sort.by(Sort.Direction.ASC, "nameAr"));
+        return categoryRepository.searchAndFilter(pharmacyId, search, pageable)
+                .map(CategoryResponse::fromEntity);
     }
 
     @Override

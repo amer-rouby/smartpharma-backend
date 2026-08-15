@@ -20,17 +20,17 @@ public class TwoFactorPendingLoginStore {
 
     private static final long TTL_MILLIS = 5 * 60 * 1000L; // 5 minutes to enter the code
 
-    private record Entry(Long userId, long expiresAt) {
+    private record Entry(Long userId, boolean rememberMe, long expiresAt) {
     }
 
     private final ConcurrentHashMap<String, Entry> pending = new ConcurrentHashMap<>();
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public String issue(Long userId) {
+    public String issue(Long userId, boolean rememberMe) {
         byte[] bytes = new byte[32];
         secureRandom.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        pending.put(token, new Entry(userId, System.currentTimeMillis() + TTL_MILLIS));
+        pending.put(token, new Entry(userId, rememberMe, System.currentTimeMillis() + TTL_MILLIS));
         return token;
     }
 
@@ -38,6 +38,18 @@ public class TwoFactorPendingLoginStore {
      * code doesn't force the user back to square one (username+password again) - they
      * can just retry with the same token until it expires or they get it right. */
     public Long peek(String token) {
+        Entry entry = peekEntry(token);
+        return entry == null ? null : entry.userId();
+    }
+
+    /** Whether the original username+password step had "remember me" checked, so the
+     * 2FA step can honor it too without the client re-sending it. */
+    public boolean peekRememberMe(String token) {
+        Entry entry = peekEntry(token);
+        return entry != null && entry.rememberMe();
+    }
+
+    private Entry peekEntry(String token) {
         if (token == null) {
             return null;
         }
@@ -46,7 +58,7 @@ public class TwoFactorPendingLoginStore {
             pending.remove(token);
             return null;
         }
-        return entry.userId();
+        return entry;
     }
 
     /** Call only once the code has actually been verified, so the token can't be

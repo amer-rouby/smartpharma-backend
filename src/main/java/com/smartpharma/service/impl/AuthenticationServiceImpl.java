@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     private static final int DEFAULT_SESSION_TIMEOUT_MINUTES = 30;
+    private static final long REMEMBER_ME_JWT_EXPIRATION_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
 
     private final UserRepository userRepository;
     private final PharmacyRepository pharmacyRepository;
@@ -41,6 +42,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        if (request.getUsername() != null) {
+            request.setUsername(request.getUsername().trim());
+        }
+
         Pharmacy pharmacy;
 
         if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
@@ -122,6 +127,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request) {
+        // A stray leading/trailing space (fat-fingered, or carried over from browser
+        // autofill) must not turn into "Invalid credentials" - the username itself
+        // never legitimately contains whitespace, unlike the password.
+        if (request.getUsername() != null) {
+            request.setUsername(request.getUsername().trim());
+        }
+
         User existingUser = userRepository.findByUsername(request.getUsername()).orElse(null);
 
         if (existingUser != null) {
@@ -157,7 +169,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             // failed-attempt counter or issue any real token yet. The pending token is
             // opaque and single-purpose (see TwoFactorPendingLoginStore); it cannot be
             // used to call any other authenticated endpoint.
-            String tempToken = twoFactorPendingLoginStore.issue(user.getId());
+            String tempToken = twoFactorPendingLoginStore.issue(user.getId(), Boolean.TRUE.equals(request.getRememberMe()));
             return AuthResponse.builder()
                     .twoFactorRequired(true)
                     .twoFactorTempToken(tempToken)
@@ -165,7 +177,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
 
         securitySettingsService.resetFailedLoginAttempts(user.getId());
-        return completeLogin(user);
+        return completeLogin(user, Boolean.TRUE.equals(request.getRememberMe()));
     }
 
     @Override
@@ -175,6 +187,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (userId == null) {
             throw new RuntimeException("Two-factor login request expired or invalid - please log in again");
         }
+        boolean rememberMe = twoFactorPendingLoginStore.peekRememberMe(tempToken);
 
         Long remainingLockMinutes = securitySettingsService.getRemainingLockMinutesIfLocked(userId);
         if (remainingLockMinutes != null) {
@@ -201,26 +214,31 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new RuntimeException("User account is deactivated");
         }
 
-        return completeLogin(user);
+        return completeLogin(user, rememberMe);
     }
 
     /** Shared tail end of both the plain and two-factor login paths: attribute the
-     * login, revoke old sessions, issue tokens, create the new session. */
-    private AuthResponse completeLogin(User user) {
+     * login, revoke old sessions, issue tokens, create the new session. rememberMe
+     * extends both the JWT itself and the session's inactivity window to 30 days -
+     * extending only one of the two would leave the other cutting the login short. */
+    private AuthResponse completeLogin(User user, boolean rememberMe) {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
         // Revoke any existing sessions for this user
         sessionService.revokeAllUserSessions(user.getId());
 
-        String accessToken = jwtService.generateToken(user, user.getPharmacy().getId());
+        String accessToken = rememberMe
+                ? jwtService.generateToken(user, user.getPharmacy().getId(), REMEMBER_ME_JWT_EXPIRATION_MS)
+                : jwtService.generateToken(user, user.getPharmacy().getId());
         String refreshToken = jwtService.generateRefreshToken(user);
         long expiresInMs = jwtService.extractClaim(accessToken, claims -> claims.getExpiration().getTime());
 
         // Get fresh user data from database to ensure we have the latest session_timeout
         User freshUser = userRepository.findById(user.getId()).orElse(user);
-        int sessionTimeout = freshUser.getSessionTimeout() != null ? freshUser.getSessionTimeout() : DEFAULT_SESSION_TIMEOUT_MINUTES;
-        sessionService.createSession(freshUser, accessToken, sessionTimeout);
+        int baselineTimeout = freshUser.getSessionTimeout() != null ? freshUser.getSessionTimeout() : DEFAULT_SESSION_TIMEOUT_MINUTES;
+        sessionService.createSession(freshUser, accessToken, baselineTimeout, rememberMe);
+        int sessionTimeout = rememberMe ? (int) (REMEMBER_ME_JWT_EXPIRATION_MS / 60000) : baselineTimeout;
 
         return AuthResponse.builder()
                 .userId(freshUser.getId())

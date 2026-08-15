@@ -11,6 +11,10 @@ import com.smartpharma.repository.StockBatchRepository;
 import com.smartpharma.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,6 +42,22 @@ public class ProductServiceImpl implements ProductService {
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> getProductsPage(Long pharmacyId, int page, int size, String search,
+                                                  String category, String sortBy, String sortDirection) {
+        Pageable pageable = createPageable(page, size, sortBy, sortDirection);
+        return productRepository.searchAndFilter(pharmacyId, search, category, pageable)
+                .map(this::mapToResponse);
+    }
+
+    private Pageable createPageable(int page, int size, String sortBy, String sortDirection) {
+        List<String> allowedFields = Arrays.asList("name", "sellPrice", "category", "createdAt");
+        String safeSortBy = allowedFields.contains(sortBy) ? sortBy : "name";
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        return PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), Sort.by(direction, safeSortBy));
     }
 
     @Override

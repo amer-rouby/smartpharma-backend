@@ -8,6 +8,7 @@ import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +34,29 @@ public class CategoryController {
         log.info("GET /api/categories - pharmacyId: {}", pharmacyId);
 
         List<CategoryResponse> categories = categoryService.getAllCategories(pharmacyId);
+        return ResponseEntity.ok(ApiResponse.success(categories, "Categories retrieved successfully"));
+    }
+
+    /**
+     * Real backend-paginated + searchable category listing for the Categories
+     * management screen. Separate from GET /api/categories (above) and GET
+     * /api/categories/active, which stay unpaginated since the product form's
+     * category dropdown and other consumers depend on getting every category back
+     * in one call.
+     */
+    @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
+    public ResponseEntity<ApiResponse<Page<CategoryResponse>>> getCategoriesPage(
+            @RequestParam Long pharmacyId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search) {
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
+        log.info("GET /api/categories/page - pharmacyId: {}, page: {}, size: {}, search: '{}'",
+                pharmacyId, page, size, search);
+
+        Page<CategoryResponse> categories = categoryService.getCategoriesPage(pharmacyId, page, size, search);
         return ResponseEntity.ok(ApiResponse.success(categories, "Categories retrieved successfully"));
     }
 

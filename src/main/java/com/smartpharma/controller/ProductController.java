@@ -8,6 +8,7 @@ import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -42,6 +43,35 @@ public class ProductController {
         return ResponseEntity.ok(
                 ApiResponse.success(products, "Products retrieved successfully")
         );
+    }
+
+    /**
+     * Real backend-paginated + searchable product listing for the Products management
+     * screen. Deliberately a separate endpoint from GET /api/products (above), which
+     * intentionally still returns the full unpaginated list - sales-form and the
+     * quick-add-scan screen depend on having every product loaded client-side for
+     * instant in-memory barcode-exact-match lookups without a network round-trip per
+     * scan, so that endpoint's behavior must not change.
+     */
+    @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getProductsPage(
+            @RequestParam Long pharmacyId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDirection) {
+
+        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+
+        log.info("GET /api/products/page - pharmacyId: {}, page: {}, size: {}, search: '{}', category: '{}'",
+                pharmacyId, page, size, search, category);
+
+        Page<ProductResponse> products = productService.getProductsPage(
+                pharmacyId, page, size, search, category, sortBy, sortDirection);
+        return ResponseEntity.ok(ApiResponse.success(products, "Products retrieved successfully"));
     }
 
     @GetMapping("/count")
