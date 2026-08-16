@@ -6,6 +6,7 @@ import com.smartpharma.entity.settings.SecuritySettings;
 import com.smartpharma.repository.UserRepository;
 import com.smartpharma.repository.settings.SecuritySettingsRepository;
 import com.smartpharma.security.TotpService;
+import com.smartpharma.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,12 +37,14 @@ class SecuritySettingsServiceImplTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private TotpService totpService;
+    @Mock
+    private NotificationService notificationService;
 
     private SecuritySettingsServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new SecuritySettingsServiceImpl(securitySettingsRepository, userRepository, passwordEncoder, totpService);
+        service = new SecuritySettingsServiceImpl(securitySettingsRepository, userRepository, passwordEncoder, totpService, notificationService);
     }
 
     private User userIn(Long pharmacyId) {
