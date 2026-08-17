@@ -19,7 +19,7 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
 
     Page<StockMovement> findByBatchIdAndPharmacyId(Long batchId, Long pharmacyId, Pageable pageable);
 
-    Page<StockMovement> findByPharmacyId(Long pharmacyId, Pageable pageable);
+    Page<StockMovement> findByPharmacyIdOrderByMovementDateDesc(Long pharmacyId, Pageable pageable);
 
     @Query("""
         SELECT sm FROM StockMovement sm
@@ -37,12 +37,14 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
         SELECT sm FROM StockMovement sm
         WHERE sm.pharmacyId = :pharmacyId
         AND sm.movementDate BETWEEN :startDate AND :endDate
+        AND (:type IS NULL OR sm.movementType = :type)
         ORDER BY sm.movementDate DESC
     """)
     Page<StockMovement> findByPharmacyIdAndDateRange(
             @Param("pharmacyId") Long pharmacyId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
+            @Param("type") MovementType type,
             Pageable pageable
     );
 
