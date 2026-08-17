@@ -13,6 +13,10 @@ public interface DemandPredictionService {
 
     void generatePredictions(Long pharmacyId, LocalDate forDate);
 
+    void generateWeeklyPredictionsForAllPharmacies();
+
+    void updatePastPredictionsWithActuals();
+
     DemandPredictionResponse generatePredictionForProduct(Long productId, Long pharmacyId, LocalDate forDate);
 
     List<DemandPredictionResponse> getUpcomingPredictions(Long pharmacyId, int daysAhead);
