@@ -124,6 +124,11 @@ public class ProductServiceImpl implements ProductService {
                     .status(StockBatch.BatchStatus.ACTIVE)
                     .build();
             stockBatchRepository.save(batch);
+            // product.stockBatches is a plain empty ArrayList on this just-built entity
+            // (not a Hibernate lazy proxy, since it was never loaded from the DB), so it
+            // won't pick up the batch we just saved unless we add it ourselves - without
+            // this, getTotalStock() below reports 0 even though the batch exists in the DB.
+            product.getStockBatches().add(batch);
             log.info("Initial stock batch created: productId={}, quantity={}, buyPrice={}",
                     product.getId(), request.getInitialStock(), effectiveBuyPrice);
         }
