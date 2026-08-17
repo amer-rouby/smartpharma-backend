@@ -56,7 +56,10 @@ class ReportServiceImplTest {
 
         ExpiryReportResponse response = reportService.getExpiryReport(request);
 
-        assertEquals(5L, response.getTotalExpiring());
+        // totalExpiring = urgent + warning + ok only, deliberately excluding already-expired
+        // batches (those are counted separately via expiredCount) - matches both the
+        // production code and the frontend, which render them as two distinct stat cards.
+        assertEquals(3L, response.getTotalExpiring());
         assertEquals(1L, response.getUrgentExpiring());
         assertEquals(1L, response.getWarningExpiring());
         assertEquals(1L, response.getOkExpiring());

@@ -59,4 +59,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("type") Notification.NotificationType type,
             @Param("createdAt") LocalDateTime createdAt
     );
+
+    @Modifying
+    @Transactional
+    void deleteByRecipientId(Long recipientId);
 }

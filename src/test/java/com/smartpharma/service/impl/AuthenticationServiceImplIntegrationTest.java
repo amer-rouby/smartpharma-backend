@@ -4,6 +4,7 @@ import com.smartpharma.dto.request.LoginRequest;
 import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.User;
 import com.smartpharma.entity.settings.SecuritySettings;
+import com.smartpharma.repository.NotificationRepository;
 import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.UserRepository;
 import com.smartpharma.repository.settings.SecuritySettingsRepository;
@@ -42,6 +43,8 @@ class AuthenticationServiceImplIntegrationTest {
     @Autowired
     private SecuritySettingsRepository securitySettingsRepository;
     @Autowired
+    private NotificationRepository notificationRepository;
+    @Autowired
     private SessionService sessionService;
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -79,6 +82,10 @@ class AuthenticationServiceImplIntegrationTest {
         // test-method transaction support did not apply here in practice.
         sessionService.deleteAllUserSessions(user.getId());
         securitySettingsRepository.findByUserId(user.getId()).ifPresent(securitySettingsRepository::delete);
+        // login_fiveWrongPasswords_locksTheAccount triggers a real SECURITY_ALERT
+        // notification via notifySecurityAlerts (wired to account lockout) - that row
+        // references this user too, and blocks the delete below just like Session did.
+        notificationRepository.deleteByRecipientId(user.getId());
         userRepository.deleteById(user.getId());
         pharmacyRepository.deleteById(pharmacy.getId());
     }
