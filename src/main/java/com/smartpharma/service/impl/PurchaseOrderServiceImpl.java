@@ -265,12 +265,15 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 Product product = item.getProduct();
                 BigDecimal newBuyPrice = item.getUnitPrice();
 
+                // quantityCurrent starts at 0 - the STOCK_IN movement created below is what
+                // actually brings it up to item.getQuantity(). Pre-filling it here as well
+                // used to double the batch's stock (100 ordered -> 200 on the shelf).
                 StockBatch batch = StockBatch.builder()
                         .product(product)
                         .pharmacy(order.getPharmacy())
                         .batchNumber("PO-" + order.getOrderNumber() + "-" + item.getProduct().getId())
                         .quantityInitial(item.getQuantity())
-                        .quantityCurrent(item.getQuantity())
+                        .quantityCurrent(0)
                         .expiryDate(LocalDate.now().plusMonths(24))
                         .buyPrice(newBuyPrice)
                         .sellPrice(product.getSellPrice())
@@ -299,22 +302,22 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                             product.getId(), product.getName(), oldBuyPrice, newBuyPrice, newSellPrice);
                 }
 
-                try {
-                    StockMovementRequest movementRequest = StockMovementRequest.builder()
-                            .batchId(batch.getId())
-                            .movementType(StockMovement.MovementType.STOCK_IN)
-                            .quantity(item.getQuantity())
-                            .unitPrice(newBuyPrice)
-                            .referenceNumber(order.getOrderNumber())
-                            .reason("Purchase order received: " + order.getOrderNumber())
-                            .build();
+                // Not caught: this movement is what actually brings the batch's
+                // quantityCurrent up from 0 to item.getQuantity() (see above), so letting
+                // a failure here roll back the whole @Transactional receive is correct -
+                // swallowing it would silently leave the batch at zero stock.
+                StockMovementRequest movementRequest = StockMovementRequest.builder()
+                        .batchId(batch.getId())
+                        .movementType(StockMovement.MovementType.STOCK_IN)
+                        .quantity(item.getQuantity())
+                        .unitPrice(newBuyPrice)
+                        .referenceNumber(order.getOrderNumber())
+                        .reason("Purchase order received: " + order.getOrderNumber())
+                        .build();
 
-                    stockMovementService.createMovement(movementRequest, userId, pharmacyId);
-                    log.info("Stock movement created for received order: batchId={}, quantity={}",
-                            batch.getId(), item.getQuantity());
-                } catch (Exception e) {
-                    log.error("Failed to create stock movement for received order: {}", e.getMessage());
-                }
+                stockMovementService.createMovement(movementRequest, userId, pharmacyId);
+                log.info("Stock movement created for received order: batchId={}, quantity={}",
+                        batch.getId(), item.getQuantity());
             }
         }
 
