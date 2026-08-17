@@ -3,6 +3,7 @@ package com.smartpharma.service;
 import com.smartpharma.dto.request.StockMovementRequest;
 import com.smartpharma.dto.response.StockMovementResponse;
 import com.smartpharma.dto.response.StockMovementStats;
+import com.smartpharma.entity.StockMovement;
 import org.springframework.data.domain.Page;
 
 import java.math.BigDecimal;
@@ -14,7 +15,7 @@ public interface StockMovementService {
 
     Page<StockMovementResponse> getMovementsByPharmacy(Long pharmacyId, int page, int size);
     Page<StockMovementResponse> getMovementsByBatch(Long batchId, Long pharmacyId, int page, int size);
-    Page<StockMovementResponse> getMovementsByDateRange(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate, int page, int size);
+    Page<StockMovementResponse> getMovementsByDateRange(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate, StockMovement.MovementType type, int page, int size);
 
     StockMovementStats getMovementStats(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate);
 

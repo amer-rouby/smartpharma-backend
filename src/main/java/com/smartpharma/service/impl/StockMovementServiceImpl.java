@@ -108,7 +108,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Transactional(readOnly = true)
     public Page<StockMovementResponse> getMovementsByPharmacy(Long pharmacyId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return movementRepository.findByPharmacyId(pharmacyId, pageable)
+        return movementRepository.findByPharmacyIdOrderByMovementDateDesc(pharmacyId, pageable)
                 .map(StockMovementResponse::fromEntity);
     }
 
@@ -122,9 +122,9 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<StockMovementResponse> getMovementsByDateRange(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
+    public Page<StockMovementResponse> getMovementsByDateRange(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate, StockMovement.MovementType type, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return movementRepository.findByPharmacyIdAndDateRange(pharmacyId, startDate, endDate, pageable)
+        return movementRepository.findByPharmacyIdAndDateRange(pharmacyId, startDate, endDate, type, pageable)
                 .map(StockMovementResponse::fromEntity);
     }
 
