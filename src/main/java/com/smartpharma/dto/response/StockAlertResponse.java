@@ -1,5 +1,6 @@
 package com.smartpharma.dto.response;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -32,14 +33,39 @@ public class StockAlertResponse {
     private LocalDateTime resolvedAt;
     private Long resolvedBy;
 
+    // Referenced products/batches can be hard-deleted after the alert row was
+    // created, leaving a stale FK - Hibernate throws EntityNotFoundException
+    // on first access of that lazy proxy, so treat it the same as "not set".
     public static StockAlertResponse fromEntity(com.smartpharma.entity.StockAlert alert) {
+        Long productId = null;
+        String productName = null;
+        try {
+            if (alert.getProduct() != null) {
+                productId = alert.getProduct().getId();
+                productName = alert.getProduct().getName();
+            }
+        } catch (EntityNotFoundException e) {
+            // deleted product, leave productId/productName null
+        }
+
+        Long batchId = null;
+        String batchNumber = null;
+        try {
+            if (alert.getBatch() != null) {
+                batchId = alert.getBatch().getId();
+                batchNumber = alert.getBatch().getBatchNumber();
+            }
+        } catch (EntityNotFoundException e) {
+            // deleted batch, leave batchId/batchNumber null
+        }
+
         return StockAlertResponse.builder()
                 .id(alert.getId())
                 .pharmacyId(alert.getPharmacy().getId())
-                .productId(alert.getProduct() != null ? alert.getProduct().getId() : null)
-                .productName(alert.getProduct() != null ? alert.getProduct().getName() : null)
-                .batchId(alert.getBatch() != null ? alert.getBatch().getId() : null)
-                .batchNumber(alert.getBatch() != null ? alert.getBatch().getBatchNumber() : null)
+                .productId(productId)
+                .productName(productName)
+                .batchId(batchId)
+                .batchNumber(batchNumber)
                 .alertType(alert.getAlertType().name())
                 .title(alert.getTitle())
                 .message(alert.getMessage())

@@ -58,6 +58,10 @@ public class StockAlertController {
             @RequestParam Long pharmacyId) {
         pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting active alerts for pharmacy: {}", pharmacyId);
+
+        alertService.generateLowStockAlerts(pharmacyId);
+        alertService.generateExpiryAlerts(pharmacyId);
+
         List<StockAlertResponse> alerts = alertService.getActiveAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(alerts));
     }

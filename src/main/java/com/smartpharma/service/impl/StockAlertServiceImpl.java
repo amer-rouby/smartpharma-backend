@@ -168,14 +168,11 @@ public class StockAlertServiceImpl implements StockAlertService {
             }
         }
 
-        boolean exists = alertRepository.findByPharmacyIdAndStatus(pharmacyId, "UNREAD", PageRequest.of(0, 100))
-                .stream()
-                .anyMatch(a -> a.getAlertType() == type &&
-                        (productId != null ? a.getProduct() != null && a.getProduct().getId().equals(productId) : true) &&
-                        a.getCreatedAt().isAfter(LocalDateTime.now().minusHours(24)));
+        long recentCount = alertRepository.countRecentSimilarAlerts(
+                pharmacyId, type, productId, batchId, LocalDateTime.now().minusHours(24));
 
-        if (exists) {
-            log.info("Similar alert already exists for type: {}, product: {}", type, productId);
+        if (recentCount > 0) {
+            log.info("Similar alert already exists for type: {}, product: {}, batch: {}", type, productId, batchId);
             return null;
         }
 
@@ -221,12 +218,20 @@ public class StockAlertServiceImpl implements StockAlertService {
         List<Product> products = productRepository.findByPharmacyId(pharmacyId);
         int createdCount = 0;
 
+        // One bulk query for every product's stock total instead of one query per
+        // product - this method runs on every /api/alerts* GET, so an N+1 loop here
+        // meant a full-catalog query storm (439 products = 439 queries) on every call.
+        Map<Long, Long> stockByProductId = new HashMap<>();
+        for (Object[] row : batchRepository.sumQuantityGroupedByProductForPharmacy(pharmacyId)) {
+            stockByProductId.put(((Number) row[0]).longValue(), ((Number) row[1]).longValue());
+        }
+
         for (Product product : products) {
             if (product.getDeletedAt() != null) {
                 continue;
             }
 
-            Long totalStock = batchRepository.sumQuantityByProductId(product.getId());
+            Long totalStock = stockByProductId.getOrDefault(product.getId(), 0L);
             if (totalStock != null && totalStock <= product.getMinStockLevel()) {
                 String title = totalStock == 0 ? "Out of Stock" : "Low Stock";
                 String message = String.format("Product '%s' - Current stock: %d (Minimum: %d)",
@@ -237,6 +242,9 @@ public class StockAlertServiceImpl implements StockAlertService {
                 StockAlertResponse alert = createAlert(pharmacyId, product.getId(), null, type, title, message,
                         totalStock == 0 ? "CRITICAL" : "HIGH");
                 if (alert != null) createdCount++;
+            } else {
+                alertRepository.autoResolveStockAlertsForProduct(pharmacyId, product.getId(),
+                        List.of(StockAlert.AlertType.LOW_STOCK, StockAlert.AlertType.OUT_OF_STOCK));
             }
         }
         log.info("Created {} low stock alerts", createdCount);
@@ -281,6 +289,12 @@ public class StockAlertServiceImpl implements StockAlertService {
 
         List<StockBatch> expiringBatches = batchRepository.findExpiringBatches(pharmacyId, thirtyDaysLater);
         for (StockBatch batch : expiringBatches) {
+            // findExpiringBatches has no lower bound, so it also returns already-expired
+            // batches (handled above) - skip those here to avoid a second, contradictory
+            // "expiring in -N days" alert for the same batch.
+            if (batch.getExpiryDate().isBefore(today)) {
+                continue;
+            }
             if (batch.getStatus() == com.smartpharma.entity.StockBatch.BatchStatus.ACTIVE) {
                 try {
                     Product product = batch.getProduct();

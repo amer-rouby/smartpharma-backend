@@ -69,6 +69,17 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     """)
     Long sumQuantityByProductId(@Param("productId") Long productId);
 
+    // Bulk variant of the above for callers that need every product's total in one
+    // pass (e.g. low-stock alert generation) - avoids issuing one query per product.
+    @Query("""
+        SELECT sb.product.id, COALESCE(SUM(sb.quantityCurrent), 0)
+        FROM StockBatch sb
+        WHERE sb.product.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        GROUP BY sb.product.id
+    """)
+    List<Object[]> sumQuantityGroupedByProductForPharmacy(@Param("pharmacyId") Long pharmacyId);
+
     @Query("""
         UPDATE StockBatch sb 
         SET sb.quantityCurrent = sb.quantityCurrent - :deduct 
