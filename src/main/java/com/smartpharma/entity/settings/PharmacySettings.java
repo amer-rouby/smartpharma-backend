@@ -80,6 +80,15 @@ public class PharmacySettings {
     @Builder.Default
     private BigDecimal largeExpenseThreshold = BigDecimal.valueOf(2000);
 
+    // Whether the sales screen must block checkout on prescription-required
+    // products until a prescription photo is attached. Defaults to on (the
+    // existing behavior); admins can turn it off to speed up checkout.
+    // Nullable (not NOT NULL): ddl-auto=update can't add a NOT NULL column to a
+    // table that already has rows without a default clause, so treat null as
+    // true wherever this is read.
+    @Builder.Default
+    private Boolean requirePrescriptionUpload = true;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

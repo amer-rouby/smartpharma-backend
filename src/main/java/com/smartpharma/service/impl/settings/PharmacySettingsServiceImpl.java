@@ -58,6 +58,9 @@ public class PharmacySettingsServiceImpl implements PharmacySettingsService {
         if (request.getLargeExpenseThreshold() != null) {
             settings.setLargeExpenseThreshold(request.getLargeExpenseThreshold());
         }
+        if (request.getRequirePrescriptionUpload() != null) {
+            settings.setRequirePrescriptionUpload(request.getRequirePrescriptionUpload());
+        }
 
         if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
             Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)

@@ -32,6 +32,7 @@ public class PharmacySettingsResponse {
     private String enabledPaymentMethods;
     private BigDecimal largeSaleThreshold;
     private BigDecimal largeExpenseThreshold;
+    private Boolean requirePrescriptionUpload;
     private LocalDateTime updatedAt;
 
     public static PharmacySettingsResponse fromEntity(PharmacySettings settings, String pharmacyName) {
@@ -53,6 +54,8 @@ public class PharmacySettingsResponse {
                 .enabledPaymentMethods(settings.getEnabledPaymentMethods())
                 .largeSaleThreshold(settings.getLargeSaleThreshold())
                 .largeExpenseThreshold(settings.getLargeExpenseThreshold())
+                .requirePrescriptionUpload(
+                        settings.getRequirePrescriptionUpload() != null ? settings.getRequirePrescriptionUpload() : true)
                 .updatedAt(settings.getUpdatedAt())
                 .build();
     }

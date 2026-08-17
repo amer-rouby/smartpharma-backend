@@ -108,7 +108,11 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
             }
         }
 
-        if (requiresPrescription && (request.getPrescriptionImageUrl() == null || request.getPrescriptionImageUrl().isBlank())) {
+        boolean requirePrescriptionUpload = pharmacySettingsRepository.findByPharmacyId(request.getPharmacyId())
+                .map(s -> s.getRequirePrescriptionUpload() == null || s.getRequirePrescriptionUpload())
+                .orElse(true);
+        if (requirePrescriptionUpload && requiresPrescription
+                && (request.getPrescriptionImageUrl() == null || request.getPrescriptionImageUrl().isBlank())) {
             throw new RuntimeException("This sale contains a prescription-only product - a prescription image is required");
         }
 

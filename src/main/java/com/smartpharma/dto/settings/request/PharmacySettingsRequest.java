@@ -66,4 +66,7 @@ public class PharmacySettingsRequest {
 
     @Builder.Default
     private BigDecimal largeExpenseThreshold = BigDecimal.valueOf(2000);
+
+    @Builder.Default
+    private Boolean requirePrescriptionUpload = true;
 }
