@@ -18,8 +18,11 @@ import com.smartpharma.service.NotificationService;
 import com.smartpharma.service.NotificationStreamService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +51,17 @@ public class NotificationServiceImpl implements NotificationService {
     private final PharmacySettingsRepository pharmacySettingsRepository;
     private final BackupRecordRepository backupRecordRepository;
     private final EmailService emailService;
+
+    // Self-injected lazy proxy so dispatchEmailForNotification (called from saveNotificationDirect,
+    // both in this class) goes through the Spring AOP proxy instead of a same-class call, which
+    // is required for @Async to actually take effect - a direct `this.` call bypasses the proxy
+    // entirely and would run synchronously despite the annotation. Field injection (not
+    // constructor, which is what @RequiredArgsConstructor would generate for a final field)
+    // because constructor-time self-injection throws BeanCurrentlyInCreationException even
+    // with @Lazy - the proxy still needs to resolve the bean name during argument creation.
+    @Autowired
+    @Lazy
+    private NotificationServiceImpl self;
 
     private static final int EXPIRY_WARNING_DAYS = 30;
     private static final int BACKUP_REMINDER_STALE_DAYS = 7;
@@ -138,7 +152,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .relatedEntityId(request.getRelatedEntityId()).build();
         NotificationResponse response = mapToResponse(notificationRepository.save(notification));
         notificationStreamService.notifyCreated(request.getPharmacy().getId(), response);
-        dispatchEmailForNotification(notification);
+        self.dispatchEmailForNotification(notification);
         return response;
     }
 
@@ -149,8 +163,13 @@ public class NotificationServiceImpl implements NotificationService {
      * individually, since "who wants an email" is a per-user choice, not a pharmacy-wide
      * one. Never allowed to fail the notification itself - SMTP problems are logged and
      * swallowed, exactly like the rest of this method's best-effort alert checks.
+     *
+     * @Async: runs on a separate thread so a slow/misconfigured SMTP server (multi-second
+     * connection/read timeouts, potentially once per recipient) never blocks the request
+     * that triggered the notification - e.g. a POS sale used to wait on this synchronously.
      */
-    private void dispatchEmailForNotification(Notification notification) {
+    @Async
+    public void dispatchEmailForNotification(Notification notification) {
         List<User> recipients = notification.getRecipient() != null
                 ? List.of(notification.getRecipient())
                 : userRepository.findActiveByPharmacyId(notification.getPharmacy().getId());
