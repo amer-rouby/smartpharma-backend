@@ -45,6 +45,8 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
     private static final int MOVING_AVG_DAYS = 14;
     private static final int DEFAULT_PREDICTION = 10;
     private static final BigDecimal CONFIDENCE_BASE = BigDecimal.valueOf(0.75);
+    private static final int FORECAST_HORIZON_DAYS = 7;
+    private static final int RETENTION_DAYS = 60;
 
     @Override
     @Transactional
@@ -63,6 +65,59 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
             }
         }
         log.info("Completed. Success: {}, Failed: {}", success, products.size() - success);
+    }
+
+    @Override
+    @Transactional
+    public void generateWeeklyPredictionsForAllPharmacies() {
+        LocalDate cutoff = LocalDate.now().minusDays(RETENTION_DAYS);
+        List<Pharmacy> pharmacies = pharmacyRepository.findAll();
+        for (Pharmacy pharmacy : pharmacies) {
+            predictionRepository.deleteByPharmacyIdAndPredictionDateBefore(pharmacy.getId(), cutoff);
+            for (int i = 1; i <= FORECAST_HORIZON_DAYS; i++) {
+                generatePredictions(pharmacy.getId(), LocalDate.now().plusDays(i));
+            }
+        }
+        log.info("Weekly prediction generation done for {} pharmacies (retention cutoff: {})",
+                pharmacies.size(), cutoff);
+    }
+
+    @Override
+    @Transactional
+    public void updatePastPredictionsWithActuals() {
+        LocalDate today = LocalDate.now();
+        List<DemandPrediction> pastPredictions = predictionRepository
+                .findByPredictionDateBeforeAndActualQuantityIsNull(today);
+        int updated = 0;
+        for (DemandPrediction prediction : pastPredictions) {
+            try {
+                Long productId = prediction.getProduct() != null ? prediction.getProduct().getId() : null;
+                Long pharmacyId = prediction.getPharmacy() != null ? prediction.getPharmacy().getId() : null;
+                if (productId == null || pharmacyId == null) continue;
+                int actualQuantity = getActualSalesForDate(productId, pharmacyId, prediction.getPredictionDate());
+                prediction.setActualQuantity(actualQuantity);
+                if (prediction.getPredictedQuantity() != null && prediction.getPredictedQuantity() > 0) {
+                    int error = Math.abs(actualQuantity - prediction.getPredictedQuantity());
+                    BigDecimal accuracy = BigDecimal.valueOf(
+                            Math.max(0, 100.0 - (error * 100.0 / prediction.getPredictedQuantity())));
+                    prediction.setAccuracyPercentage(accuracy);
+                }
+                predictionRepository.save(prediction);
+                updated++;
+            } catch (Exception e) {
+                log.error("Failed to update actuals for prediction {}: {}", prediction.getId(), e.getMessage(), e);
+            }
+        }
+        log.info("Updated {} of {} past predictions with actual sales data", updated, pastPredictions.size());
+    }
+
+    private int getActualSalesForDate(Long productId, Long pharmacyId, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.atTime(LocalTime.MAX);
+        List<SaleItem> items = saleItemRepository.findByProductIdAndPharmacyIdAndDateBetween(
+                productId, pharmacyId, start, end);
+        if (items == null) return 0;
+        return items.stream().mapToInt(i -> i.getQuantity() != null ? i.getQuantity() : 0).sum();
     }
 
     @Override
@@ -115,7 +170,9 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
     @Transactional(readOnly = true)
     public Page<DemandPredictionResponse> getPredictions(Long pharmacyId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return predictionRepository.findByPharmacyId(pharmacyId, pageable)
+        return predictionRepository
+                .findByPharmacyIdAndPredictionDateGreaterThanEqualOrderByPredictionDateAsc(
+                        pharmacyId, LocalDate.now(), pageable)
                 .map(p -> {
                     Long prodId = p.getProduct() != null ? p.getProduct().getId() : null;
                     return DemandPredictionResponse.fromEntity(p, getCurrentStock(prodId));

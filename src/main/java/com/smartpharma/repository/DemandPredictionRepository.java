@@ -32,6 +32,12 @@ public interface DemandPredictionRepository extends JpaRepository<DemandPredicti
 
     Page<DemandPrediction> findByPharmacyId(Long pharmacyId, Pageable pageable);
 
+    Page<DemandPrediction> findByPharmacyIdAndPredictionDateGreaterThanEqualOrderByPredictionDateAsc(
+            Long pharmacyId, LocalDate fromDate, Pageable pageable
+    );
+
+    List<DemandPrediction> findByPredictionDateBeforeAndActualQuantityIsNull(LocalDate date);
+
     Optional<DemandPrediction> findByProductIdAndPharmacyIdAndPredictionDate(
             Long productId, Long pharmacyId, LocalDate predictionDate
     );
