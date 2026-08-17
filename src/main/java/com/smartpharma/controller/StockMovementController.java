@@ -4,6 +4,7 @@ import com.smartpharma.dto.request.StockMovementRequest;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.StockMovementResponse;
 import com.smartpharma.dto.response.StockMovementStats;
+import com.smartpharma.entity.StockMovement;
 import com.smartpharma.service.StockMovementService;
 import com.smartpharma.util.SecurityUtils;
 import jakarta.validation.Valid;
@@ -76,14 +77,15 @@ public class StockMovementController {
             @RequestParam Long pharmacyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(required = false) StockMovement.MovementType movementType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
-        log.info("Getting movements for pharmacy: {} from {} to {}", pharmacyId, startDate, endDate);
+        log.info("Getting movements for pharmacy: {} from {} to {} type {}", pharmacyId, startDate, endDate, movementType);
 
-        Page<StockMovementResponse> movements = movementService.getMovementsByDateRange(pharmacyId, startDate, endDate, page, size);
+        Page<StockMovementResponse> movements = movementService.getMovementsByDateRange(pharmacyId, startDate, endDate, movementType, page, size);
         return ResponseEntity.ok(ApiResponse.success(movements));
     }
 
