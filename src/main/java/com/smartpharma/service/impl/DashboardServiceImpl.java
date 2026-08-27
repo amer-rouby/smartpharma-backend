@@ -1,16 +1,24 @@
 package com.smartpharma.service.impl;
 
 import com.smartpharma.dto.response.DashboardResponse;
+import com.smartpharma.dto.response.DemandPredictionResponse;
+import com.smartpharma.dto.response.SmartInsightsDTO;
 import com.smartpharma.entity.Product;
 import com.smartpharma.entity.SaleTransaction;
 import com.smartpharma.entity.StockBatch;
+import com.smartpharma.entity.settings.SmartFeatureSettings;
+import com.smartpharma.exception.LocalizedException;
 import com.smartpharma.repository.ProductRepository;
 import com.smartpharma.repository.SaleTransactionRepository;
 import com.smartpharma.repository.StockBatchRepository;
 import com.smartpharma.service.DashboardService;
+import com.smartpharma.service.DemandPredictionService;
+import com.smartpharma.service.PricingRecommendationService;
+import com.smartpharma.service.settings.SmartFeatureSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +39,12 @@ public class DashboardServiceImpl implements DashboardService {
     private final SaleTransactionRepository saleTransactionRepository;
     private final ProductRepository productRepository;
     private final StockBatchRepository stockBatchRepository;
+    private final SmartFeatureSettingsService smartFeatureSettingsService;
+    private final DemandPredictionService demandPredictionService;
+    private final PricingRecommendationService pricingRecommendationService;
+
+    private static final int SALES_TREND_WINDOW_DAYS = 30;
+    private static final Set<String> HIGH_RISK_LEVELS = Set.of("CRITICAL", "HIGH");
 
     @Override
     @Transactional(readOnly = true)
@@ -76,6 +91,74 @@ public class DashboardServiceImpl implements DashboardService {
                 .topProducts(topProducts)
                 .recentSales(recentSales)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SmartInsightsDTO getSmartInsights(Long pharmacyId) {
+        SmartFeatureSettings flags = smartFeatureSettingsService.getOrCreate(pharmacyId);
+        if (!isEnabled(flags.getDashboardInsightsEnabled())) {
+            throw new LocalizedException(HttpStatus.FORBIDDEN, "FEATURE_DISABLED_DASHBOARD_INSIGHTS",
+                    "Dashboard insights feature is disabled for this pharmacy");
+        }
+
+        LocalDate today = LocalDate.now();
+        BigDecimal todayRevenue = saleTransactionRepository.sumTotalAmountByPharmacyIdAndDateRange(
+                pharmacyId, today.atStartOfDay(), today.atTime(LocalTime.MAX));
+        if (todayRevenue == null) todayRevenue = BigDecimal.ZERO;
+
+        LocalDate trendStart = today.minusDays(SALES_TREND_WINDOW_DAYS);
+        LocalDate trendEnd = today.minusDays(1);
+        BigDecimal trendRevenue = saleTransactionRepository.sumTotalAmountByPharmacyIdAndDateRange(
+                pharmacyId, trendStart.atStartOfDay(), trendEnd.atTime(LocalTime.MAX));
+        BigDecimal averageDailyRevenue = trendRevenue != null
+                ? trendRevenue.divide(BigDecimal.valueOf(SALES_TREND_WINDOW_DAYS), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        Double salesDeltaPercent = null;
+        if (averageDailyRevenue.compareTo(BigDecimal.ZERO) > 0) {
+            salesDeltaPercent = todayRevenue.subtract(averageDailyRevenue)
+                    .divide(averageDailyRevenue, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .doubleValue();
+        }
+
+        Integer highRiskStockoutCount = null;
+        if (isEnabled(flags.getStockPredictionEnabled())) {
+            List<DemandPredictionResponse> upcoming = demandPredictionService.getUpcomingPredictions(pharmacyId, 1);
+            highRiskStockoutCount = (int) upcoming.stream()
+                    .filter(p -> HIGH_RISK_LEVELS.contains(p.getRiskLevel()))
+                    .count();
+        }
+
+        Integer reorderRecommendationsCount = null;
+        if (isEnabled(flags.getReorderRecommendationsEnabled())) {
+            reorderRecommendationsCount = demandPredictionService.getReorderRecommendations(pharmacyId).size();
+        }
+
+        Integer pricingRecommendationsCount = null;
+        if (isEnabled(flags.getPricingRecommendationsEnabled())) {
+            pricingRecommendationsCount = pricingRecommendationService.getRecommendations(pharmacyId).size();
+        }
+
+        // Unusual-activity detection (anomaly count) doesn't exist yet - always
+        // null for now regardless of the anomalyDetectionEnabled flag. Wire this
+        // up to the real count once that feature is built.
+        Integer unusualActivityCount = null;
+
+        return SmartInsightsDTO.builder()
+                .todayRevenue(todayRevenue)
+                .averageDailyRevenue30d(averageDailyRevenue)
+                .salesDeltaPercent(salesDeltaPercent)
+                .highRiskStockoutCount(highRiskStockoutCount)
+                .reorderRecommendationsCount(reorderRecommendationsCount)
+                .pricingRecommendationsCount(pricingRecommendationsCount)
+                .unusualActivityCount(unusualActivityCount)
+                .build();
+    }
+
+    private boolean isEnabled(Boolean flag) {
+        return flag == null || flag;
     }
 
     private BigDecimal calculateInventoryValue(Long pharmacyId) {
