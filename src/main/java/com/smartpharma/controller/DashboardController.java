@@ -4,6 +4,7 @@ package com.smartpharma.controller;
 
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.DashboardResponse;
+import com.smartpharma.dto.response.SmartInsightsDTO;
 import com.smartpharma.service.DashboardService;
 import com.smartpharma.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -35,5 +36,16 @@ public class DashboardController {
                 stats,
                 "Dashboard stats retrieved successfully"
         ));
+    }
+
+    // No try/catch - a disabled feature flag throws LocalizedException, handled
+    // globally with the correct status and translatable error code.
+    @GetMapping("/smart-insights")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
+    public ResponseEntity<ApiResponse<SmartInsightsDTO>> getSmartInsights(
+            @RequestParam(required = false) Long pharmacyId) {
+        Long resolvedPharmacyId = SecurityUtils.getCurrentPharmacyId();
+        SmartInsightsDTO insights = dashboardService.getSmartInsights(resolvedPharmacyId);
+        return ResponseEntity.ok(ApiResponse.success(insights, "Smart insights retrieved successfully"));
     }
 }
