@@ -1,6 +1,7 @@
 package com.smartpharma.repository;
 
 import com.smartpharma.entity.PurchaseOrderItem;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -32,4 +33,17 @@ public interface PurchaseOrderItemRepository extends JpaRepository<PurchaseOrder
     """)
     Long sumQuantityByProductIdAndPharmacyId(@Param("productId") Long productId,
                                              @Param("pharmacyId") Long pharmacyId);
+
+    @Query("""
+        SELECT poi FROM PurchaseOrderItem poi
+        JOIN poi.purchaseOrder po
+        WHERE poi.product.id = :productId
+        AND po.pharmacy.id = :pharmacyId
+        AND po.supplier IS NOT NULL
+        AND po.deletedAt IS NULL
+        ORDER BY po.orderDate DESC, po.createdAt DESC
+    """)
+    List<PurchaseOrderItem> findMostRecentByProductIdAndPharmacyId(@Param("productId") Long productId,
+                                                                     @Param("pharmacyId") Long pharmacyId,
+                                                                     Pageable pageable);
 }

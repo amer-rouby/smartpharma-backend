@@ -3,6 +3,7 @@ package com.smartpharma.service;
 import com.smartpharma.dto.request.UpdatePredictionDTO;
 import com.smartpharma.dto.response.DemandPredictionResponse;
 import com.smartpharma.dto.response.PurchaseOrderSummaryDTO;
+import com.smartpharma.dto.response.ReorderRecommendationDTO;
 import com.smartpharma.dto.response.ShareLinkResponse;
 import org.springframework.data.domain.Page;
 import java.time.LocalDate;
@@ -42,4 +43,6 @@ public interface DemandPredictionService {
     ShareLinkResponse generateShareLink(Long predictionId, Long pharmacyId, Long userId, int expiryHours);
 
     PurchaseOrderSummaryDTO createPurchaseFromPrediction(Long predictionId, Long pharmacyId, Long userId);
+
+    List<ReorderRecommendationDTO> getReorderRecommendations(Long pharmacyId);
 }

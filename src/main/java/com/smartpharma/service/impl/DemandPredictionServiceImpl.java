@@ -3,15 +3,20 @@ package com.smartpharma.service.impl;
 import com.smartpharma.dto.request.UpdatePredictionDTO;
 import com.smartpharma.dto.response.DemandPredictionResponse;
 import com.smartpharma.dto.response.PurchaseOrderSummaryDTO;
+import com.smartpharma.dto.response.ReorderRecommendationDTO;
 import com.smartpharma.dto.request.CreateShareLinkRequest;
 import com.smartpharma.dto.response.ShareLinkResponse;
 import com.smartpharma.entity.DemandPrediction;
 import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.Product;
+import com.smartpharma.entity.PurchaseOrderItem;
 import com.smartpharma.entity.SaleItem;
+import com.smartpharma.entity.Supplier;
+import com.smartpharma.exception.LocalizedException;
 import com.smartpharma.repository.DemandPredictionRepository;
 import com.smartpharma.repository.PharmacyRepository;
 import com.smartpharma.repository.ProductRepository;
+import com.smartpharma.repository.PurchaseOrderItemRepository;
 import com.smartpharma.repository.SaleItemRepository;
 import com.smartpharma.service.DemandPredictionService;
 import com.smartpharma.service.ShareLinkService;
@@ -21,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,12 +49,14 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
     private final SaleItemRepository saleItemRepository;
     private final ShareLinkService shareLinkService;
     private final SmartFeatureSettingsService smartFeatureSettingsService;
+    private final PurchaseOrderItemRepository purchaseOrderItemRepository;
 
     private static final int MOVING_AVG_DAYS = 14;
     private static final int DEFAULT_PREDICTION = 10;
     private static final BigDecimal CONFIDENCE_BASE = BigDecimal.valueOf(0.75);
     private static final int FORECAST_HORIZON_DAYS = 7;
     private static final int RETENTION_DAYS = 60;
+    private static final int REORDER_TARGET_DAYS_OF_STOCK = 14;
 
     @Override
     @Transactional
@@ -202,6 +210,94 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
     private boolean isStockPredictionEnabled(Long pharmacyId) {
         Boolean enabled = smartFeatureSettingsService.getOrCreate(pharmacyId).getStockPredictionEnabled();
         return enabled == null || enabled;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReorderRecommendationDTO> getReorderRecommendations(Long pharmacyId) {
+        Boolean enabled = smartFeatureSettingsService.getOrCreate(pharmacyId).getReorderRecommendationsEnabled();
+        if (enabled != null && !enabled) {
+            throw new LocalizedException(HttpStatus.FORBIDDEN, "FEATURE_DISABLED_REORDER_RECOMMENDATIONS",
+                    "Reorder recommendations feature is disabled for this pharmacy");
+        }
+        return computeReorderRecommendations(pharmacyId);
+    }
+
+    // Shared by the reorder-recommendations endpoint and (once built) the
+    // supplier-grouped view - the base recommendedOrder field on the response only
+    // compares stock against a single day's forecast, so a genuinely critical
+    // product can show 0 there. Reordering needs a real coverage target instead.
+    private List<ReorderRecommendationDTO> computeReorderRecommendations(Long pharmacyId) {
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        List<DemandPrediction> predictions = predictionRepository.findUpcomingPredictions(pharmacyId, tomorrow, tomorrow);
+
+        List<ReorderRecommendationDTO> result = new ArrayList<>();
+        for (DemandPrediction p : predictions) {
+            Long productId = p.getProduct() != null ? p.getProduct().getId() : null;
+            Integer currentStock = getCurrentStock(productId);
+            DemandPredictionResponse enriched = DemandPredictionResponse.fromEntity(p, currentStock, true);
+
+            int dailyForecast = p.getPredictedQuantity() != null ? p.getPredictedQuantity() : 0;
+            int recommendedQuantity = Math.max(0, dailyForecast * REORDER_TARGET_DAYS_OF_STOCK - currentStock);
+            if (recommendedQuantity <= 0) continue;
+
+            Supplier supplier = findInferredSupplier(productId, pharmacyId);
+
+            result.add(ReorderRecommendationDTO.builder()
+                    .predictionId(p.getId())
+                    .productId(productId)
+                    .productName(enriched.getProductName())
+                    .productCode(enriched.getProductCode())
+                    .currentStock(currentStock)
+                    .recommendedQuantity(recommendedQuantity)
+                    .supplierId(supplier != null ? supplier.getId() : null)
+                    .supplierName(supplier != null ? supplier.getName() : null)
+                    .reason(buildReorderReason(enriched))
+                    .priority(mapRiskToPriority(enriched.getRiskLevel()))
+                    .riskLevel(enriched.getRiskLevel())
+                    .daysUntilStockout(enriched.getDaysUntilStockout())
+                    .build());
+        }
+
+        result.sort(Comparator
+                .comparingInt((ReorderRecommendationDTO r) -> riskRank(r.getRiskLevel()))
+                .thenComparing(Comparator.comparingInt(ReorderRecommendationDTO::getRecommendedQuantity).reversed()));
+
+        return result;
+    }
+
+    private Supplier findInferredSupplier(Long productId, Long pharmacyId) {
+        if (productId == null) return null;
+        List<PurchaseOrderItem> recent = purchaseOrderItemRepository
+                .findMostRecentByProductIdAndPharmacyId(productId, pharmacyId, PageRequest.of(0, 1));
+        if (recent.isEmpty()) return null;
+        return recent.get(0).getPurchaseOrder().getSupplier();
+    }
+
+    private String buildReorderReason(DemandPredictionResponse r) {
+        if (r.getDaysUntilStockout() != null) {
+            return "Stock expected to run out in " + r.getDaysUntilStockout() + " day(s) based on recent sales";
+        }
+        return "Recommended based on demand forecast";
+    }
+
+    private String mapRiskToPriority(String riskLevel) {
+        if (riskLevel == null) return "LOW";
+        return switch (riskLevel) {
+            case "CRITICAL", "HIGH" -> "HIGH";
+            case "MEDIUM" -> "MEDIUM";
+            default -> "LOW";
+        };
+    }
+
+    private int riskRank(String riskLevel) {
+        if (riskLevel == null) return 4;
+        return switch (riskLevel) {
+            case "CRITICAL" -> 0;
+            case "HIGH" -> 1;
+            case "MEDIUM" -> 2;
+            default -> 3;
+        };
     }
 
     @Override
