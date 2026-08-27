@@ -30,9 +30,15 @@ public class DemandPredictionResponse {
     private String trend;
     private String seasonalityFactor;
     private String recommendation;
+    private Integer daysUntilStockout;
+    private String riskLevel;
     private LocalDateTime createdAt;
 
     public static DemandPredictionResponse fromEntity(DemandPrediction prediction, Integer currentStock) {
+        return fromEntity(prediction, currentStock, true);
+    }
+
+    public static DemandPredictionResponse fromEntity(DemandPrediction prediction, Integer currentStock, boolean includeRiskData) {
         Integer predictedQty = prediction.getPredictedQuantity() != null ? prediction.getPredictedQuantity() : 0;
         Integer stock = currentStock != null ? currentStock : 0;
         Integer recommendedOrder = Math.max(0, predictedQty - stock);
@@ -42,6 +48,13 @@ public class DemandPredictionResponse {
         String productName = prediction.getProduct() != null && prediction.getProduct().getName() != null
                 ? prediction.getProduct().getName() : "Unknown";
         String recommendation = generateRecommendation(productName, predictedQty, stock, recommendedOrder, trend);
+
+        Integer daysUntilStockout = null;
+        String riskLevel = null;
+        if (includeRiskData) {
+            daysUntilStockout = calculateDaysUntilStockout(stock, predictedQty);
+            riskLevel = calculateRiskLevel(stock, daysUntilStockout);
+        }
 
         return DemandPredictionResponse.builder()
                 .predictionId(prediction.getId())
@@ -58,8 +71,28 @@ public class DemandPredictionResponse {
                 .trend(trend)
                 .seasonalityFactor(seasonality)
                 .recommendation(recommendation)
+                .daysUntilStockout(daysUntilStockout)
+                .riskLevel(riskLevel)
                 .createdAt(prediction.getCreatedAt())
                 .build();
+    }
+
+    // currentStock / average daily demand. Predictions carry a per-day forecast
+    // quantity already (see DemandPredictionServiceImpl.calculateSimpleForecast),
+    // so it doubles as the daily consumption rate here.
+    private static Integer calculateDaysUntilStockout(Integer currentStock, Integer predictedDailyQuantity) {
+        if (currentStock == null || currentStock <= 0) return 0;
+        if (predictedDailyQuantity == null || predictedDailyQuantity <= 0) return null;
+        return currentStock / predictedDailyQuantity;
+    }
+
+    private static String calculateRiskLevel(Integer currentStock, Integer daysUntilStockout) {
+        if (currentStock != null && currentStock <= 0) return "CRITICAL";
+        if (daysUntilStockout == null) return "LOW";
+        if (daysUntilStockout < 3) return "CRITICAL";
+        if (daysUntilStockout < 7) return "HIGH";
+        if (daysUntilStockout < 14) return "MEDIUM";
+        return "LOW";
     }
 
     private static String calculateTrend(Integer predicted, Integer current) {
