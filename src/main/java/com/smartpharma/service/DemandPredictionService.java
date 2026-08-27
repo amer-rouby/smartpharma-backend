@@ -5,6 +5,7 @@ import com.smartpharma.dto.response.DemandPredictionResponse;
 import com.smartpharma.dto.response.PurchaseOrderSummaryDTO;
 import com.smartpharma.dto.response.ReorderRecommendationDTO;
 import com.smartpharma.dto.response.ShareLinkResponse;
+import com.smartpharma.dto.response.SupplierReorderGroupDTO;
 import org.springframework.data.domain.Page;
 import java.time.LocalDate;
 import java.util.List;
@@ -45,4 +46,6 @@ public interface DemandPredictionService {
     PurchaseOrderSummaryDTO createPurchaseFromPrediction(Long predictionId, Long pharmacyId, Long userId);
 
     List<ReorderRecommendationDTO> getReorderRecommendations(Long pharmacyId);
+
+    List<SupplierReorderGroupDTO> getReorderRecommendationsBySupplier(Long pharmacyId);
 }

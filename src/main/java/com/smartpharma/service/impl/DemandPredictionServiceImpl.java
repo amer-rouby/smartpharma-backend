@@ -6,6 +6,7 @@ import com.smartpharma.dto.response.PurchaseOrderSummaryDTO;
 import com.smartpharma.dto.response.ReorderRecommendationDTO;
 import com.smartpharma.dto.request.CreateShareLinkRequest;
 import com.smartpharma.dto.response.ShareLinkResponse;
+import com.smartpharma.dto.response.SupplierReorderGroupDTO;
 import com.smartpharma.entity.DemandPrediction;
 import com.smartpharma.entity.Pharmacy;
 import com.smartpharma.entity.Product;
@@ -223,7 +224,35 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
         return computeReorderRecommendations(pharmacyId);
     }
 
-    // Shared by the reorder-recommendations endpoint and (once built) the
+    @Override
+    @Transactional(readOnly = true)
+    public List<SupplierReorderGroupDTO> getReorderRecommendationsBySupplier(Long pharmacyId) {
+        Boolean enabled = smartFeatureSettingsService.getOrCreate(pharmacyId).getSupplierRecommendationsEnabled();
+        if (enabled != null && !enabled) {
+            throw new LocalizedException(HttpStatus.FORBIDDEN, "FEATURE_DISABLED_SUPPLIER_RECOMMENDATIONS",
+                    "Supplier order recommendations feature is disabled for this pharmacy");
+        }
+
+        List<ReorderRecommendationDTO> recommendations = computeReorderRecommendations(pharmacyId);
+        Map<Long, SupplierReorderGroupDTO> groups = new LinkedHashMap<>();
+
+        for (ReorderRecommendationDTO rec : recommendations) {
+            Long key = rec.getSupplierId() != null ? rec.getSupplierId() : -1L;
+            SupplierReorderGroupDTO group = groups.computeIfAbsent(key, k -> SupplierReorderGroupDTO.builder()
+                    .supplierId(rec.getSupplierId())
+                    .supplierName(rec.getSupplierName())
+                    .recommendations(new ArrayList<>())
+                    .build());
+            group.getRecommendations().add(rec);
+        }
+
+        List<SupplierReorderGroupDTO> result = new ArrayList<>(groups.values());
+        result.sort(Comparator.comparing((SupplierReorderGroupDTO g) -> g.getSupplierId() == null)
+                .thenComparing(g -> g.getSupplierName() != null ? g.getSupplierName() : ""));
+        return result;
+    }
+
+    // Shared by the reorder-recommendations endpoint and the
     // supplier-grouped view - the base recommendedOrder field on the response only
     // compares stock against a single day's forecast, so a genuinely critical
     // product can show 0 there. Reordering needs a real coverage target instead.
