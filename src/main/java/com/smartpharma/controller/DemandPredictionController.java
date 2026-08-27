@@ -6,6 +6,7 @@ import com.smartpharma.dto.response.DemandPredictionResponse;
 import com.smartpharma.dto.response.PurchaseOrderSummaryDTO;
 import com.smartpharma.dto.response.ReorderRecommendationDTO;
 import com.smartpharma.dto.response.ShareLinkResponse;
+import com.smartpharma.dto.response.SupplierReorderGroupDTO;
 import com.smartpharma.service.DemandPredictionService;
 import com.smartpharma.util.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -282,5 +283,13 @@ public class DemandPredictionController {
         Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         List<ReorderRecommendationDTO> recommendations = predictionService.getReorderRecommendations(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(recommendations));
+    }
+
+    @GetMapping("/reorder-recommendations/by-supplier")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<SupplierReorderGroupDTO>>> getReorderRecommendationsBySupplier() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        List<SupplierReorderGroupDTO> groups = predictionService.getReorderRecommendationsBySupplier(pharmacyId);
+        return ResponseEntity.ok(ApiResponse.success(groups));
     }
 }
