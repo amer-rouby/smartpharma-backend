@@ -15,6 +15,7 @@ import com.smartpharma.repository.ProductRepository;
 import com.smartpharma.repository.SaleItemRepository;
 import com.smartpharma.service.DemandPredictionService;
 import com.smartpharma.service.ShareLinkService;
+import com.smartpharma.service.settings.SmartFeatureSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,6 +42,7 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
     private final PharmacyRepository pharmacyRepository;
     private final SaleItemRepository saleItemRepository;
     private final ShareLinkService shareLinkService;
+    private final SmartFeatureSettingsService smartFeatureSettingsService;
 
     private static final int MOVING_AVG_DAYS = 14;
     private static final int DEFAULT_PREDICTION = 10;
@@ -147,7 +149,7 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
         }
         DemandPrediction saved = predictionRepository.save(prediction);
         log.info("Prediction saved: product={}, date={}, predicted={}", productId, forDate, predictedQuantity);
-        return DemandPredictionResponse.fromEntity(saved, currentStock);
+        return DemandPredictionResponse.fromEntity(saved, currentStock, isStockPredictionEnabled(pharmacyId));
     }
 
     @Override
@@ -158,10 +160,11 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
         List<DemandPrediction> predictions = predictionRepository
                 .findUpcomingPredictions(pharmacyId, today, endDate);
         log.info("Found {} upcoming predictions for pharmacy {}", predictions.size(), pharmacyId);
+        boolean riskEnabled = isStockPredictionEnabled(pharmacyId);
         return predictions.stream()
                 .map(p -> {
                     Long prodId = p.getProduct() != null ? p.getProduct().getId() : null;
-                    return DemandPredictionResponse.fromEntity(p, getCurrentStock(prodId));
+                    return DemandPredictionResponse.fromEntity(p, getCurrentStock(prodId), riskEnabled);
                 })
                 .collect(Collectors.toList());
     }
@@ -170,12 +173,13 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
     @Transactional(readOnly = true)
     public Page<DemandPredictionResponse> getPredictions(Long pharmacyId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
+        boolean riskEnabled = isStockPredictionEnabled(pharmacyId);
         return predictionRepository
                 .findByPharmacyIdAndPredictionDateGreaterThanEqualOrderByPredictionDateAsc(
                         pharmacyId, LocalDate.now(), pageable)
                 .map(p -> {
                     Long prodId = p.getProduct() != null ? p.getProduct().getId() : null;
-                    return DemandPredictionResponse.fromEntity(p, getCurrentStock(prodId));
+                    return DemandPredictionResponse.fromEntity(p, getCurrentStock(prodId), riskEnabled);
                 });
     }
 
@@ -188,7 +192,16 @@ public class DemandPredictionServiceImpl implements DemandPredictionService {
             throw new RuntimeException("Access denied: Prediction does not belong to this pharmacy");
         }
         Long prodId = prediction.getProduct() != null ? prediction.getProduct().getId() : null;
-        return DemandPredictionResponse.fromEntity(prediction, getCurrentStock(prodId));
+        return DemandPredictionResponse.fromEntity(prediction, getCurrentStock(prodId), isStockPredictionEnabled(pharmacyId));
+    }
+
+    // The stockout-risk enrichment (daysUntilStockout/riskLevel) is the "smart" part of
+    // an otherwise pre-existing endpoint, so a disabled flag just omits those two fields
+    // rather than failing the whole request - the base prediction data predates this
+    // feature flag and stays available regardless.
+    private boolean isStockPredictionEnabled(Long pharmacyId) {
+        Boolean enabled = smartFeatureSettingsService.getOrCreate(pharmacyId).getStockPredictionEnabled();
+        return enabled == null || enabled;
     }
 
     @Override
