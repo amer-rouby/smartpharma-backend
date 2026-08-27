@@ -11,6 +11,7 @@ import com.smartpharma.service.settings.SmartFeatureSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -22,13 +23,7 @@ public class SmartFeatureSettingsServiceImpl implements SmartFeatureSettingsServ
     private final PharmacyRepository pharmacyRepository;
 
     @Override
-    @Transactional
-    // Not readOnly: getOrCreate() below may INSERT default settings on first
-    // access. Since it's called via self-invocation (this.getOrCreate(...)),
-    // Spring's proxy doesn't open a separate transaction for it - it runs
-    // inside whatever transaction this method started, so marking this one
-    // readOnly would make that insert fail ("cannot execute INSERT in a
-    // read-only transaction").
+    @Transactional(readOnly = true)
     public SmartFeatureSettingsResponse getSettings(Long pharmacyId) {
         return SmartFeatureSettingsResponse.fromEntity(getOrCreate(pharmacyId));
     }
@@ -81,7 +76,15 @@ public class SmartFeatureSettingsServiceImpl implements SmartFeatureSettingsServ
     }
 
     @Override
-    @Transactional
+    // REQUIRES_NEW rather than the default REQUIRED: this is now called for
+    // feature-flag gating from all over the app (reorder recommendations,
+    // dashboard insights, anomaly detection, etc.), often from inside a
+    // caller's own @Transactional(readOnly = true) method. With REQUIRED,
+    // the insert-on-first-access below would join that read-only transaction
+    // and fail ("cannot execute INSERT in a read-only transaction"). Starting
+    // a fresh transaction here always gets a writable one regardless of the
+    // caller's transaction state.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public SmartFeatureSettings getOrCreate(Long pharmacyId) {
         return settingsRepository.findByPharmacyId(pharmacyId)
                 .orElseGet(() -> createDefaultSettings(pharmacyId));
