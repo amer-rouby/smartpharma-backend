@@ -1,7 +1,5 @@
 package com.smartpharma.exception;
 
-import com.smartpharma.exception.MaxExtensionsReachedException;
-import com.smartpharma.exception.SessionExpiredException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -23,47 +21,25 @@ import java.util.Map;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
-    
-    @ExceptionHandler(SessionExpiredException.class)
-    public ResponseEntity<Map<String, Object>> handleSessionExpiredException(SessionExpiredException ex) {
-        log.error("Session expired: {}", ex.getMessage());
-        Map<String, Object> error = new HashMap<>();
-        error.put("code", "SESSION_EXPIRED");
-        error.put("message", ex.getMessage());
-        error.put("timestamp", LocalDateTime.now().toString());
-        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
-    }
 
-    @ExceptionHandler(AccountLockedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccountLockedException(AccountLockedException ex) {
-        log.warn("Login blocked - account locked: {}", ex.getMessage());
-        Map<String, Object> error = new HashMap<>();
-        error.put("code", "ACCOUNT_LOCKED");
-        error.put("message", ex.getMessage());
-        error.put("timestamp", LocalDateTime.now().toString());
-        return new ResponseEntity<>(error, HttpStatus.LOCKED);
-    }
-
-    @ExceptionHandler(MaxExtensionsReachedException.class)
-    public ResponseEntity<Map<String, Object>> handleMaxExtensionsReachedException(MaxExtensionsReachedException ex) {
-        log.error("Max extensions reached: {}", ex.getMessage());
-        Map<String, Object> error = new HashMap<>();
-        error.put("success", false);
-        error.put("code", "MAX_EXTENSIONS_REACHED");
-        error.put("message", ex.getMessage());
-        error.put("data", null);
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex) {
-        log.error("Resource not found: {}", ex.getMessage());
+    // LocalizedException (and everything that extends it - ResourceNotFoundException,
+    // SessionExpiredException, AccountLockedException, MaxExtensionsReachedException)
+    // carries its own HTTP status + a stable error `code` + interpolation `params`, so
+    // this single handler replaces what used to be 4 separate handlers producing 3
+    // different JSON shapes. The frontend resolves `code` to ERRORS.<code> in
+    // ar.json/en.json instead of showing `message` (English, kept only for server logs
+    // and as a fallback for any not-yet-migrated caller).
+    @ExceptionHandler(LocalizedException.class)
+    public ResponseEntity<ErrorResponse> handleLocalizedException(LocalizedException ex) {
+        log.warn("{} [{}]: {}", ex.getStatus(), ex.getErrorCode(), ex.getMessage());
         ErrorResponse error = new ErrorResponse(
-                HttpStatus.NOT_FOUND.value(),
+                ex.getStatus().value(),
                 ex.getMessage(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                ex.getErrorCode(),
+                ex.getParams()
         );
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return new ResponseEntity<>(error, ex.getStatus());
     }
 
     // Case-insensitive fragments of a RuntimeException's message that indicate what
@@ -199,5 +175,9 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    public record ErrorResponse(int status, String message, LocalDateTime timestamp) {}
+    public record ErrorResponse(int status, String message, LocalDateTime timestamp, String code, Map<String, Object> params) {
+        public ErrorResponse(int status, String message, LocalDateTime timestamp) {
+            this(status, message, timestamp, null, Map.of());
+        }
+    }
 }

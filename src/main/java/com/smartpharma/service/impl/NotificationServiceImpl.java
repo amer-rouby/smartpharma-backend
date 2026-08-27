@@ -9,6 +9,8 @@ import com.smartpharma.entity.StockBatch;
 import com.smartpharma.entity.User;
 import com.smartpharma.entity.settings.BackupRecord;
 import com.smartpharma.entity.settings.NotificationSettings;
+import com.smartpharma.exception.LocalizedException;
+import com.smartpharma.exception.ResourceNotFoundException;
 import com.smartpharma.repository.*;
 import com.smartpharma.repository.settings.BackupRecordRepository;
 import com.smartpharma.repository.settings.NotificationSettingsRepository;
@@ -22,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -86,9 +89,9 @@ public class NotificationServiceImpl implements NotificationService {
     @Override @Transactional
     public NotificationResponse markAsRead(Long notificationId, Long userId, Long pharmacyId) {
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("NOTIFICATION_NOT_FOUND", "Notification not found"));
         if (!notification.getPharmacy().getId().equals(pharmacyId)) {
-            throw new RuntimeException("Notification not found");
+            throw new ResourceNotFoundException("NOTIFICATION_NOT_FOUND", "Notification not found");
         }
         if (notification.getRecipient() == null || notification.getRecipient().getId().equals(userId)) {
             notification.setRead(true);
@@ -97,7 +100,8 @@ public class NotificationServiceImpl implements NotificationService {
             notificationStreamService.notifyChanged(notification.getPharmacy().getId());
             return response;
         }
-        throw new RuntimeException("Unauthorized to mark this notification as read");
+        throw new LocalizedException(HttpStatus.BAD_REQUEST, "NOTIFICATION_MARK_READ_UNAUTHORIZED",
+                "Unauthorized to mark this notification as read");
     }
 
     @Override @Transactional
@@ -267,15 +271,16 @@ public class NotificationServiceImpl implements NotificationService {
     @Override @Transactional
     public void deleteNotification(Long id, Long userId, Long pharmacyId) {
         Notification notification = notificationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("NOTIFICATION_NOT_FOUND", "Notification not found"));
         if (!notification.getPharmacy().getId().equals(pharmacyId)) {
-            throw new RuntimeException("Notification not found");
+            throw new ResourceNotFoundException("NOTIFICATION_NOT_FOUND", "Notification not found");
         }
         if (notification.getRecipient() == null || notification.getRecipient().getId().equals(userId)) {
             notificationRepository.delete(notification);
             notificationStreamService.notifyChanged(notification.getPharmacy().getId());
         } else {
-            throw new RuntimeException("Unauthorized to delete this notification");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "NOTIFICATION_DELETE_UNAUTHORIZED",
+                    "Unauthorized to delete this notification");
         }
     }
 
@@ -300,7 +305,7 @@ public class NotificationServiceImpl implements NotificationService {
     private void createLowStockNotification(Product product, Long pharmacyId, Long currentStock,
                                               Notification.NotificationType type, User recipient) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy not found"));
         long stock = currentStock == null ? 0 : currentStock;
         boolean outOfStock = type == Notification.NotificationType.OUT_OF_STOCK;
         createNotification(NotificationRequest.builder()
@@ -344,7 +349,7 @@ public class NotificationServiceImpl implements NotificationService {
     private void createExpiryNotification(StockBatch batch, Long pharmacyId, String statusLabel,
                                           Notification.NotificationType type, Notification.NotificationPriority priority) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy not found"));
         boolean expired = type == Notification.NotificationType.EXPIRED;
         long days = ChronoUnit.DAYS.between(LocalDate.now(), batch.getExpiryDate());
 
@@ -368,7 +373,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override @Transactional
     public void notifySaleCompleted(Long pharmacyId, Long saleId, BigDecimal totalAmount) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy not found"));
         var pharmacySettings = pharmacySettingsRepository.findByPharmacyId(pharmacyId);
         BigDecimal threshold = pharmacySettings.map(s -> s.getLargeSaleThreshold()).orElse(BigDecimal.valueOf(5000));
         String currency = pharmacySettings.map(s -> s.getCurrency()).orElse("EGP");
@@ -388,7 +393,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override @Transactional
     public void notifyExpenseAdded(Long pharmacyId, Long expenseId, BigDecimal amount) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy not found"));
         var pharmacySettings = pharmacySettingsRepository.findByPharmacyId(pharmacyId);
         BigDecimal threshold = pharmacySettings.map(s -> s.getLargeExpenseThreshold()).orElse(BigDecimal.valueOf(2000));
         String currency = pharmacySettings.map(s -> s.getCurrency()).orElse("EGP");

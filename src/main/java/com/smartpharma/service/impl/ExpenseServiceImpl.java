@@ -39,10 +39,10 @@ public class ExpenseServiceImpl implements ExpenseService {
     @Override
     public ExpenseResponse createExpense(ExpenseRequest request, Long userId) {
         Pharmacy pharmacy = pharmacyRepository.findByIdAndDeletedAtIsNull(request.getPharmacyId())
-                .orElseThrow(() -> new ResourceNotFoundException("Pharmacy not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy not found"));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User not found"));
 
         Expense expense = Expense.builder()
                 .pharmacy(pharmacy)
@@ -69,7 +69,7 @@ public class ExpenseServiceImpl implements ExpenseService {
     @Override
     public ExpenseResponse updateExpense(Long id, ExpenseRequest request, Long pharmacyId, Long userId) {
         Expense expense = expenseRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("EXPENSE_NOT_FOUND", "Expense not found"));
 
         expense.setCategory(request.getCategory());
         expense.setTitle(request.getTitle());
@@ -87,7 +87,7 @@ public class ExpenseServiceImpl implements ExpenseService {
     @Override
     public void deleteExpense(Long id, Long pharmacyId) {
         Expense expense = expenseRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("EXPENSE_NOT_FOUND", "Expense not found"));
 
         expense.markAsDeleted();
         expenseRepository.save(expense);
@@ -97,7 +97,7 @@ public class ExpenseServiceImpl implements ExpenseService {
     @Transactional(readOnly = true)
     public ExpenseResponse getExpense(Long id, Long pharmacyId) {
         Expense expense = expenseRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("EXPENSE_NOT_FOUND", "Expense not found"));
         return mapToResponse(expense);
     }
 

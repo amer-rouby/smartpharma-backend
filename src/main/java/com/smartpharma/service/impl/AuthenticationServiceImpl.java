@@ -141,7 +141,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             if (remainingLockMinutes != null) {
                 throw new AccountLockedException(
                         "Account is locked due to too many failed login attempts. Try again in "
-                                + remainingLockMinutes + " minute(s).");
+                                + remainingLockMinutes + " minute(s).",
+                        java.util.Map.of("minutes", remainingLockMinutes));
             }
         }
 
@@ -194,7 +195,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             twoFactorPendingLoginStore.invalidate(tempToken);
             throw new AccountLockedException(
                     "Account is locked due to too many failed attempts. Try again in "
-                            + remainingLockMinutes + " minute(s).");
+                            + remainingLockMinutes + " minute(s).",
+                    java.util.Map.of("minutes", remainingLockMinutes));
         }
 
         if (!securitySettingsService.verifyTwoFactorCode(userId, code)) {
