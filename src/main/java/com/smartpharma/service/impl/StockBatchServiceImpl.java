@@ -16,7 +16,9 @@ import com.smartpharma.repository.ProductRepository;
 import com.smartpharma.repository.StockAdjustmentHistoryRepository;
 import com.smartpharma.repository.StockBatchRepository;
 import com.smartpharma.repository.UserRepository;
+import com.smartpharma.service.NotificationStreamService;
 import com.smartpharma.service.StockBatchService;
+import com.smartpharma.service.settings.SmartFeatureSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -44,6 +46,8 @@ public class StockBatchServiceImpl implements StockBatchService {
     private final PharmacyRepository pharmacyRepository;
     private final UserRepository userRepository;
     private final StockAdjustmentHistoryRepository stockAdjustmentHistoryRepository;
+    private final NotificationStreamService notificationStreamService;
+    private final SmartFeatureSettingsService smartFeatureSettingsService;
 
     @Override
     @Transactional(readOnly = true)
@@ -136,7 +140,9 @@ public class StockBatchServiceImpl implements StockBatchService {
 
         StockBatch saved = stockBatchRepository.save(batch);
         log.info("Batch created successfully: id={}, batchNumber={}", saved.getId(), saved.getBatchNumber());
-        return mapToResponse(saved);
+        StockBatchResponse response = mapToResponse(saved);
+        notifyRealtimeStockChange(pharmacyId, response, "CREATED");
+        return response;
     }
 
     @Override
@@ -181,7 +187,9 @@ public class StockBatchServiceImpl implements StockBatchService {
 
         StockBatch updated = stockBatchRepository.save(batch);
         log.info("Batch updated successfully: id={}, status={}", updated.getId(), updated.getStatus());
-        return mapToResponse(updated);
+        StockBatchResponse response = mapToResponse(updated);
+        notifyRealtimeStockChange(pharmacyId, response, "UPDATED");
+        return response;
     }
 
     @Override
@@ -203,8 +211,9 @@ public class StockBatchServiceImpl implements StockBatchService {
 
         batch.setStatus(StockBatch.BatchStatus.DISCARDED);
         batch.setUpdatedAt(LocalDateTime.now());
-        stockBatchRepository.save(batch);
+        StockBatch discarded = stockBatchRepository.save(batch);
         log.info("Batch marked as discarded: id={}", id);
+        notifyRealtimeStockChange(pharmacyId, mapToResponse(discarded), "DELETED");
     }
 
     @Override
@@ -292,7 +301,19 @@ public class StockBatchServiceImpl implements StockBatchService {
         log.info("Stock adjusted | batchId: {} | type: {} | qty: {} | {}→{} | status: {}",
                 batchId, type, adjustmentQuantity, currentQuantity, newQuantity, updated.getStatus());
 
-        return mapToResponse(updated);
+        StockBatchResponse response = mapToResponse(updated);
+        notifyRealtimeStockChange(pharmacyId, response, "ADJUSTED");
+        return response;
+    }
+
+    private void notifyRealtimeStockChange(Long pharmacyId, StockBatchResponse batch, String changeType) {
+        try {
+            Boolean enabled = smartFeatureSettingsService.getOrCreate(pharmacyId).getRealtimeUpdatesEnabled();
+            if (enabled != null && !enabled) return;
+            notificationStreamService.notifyStockChanged(pharmacyId, Map.of("changeType", changeType, "batch", batch));
+        } catch (Exception e) {
+            log.warn("Failed to send real-time stock update for pharmacy {}: {}", pharmacyId, e.getMessage());
+        }
     }
 
     @Override
