@@ -36,6 +36,32 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     @Query("""
         SELECT st FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
+        AND st.user.id = :userId
+        AND st.transactionDate > :since
+        ORDER BY st.transactionDate DESC
+    """)
+    List<SaleTransaction> findByPharmacyIdAndUserIdAndTransactionDateAfter(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("userId") Long userId,
+            @Param("since") LocalDateTime since);
+
+    // SaleTransaction has @Where(deleted_at IS NULL), which Hibernate applies to
+    // every JPQL query against it - a native query is the only way to see
+    // soft-deleted rows, which is exactly what "excessive returns" needs to count.
+    @Query(value = """
+        SELECT st.user_id AS userId, u.full_name AS userName, COUNT(*) AS cnt
+        FROM smartpharma.sales_transactions st
+        JOIN smartpharma.users u ON u.id = st.user_id
+        WHERE st.pharmacy_id = :pharmacyId
+        AND st.deleted_at IS NOT NULL
+        AND st.deleted_at > :since
+        GROUP BY st.user_id, u.full_name
+    """, nativeQuery = true)
+    List<Object[]> countDeletedSalesByUserSince(@Param("pharmacyId") Long pharmacyId, @Param("since") LocalDateTime since);
+
+    @Query("""
+        SELECT st FROM SaleTransaction st
+        WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
         AND st.transactionDate <= :endDate
         AND st.deletedAt IS NULL

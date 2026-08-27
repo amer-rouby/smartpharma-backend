@@ -3,11 +3,13 @@ package com.smartpharma.service.impl;
 import com.smartpharma.dto.response.DashboardResponse;
 import com.smartpharma.dto.response.DemandPredictionResponse;
 import com.smartpharma.dto.response.SmartInsightsDTO;
+import com.smartpharma.entity.AnomalyDetection;
 import com.smartpharma.entity.Product;
 import com.smartpharma.entity.SaleTransaction;
 import com.smartpharma.entity.StockBatch;
 import com.smartpharma.entity.settings.SmartFeatureSettings;
 import com.smartpharma.exception.LocalizedException;
+import com.smartpharma.repository.AnomalyDetectionRepository;
 import com.smartpharma.repository.ProductRepository;
 import com.smartpharma.repository.SaleTransactionRepository;
 import com.smartpharma.repository.StockBatchRepository;
@@ -42,6 +44,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final SmartFeatureSettingsService smartFeatureSettingsService;
     private final DemandPredictionService demandPredictionService;
     private final PricingRecommendationService pricingRecommendationService;
+    private final AnomalyDetectionRepository anomalyDetectionRepository;
 
     private static final int SALES_TREND_WINDOW_DAYS = 30;
     private static final Set<String> HIGH_RISK_LEVELS = Set.of("CRITICAL", "HIGH");
@@ -141,10 +144,11 @@ public class DashboardServiceImpl implements DashboardService {
             pricingRecommendationsCount = pricingRecommendationService.getRecommendations(pharmacyId).size();
         }
 
-        // Unusual-activity detection (anomaly count) doesn't exist yet - always
-        // null for now regardless of the anomalyDetectionEnabled flag. Wire this
-        // up to the real count once that feature is built.
         Integer unusualActivityCount = null;
+        if (isEnabled(flags.getAnomalyDetectionEnabled())) {
+            unusualActivityCount = (int) anomalyDetectionRepository.countByPharmacyIdAndStatus(
+                    pharmacyId, AnomalyDetection.Status.NEW);
+        }
 
         return SmartInsightsDTO.builder()
                 .todayRevenue(todayRevenue)
