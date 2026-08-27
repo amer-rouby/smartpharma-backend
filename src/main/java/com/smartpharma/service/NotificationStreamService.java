@@ -50,6 +50,13 @@ public class NotificationStreamService {
         sendEvent(pharmacyId, "notifications-changed", Map.of("refresh", true));
     }
 
+    public void notifyStockChanged(Long pharmacyId, Object payload) {
+        if (pharmacyId == null || payload == null) {
+            return;
+        }
+        sendEvent(pharmacyId, "stock-changed", payload);
+    }
+
     private void sendEvent(Long pharmacyId, String eventName, Object data) {
         List<SseEmitter> emitters = emittersByPharmacy.get(pharmacyId);
         if (emitters == null || emitters.isEmpty()) {
