@@ -22,7 +22,13 @@ public class SmartFeatureSettingsServiceImpl implements SmartFeatureSettingsServ
     private final PharmacyRepository pharmacyRepository;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
+    // Not readOnly: getOrCreate() below may INSERT default settings on first
+    // access. Since it's called via self-invocation (this.getOrCreate(...)),
+    // Spring's proxy doesn't open a separate transaction for it - it runs
+    // inside whatever transaction this method started, so marking this one
+    // readOnly would make that insert fail ("cannot execute INSERT in a
+    // read-only transaction").
     public SmartFeatureSettingsResponse getSettings(Long pharmacyId) {
         return SmartFeatureSettingsResponse.fromEntity(getOrCreate(pharmacyId));
     }
