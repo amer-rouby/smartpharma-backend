@@ -36,6 +36,18 @@ public interface SaleItemRepository extends JpaRepository<SaleItem, Long> {
             @Param("endDate") LocalDateTime endDate);
 
     @Query("""
+        SELECT COALESCE(SUM(si.quantity), 0) FROM SaleItem si
+        JOIN si.transaction t
+        WHERE si.product.id = :productId
+        AND t.pharmacy.id = :pharmacyId
+        AND t.transactionDate BETWEEN :startDate AND :endDate
+    """)
+    Integer sumQuantityByProductIdAndPharmacyIdAndDateRange(@Param("productId") Long productId,
+                                                             @Param("pharmacyId") Long pharmacyId,
+                                                             @Param("startDate") LocalDateTime startDate,
+                                                             @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
         SELECT si FROM SaleItem si 
         JOIN si.transaction t 
         WHERE t.pharmacy.id = :pharmacyId 
