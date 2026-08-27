@@ -4,6 +4,7 @@ import com.smartpharma.dto.request.UpdatePredictionDTO;
 import com.smartpharma.dto.response.ApiResponse;
 import com.smartpharma.dto.response.DemandPredictionResponse;
 import com.smartpharma.dto.response.PurchaseOrderSummaryDTO;
+import com.smartpharma.dto.response.ReorderRecommendationDTO;
 import com.smartpharma.dto.response.ShareLinkResponse;
 import com.smartpharma.service.DemandPredictionService;
 import com.smartpharma.util.SecurityUtils;
@@ -269,5 +270,17 @@ public class DemandPredictionController {
             return ResponseEntity.internalServerError()
                     .body(ApiResponse.error("Failed to create order: " + e.getMessage()));
         }
+    }
+
+    // No try/catch here - a disabled feature flag throws LocalizedException, which
+    // the global exception handler turns into a 403 with the right error code for
+    // the frontend to translate. Wrapping it in a generic catch would collapse it
+    // into an opaque 500.
+    @GetMapping("/reorder-recommendations")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<ReorderRecommendationDTO>>> getReorderRecommendations() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        List<ReorderRecommendationDTO> recommendations = predictionService.getReorderRecommendations(pharmacyId);
+        return ResponseEntity.ok(ApiResponse.success(recommendations));
     }
 }
