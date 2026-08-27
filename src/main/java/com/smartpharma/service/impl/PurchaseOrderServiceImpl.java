@@ -8,6 +8,8 @@ import com.smartpharma.dto.response.SendEmailResponse;
 import com.smartpharma.dto.response.SendWhatsAppResponse;
 import com.smartpharma.dto.response.WhatsAppMessageResponse;
 import com.smartpharma.entity.*;
+import com.smartpharma.exception.LocalizedException;
+import com.smartpharma.exception.ResourceNotFoundException;
 import com.smartpharma.repository.*;
 import com.smartpharma.service.EmailService;
 import com.smartpharma.service.PurchaseOrderPdfService;
@@ -17,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -62,7 +66,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Transactional(readOnly = true)
     public PurchaseOrderResponse getOrder(Long id, Long pharmacyId) {
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found"));
         return PurchaseOrderResponse.fromEntity(order);
     }
 
@@ -70,17 +74,19 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Transactional
     public PurchaseOrderResponse createOrder(PurchaseOrderRequest request, Long pharmacyId, Long userId) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy not found"));
 
         Supplier supplier = supplierRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(request.getSupplierId(), pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Supplier not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("SUPPLIER_NOT_FOUND", "Supplier not found"));
 
         if (!supplier.isActive()) {
-            throw new RuntimeException("Cannot create a purchase order for a blocked or inactive supplier: " + supplier.getName());
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "SUPPLIER_BLOCKED_OR_INACTIVE",
+                    "Cannot create a purchase order for a blocked or inactive supplier: " + supplier.getName(),
+                    Map.of("supplierName", supplier.getName()));
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User not found"));
 
         String orderNumber = generateOrderNumber(pharmacyId);
 
@@ -102,16 +108,20 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         for (PurchaseOrderItemRequest itemReq : request.getItems()) {
             Product product = productRepository.findByIdAndPharmacyId(itemReq.getProductId(), pharmacyId)
-                    .orElseThrow(() -> new RuntimeException("Product not found: " + itemReq.getProductId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("PRODUCT_NOT_FOUND", "Product not found: " + itemReq.getProductId()));
 
             BigDecimal unitPrice = itemReq.getUnitPrice();
             if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) < 0) {
-                throw new RuntimeException("Invalid unit price for product: " + product.getName());
+                throw new LocalizedException(HttpStatus.BAD_REQUEST, "INVALID_UNIT_PRICE",
+                        "Invalid unit price for product: " + product.getName(),
+                        Map.of("productName", product.getName()));
             }
 
             Integer quantity = itemReq.getQuantity();
             if (quantity == null || quantity < 1) {
-                throw new RuntimeException("Invalid quantity for product: " + product.getName());
+                throw new LocalizedException(HttpStatus.BAD_REQUEST, "INVALID_QUANTITY",
+                        "Invalid quantity for product: " + product.getName(),
+                        Map.of("productName", product.getName()));
             }
 
             PurchaseOrderItem item = PurchaseOrderItem.builder()
@@ -136,7 +146,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     public PurchaseOrderResponse createFromPrediction(Long predictionId, Long pharmacyId, Long userId) {
         List<PurchaseOrder> existing = orderRepository.findByPredictionId(predictionId);
         if (!existing.isEmpty()) {
-            throw new RuntimeException("Purchase order already exists for this prediction");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_ALREADY_EXISTS_FOR_PREDICTION",
+                    "Purchase order already exists for this prediction");
         }
 
         PurchaseOrderRequest request = PurchaseOrderRequest.builder()
@@ -154,17 +165,20 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Transactional
     public PurchaseOrderResponse updateOrder(Long id, PurchaseOrderRequest request, Long pharmacyId, Long userId) {
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found"));
 
         if (!order.isDraft()) {
-            throw new RuntimeException("Only draft orders can be updated");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_NOT_DRAFT",
+                    "Only draft orders can be updated");
         }
 
         Supplier supplier = supplierRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(request.getSupplierId(), pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Supplier not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("SUPPLIER_NOT_FOUND", "Supplier not found"));
 
         if (!supplier.isActive()) {
-            throw new RuntimeException("Cannot assign a blocked or inactive supplier: " + supplier.getName());
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "SUPPLIER_BLOCKED_OR_INACTIVE",
+                    "Cannot assign a blocked or inactive supplier: " + supplier.getName(),
+                    Map.of("supplierName", supplier.getName()));
         }
 
         order.setSupplier(supplier);
@@ -178,7 +192,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         for (PurchaseOrderItemRequest itemReq : request.getItems()) {
             Product product = productRepository.findByIdAndPharmacyId(itemReq.getProductId(), pharmacyId)
-                    .orElseThrow(() -> new RuntimeException("Product not found: " + itemReq.getProductId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("PRODUCT_NOT_FOUND", "Product not found: " + itemReq.getProductId()));
 
             PurchaseOrderItem item = PurchaseOrderItem.builder()
                     .product(product)
@@ -199,10 +213,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Transactional
     public void deleteOrder(Long id, Long pharmacyId, Long userId) {
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found"));
 
         if (!order.isDraft()) {
-            throw new RuntimeException("Only draft orders can be deleted");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_NOT_DRAFT",
+                    "Only draft orders can be deleted");
         }
 
         order.setDeletedAt(LocalDateTime.now());
@@ -214,14 +229,15 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Transactional
     public PurchaseOrderResponse approveOrder(Long id, Long pharmacyId, Long userId) {
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found"));
 
         if (!order.isDraft()) {
-            throw new RuntimeException("Only draft orders can be approved");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_NOT_DRAFT",
+                    "Only draft orders can be approved");
         }
 
         User approver = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User not found"));
 
         order.setStatus("APPROVED");
         order.setApprovedBy(approver);
@@ -235,10 +251,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Transactional
     public PurchaseOrderResponse cancelOrder(Long id, Long pharmacyId, Long userId) {
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found"));
 
         if (order.isReceived() || order.isCancelled()) {
-            throw new RuntimeException("Cannot cancel this order");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_CANNOT_CANCEL",
+                    "Cannot cancel this order");
         }
 
         order.setStatus("CANCELLED");
@@ -251,10 +268,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Transactional
     public PurchaseOrderResponse receiveOrder(Long id, Long pharmacyId, Long userId) {
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found"));
 
         if (!order.isApproved()) {
-            throw new RuntimeException("Only approved orders can be received");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_NOT_APPROVED",
+                    "Only approved orders can be received");
         }
 
         order.setStatus("RECEIVED");
@@ -363,16 +381,18 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         log.info("Sending WhatsApp message for orderId: {}, pharmacyId: {}", orderId, pharmacyId);
 
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(orderId, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found with id: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found with id: " + orderId));
 
         Supplier supplier = order.getSupplier();
         if (supplier == null) {
-            throw new RuntimeException("No supplier assigned to this purchase order");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_NO_SUPPLIER",
+                    "No supplier assigned to this purchase order");
         }
 
         String phone = supplier.getPhone();
         if (phone == null || phone.isBlank()) {
-            throw new RuntimeException("Supplier has no phone number");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "SUPPLIER_NO_PHONE",
+                    "Supplier has no phone number");
         }
 
         // Clean phone number to international format (without +)
@@ -411,16 +431,18 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         log.info("Generating WhatsApp message for orderId: {}, pharmacyId: {}", orderId, pharmacyId);
 
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(orderId, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found with id: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found with id: " + orderId));
 
         Supplier supplier = order.getSupplier();
         if (supplier == null) {
-            throw new RuntimeException("No supplier assigned to this purchase order");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_NO_SUPPLIER",
+                    "No supplier assigned to this purchase order");
         }
 
         String phone = supplier.getPhone();
         if (phone == null || phone.isBlank()) {
-            throw new RuntimeException("Supplier has no phone number");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "SUPPLIER_NO_PHONE",
+                    "Supplier has no phone number");
         }
 
         // Clean phone number: keep only digits, ensure international format without +
@@ -551,16 +573,18 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         log.info("Sending purchase order email for orderId: {}, pharmacyId: {}", orderId, pharmacyId);
 
         PurchaseOrder order = orderRepository.findByIdAndPharmacyIdAndDeletedAtIsNull(orderId, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Purchase order not found with id: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("PURCHASE_ORDER_NOT_FOUND", "Purchase order not found with id: " + orderId));
 
         Supplier supplier = order.getSupplier();
         if (supplier == null) {
-            throw new RuntimeException("No supplier assigned to this purchase order");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PURCHASE_ORDER_NO_SUPPLIER",
+                    "No supplier assigned to this purchase order");
         }
 
         String email = supplier.getEmail();
         if (email == null || email.isBlank()) {
-            throw new RuntimeException("Supplier has no email address on file");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "SUPPLIER_NO_EMAIL",
+                    "Supplier has no email address on file");
         }
 
         String subject = "Purchase Order " + order.getOrderNumber()

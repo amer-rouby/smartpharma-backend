@@ -6,6 +6,8 @@ import com.smartpharma.dto.response.SaleTransactionDTO;
 import com.smartpharma.dto.response.SalesReportResponse;
 import com.smartpharma.entity.*;
 import com.smartpharma.entity.enums.PaymentMethod;
+import com.smartpharma.exception.LocalizedException;
+import com.smartpharma.exception.ResourceNotFoundException;
 import com.smartpharma.repository.*;
 import com.smartpharma.repository.settings.PharmacySettingsRepository;
 import com.smartpharma.service.NotificationService;
@@ -14,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -64,7 +67,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     public SaleTransactionDTO getSaleById(Long id, Long pharmacyId) {
         log.debug("Fetching sale | id: {} | pharmacyId: {}", id, pharmacyId);
         SaleTransaction sale = saleTransactionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Sale not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("SALE_NOT_FOUND", "Sale not found with id: " + id));
         validatePharmacyAccess(sale, pharmacyId);
         return mapToDTO(sale);
     }
@@ -76,13 +79,14 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 request.getPharmacyId(), request.getItems().size(), currentUserId);
 
         if (currentUserId == null) {
-            throw new RuntimeException("Cannot create sale: no authenticated user could be resolved");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "SALE_NO_AUTHENTICATED_USER",
+                    "Cannot create sale: no authenticated user could be resolved");
         }
 
         Pharmacy pharmacy = pharmacyRepository.findById(request.getPharmacyId())
-                .orElseThrow(() -> new RuntimeException("Pharmacy not found: " + request.getPharmacyId()));
+                .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy not found: " + request.getPharmacyId()));
         User user = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserId));
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User not found: " + currentUserId));
 
         String paymentMethodValue = Optional.ofNullable(request.getPaymentMethod()).orElse("CASH").toUpperCase();
         validatePaymentMethodEnabled(request.getPharmacyId(), paymentMethodValue);
@@ -113,7 +117,8 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .orElse(true);
         if (requirePrescriptionUpload && requiresPrescription
                 && (request.getPrescriptionImageUrl() == null || request.getPrescriptionImageUrl().isBlank())) {
-            throw new RuntimeException("This sale contains a prescription-only product - a prescription image is required");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PRESCRIPTION_IMAGE_REQUIRED",
+                    "This sale contains a prescription-only product - a prescription image is required");
         }
 
         sale.setItems(saleItems);
@@ -144,7 +149,9 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .map(String::trim).map(String::toUpperCase).filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
         if (!enabledMethods.contains(paymentMethodValue)) {
-            throw new RuntimeException("Payment method '" + paymentMethodValue + "' is not enabled for this pharmacy");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "PAYMENT_METHOD_NOT_ENABLED",
+                    "Payment method '" + paymentMethodValue + "' is not enabled for this pharmacy",
+                    Map.of("paymentMethod", paymentMethodValue));
         }
     }
 
@@ -153,7 +160,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     public SaleTransactionDTO updateSale(Long id, SaleRequest request, Long pharmacyId) {
         log.info("Updating sale | id: {} | pharmacyId: {}", id, pharmacyId);
         SaleTransaction entity = saleTransactionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Sale not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("SALE_NOT_FOUND", "Sale not found: " + id));
         validatePharmacyAccess(entity, pharmacyId);
 
         Optional.ofNullable(request.getDiscountAmount()).ifPresent(entity::setDiscountAmount);
@@ -173,7 +180,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     public void deleteSale(Long id, Long pharmacyId) {
         log.info("Soft deleting sale | id: {} | pharmacyId: {}", id, pharmacyId);
         SaleTransaction sale = saleTransactionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Sale not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("SALE_NOT_FOUND", "Sale not found: " + id));
         validatePharmacyAccess(sale, pharmacyId);
         sale.markAsDeleted();
         saleTransactionRepository.save(sale);
@@ -373,11 +380,13 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
     private SaleItem processSaleItem(SaleItemRequest itemRequest, SaleTransaction sale) {
         Product product = productRepository.findById(itemRequest.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found: " + itemRequest.getProductId()));
+                .orElseThrow(() -> new ResourceNotFoundException("PRODUCT_NOT_FOUND", "Product not found: " + itemRequest.getProductId()));
 
         StockBatch selectedBatch = selectStockBatch(product.getId(), itemRequest.getQuantity());
         if (selectedBatch == null) {
-            throw new RuntimeException("Insufficient stock for product: " + product.getName());
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "INSUFFICIENT_STOCK",
+                    "Insufficient stock for product: " + product.getName(),
+                    Map.of("productName", product.getName()));
         }
 
         SaleItem saleItem = SaleItem.builder()
@@ -424,7 +433,8 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         }
         Integer newQuantity = batch.getQuantityCurrent() - quantity;
         if (newQuantity < 0) {
-            throw new RuntimeException("Stock deduction error: insufficient quantity");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "STOCK_DEDUCTION_ERROR",
+                    "Stock deduction error: insufficient quantity");
         }
         batch.setQuantityCurrent(newQuantity);
         stockBatchRepository.save(batch);
@@ -441,7 +451,8 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         if (!sale.getPharmacy().getId().equals(pharmacyId)) {
             log.warn("Access denied | sale: {} | requested pharmacy: {} | actual pharmacy: {}",
                     sale.getId(), pharmacyId, sale.getPharmacy().getId());
-            throw new RuntimeException("Access denied: Sale does not belong to this pharmacy");
+            throw new LocalizedException(HttpStatus.FORBIDDEN, "SALE_PHARMACY_ACCESS_DENIED",
+                    "Access denied: Sale does not belong to this pharmacy");
         }
     }
 

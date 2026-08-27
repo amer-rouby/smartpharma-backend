@@ -1,7 +1,11 @@
 package com.smartpharma.exception;
 
-public class SessionExpiredException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+import java.util.Map;
+
+public class SessionExpiredException extends LocalizedException {
     public SessionExpiredException(String message) {
-        super(message);
+        super(HttpStatus.UNAUTHORIZED, "SESSION_EXPIRED", message, Map.of());
     }
 }
