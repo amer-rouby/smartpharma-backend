@@ -48,17 +48,11 @@ public class Pharmacy {
     @Column(length = 50)
     private PlanType planType = PlanType.BASIC;
 
-    // Set only once an activation/renewal code has actually been applied (see
-    // com.smartpharma.license.service.impl.LicenseServiceImpl) - null means
-    // never licensed yet, treated as unlimited so this never retroactively
-    // locks out a pharmacy nobody has issued a code to.
+    // Null = never licensed yet, treated as unlimited.
     @Column(name = "subscription_expires_at")
     private Instant subscriptionExpiresAt;
 
-    // Watermark that only ever moves forward - if the system clock is ever
-    // seen behind this, the pharmacy is treated as locked regardless of
-    // subscriptionExpiresAt, so rolling the clock back can't "un-expire" a
-    // lapsed subscription. Internal bookkeeping only, never exposed via API.
+    // Forward-only watermark against clock-rollback bypass; not exposed via API.
     @Column(name = "license_last_seen_at")
     private Instant licenseLastSeenAt;
 
