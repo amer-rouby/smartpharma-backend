@@ -4,6 +4,7 @@ package com.smartpharma.sales.entity;
 import com.smartpharma.common.entity.Pharmacy;
 import com.smartpharma.common.entity.User;
 import com.smartpharma.payments.entity.enums.PaymentMethod;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -88,6 +89,7 @@ public class SaleTransaction {
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
     @Builder.Default
+    @JsonIgnoreProperties({"transaction"})
     private List<SaleItem> items = new ArrayList<>();
 
 //    public enum PaymentMethod {

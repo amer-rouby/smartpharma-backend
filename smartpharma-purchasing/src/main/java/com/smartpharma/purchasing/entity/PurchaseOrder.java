@@ -3,6 +3,7 @@ package com.smartpharma.purchasing.entity;
 
 import com.smartpharma.common.entity.Pharmacy;
 import com.smartpharma.common.entity.User;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -97,6 +98,7 @@ public class PurchaseOrder {
 
     @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @JsonIgnoreProperties({"purchaseOrder"})
     private List<PurchaseOrderItem> items = new ArrayList<>();
 
     public void addItem(PurchaseOrderItem item) {
