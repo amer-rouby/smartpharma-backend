@@ -1,0 +1,29 @@
+package com.smartpharma.notifications.service;
+
+import com.smartpharma.notifications.dto.request.NotificationRequest;
+import com.smartpharma.notifications.dto.response.NotificationResponse;
+import org.springframework.data.domain.Page;
+import java.math.BigDecimal;
+import java.util.List;
+
+public interface NotificationService {
+
+    NotificationResponse createNotification(NotificationRequest request);
+    NotificationResponse markAsRead(Long notificationId, Long userId, Long pharmacyId);
+
+    int markAllAsRead(Long pharmacyId, Long userId);
+
+    Page<NotificationResponse> getUserNotifications(Long pharmacyId, Long userId, int page, int size);
+    List<NotificationResponse> getUnreadNotifications(Long pharmacyId, Long userId);
+    Long getUnreadCount(Long pharmacyId, Long userId);
+
+    void deleteNotification(Long notificationId, Long userId, Long pharmacyId);
+
+    void checkAndCreateLowStockAlerts(Long pharmacyId);
+    void checkAndCreateExpiryAlerts(Long pharmacyId);
+    void checkAndCreateBackupReminders(Long pharmacyId);
+
+    void notifySaleCompleted(Long pharmacyId, Long saleId, BigDecimal totalAmount);
+    void notifyExpenseAdded(Long pharmacyId, Long expenseId, BigDecimal amount);
+    void notifySecurityAlert(Long lockedOutUserId);
+}
