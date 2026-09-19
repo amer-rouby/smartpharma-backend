@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.Where;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +47,20 @@ public class Pharmacy {
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private PlanType planType = PlanType.BASIC;
+
+    // Set only once an activation/renewal code has actually been applied (see
+    // com.smartpharma.license.service.impl.LicenseServiceImpl) - null means
+    // never licensed yet, treated as unlimited so this never retroactively
+    // locks out a pharmacy nobody has issued a code to.
+    @Column(name = "subscription_expires_at")
+    private Instant subscriptionExpiresAt;
+
+    // Watermark that only ever moves forward - if the system clock is ever
+    // seen behind this, the pharmacy is treated as locked regardless of
+    // subscriptionExpiresAt, so rolling the clock back can't "un-expire" a
+    // lapsed subscription. Internal bookkeeping only, never exposed via API.
+    @Column(name = "license_last_seen_at")
+    private Instant licenseLastSeenAt;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
