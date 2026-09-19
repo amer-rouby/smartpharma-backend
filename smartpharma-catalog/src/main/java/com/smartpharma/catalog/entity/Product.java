@@ -2,6 +2,7 @@ package com.smartpharma.catalog.entity;
 
 
 import com.smartpharma.common.entity.Pharmacy;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -85,6 +86,7 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude
     @Builder.Default
+    @JsonIgnoreProperties({"product"})
     private List<StockBatch> stockBatches = new ArrayList<>();
 
     @Transient
