@@ -16,15 +16,9 @@ import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Date;
 
-// Vendor-only tool - run this locally whenever a pharmacy pays for another
-// month, NEVER deploy it (and never deploy the private key file it reads) to
-// a customer's machine. It just prints a renewal code to paste into the app's
-// "Renew subscription" screen. Plain main(), no Spring context needed:
-//
+// Vendor-only tool, never deployed to a customer's machine. Usage:
 //   mvn compile exec:java -Dexec.mainClass=com.smartpharma.license.tools.LicenseCodeGenerator \
 //       -Dexec.args="E:/Backend/Projects/smartpharma-license-keys/license-private.pem 1 1"
-//
-// args: <private-key-pem-path> <pharmacyId> <months>
 public final class LicenseCodeGenerator {
 
     private LicenseCodeGenerator() {

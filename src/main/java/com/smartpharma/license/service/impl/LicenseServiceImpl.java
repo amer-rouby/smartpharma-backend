@@ -34,31 +34,19 @@ import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Date;
 
-// Renewal codes are RS256-signed JWTs produced offline by the vendor (see
-// license.tools.LicenseCodeGenerator) using a private key that never ships with
-// this app - only the matching public key (license-public-key.pem, safe to
-// ship) is used here, and only to verify, never to produce a valid code. A
-// plain stored date or a shared secret baked into this app would be
-// readable/editable by the pharmacy's own admin on their own machine,
-// defeating the whole point.
+// Renewal codes are RS256 JWTs signed offline by the vendor's private key
+// (see license.tools.LicenseCodeGenerator); only the public key ships here.
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class LicenseServiceImpl implements LicenseService {
 
-    // Deliberately generous (not a few minutes): a brief forward clock glitch
-    // followed by a legitimate correction back to the real time (NTP resync,
-    // timezone mix-up, a user fixing a fat-fingered date) must never look like
-    // tampering and lock out a paying customer - subscriptions are monthly, so
-    // the realistic bypass attempt this guards against is rolling back weeks,
-    // not minutes.
+    // Generous on purpose - guards against rolling back weeks, not a brief NTP glitch.
     private static final Duration CLOCK_ROLLBACK_TOLERANCE = Duration.ofHours(24);
 
     private final PharmacyRepository pharmacyRepository;
 
-    // Blank by default so this fails closed on any instance where it wasn't
-    // deliberately set - only this vendor-only, never-shipped branch/instance
-    // should ever have this pointed at a real private key file.
+    // Blank by default so this fails closed unless deliberately configured.
     @Value("${license.private-key-path:}")
     private String privateKeyPath;
 
@@ -88,20 +76,13 @@ public class LicenseServiceImpl implements LicenseService {
                 .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy", "id", pharmacyId));
 
         if (pharmacy.getSubscriptionExpiresAt() == null) {
-            // Never licensed yet = unlimited, not locked. Keeps this feature
-            // from retroactively locking out any existing pharmacy the moment
-            // it ships, until you deliberately send that pharmacy a code.
+            // Never licensed yet = unlimited, not locked.
             return LicenseStatusResponse.builder().expired(false).expiresAt(null).build();
         }
 
         Instant now = Instant.now();
 
-        // The system clock was rolled back behind where we've already seen it -
-        // treat as locked no matter what subscriptionExpiresAt says, otherwise a
-        // customer could "un-expire" a lapsed subscription just by changing
-        // their PC's date. licenseLastSeenAt only ever advances (never reset
-        // backward), including while a rollback is in progress, so a repeated
-        // attempt is still caught against the same real reference point.
+        // Clock rolled back behind our watermark = treat as locked regardless of expiresAt.
         Instant lastSeenAt = pharmacy.getLicenseLastSeenAt();
         boolean clockRolledBack = lastSeenAt != null && now.isBefore(lastSeenAt.minus(CLOCK_ROLLBACK_TOLERANCE));
 
@@ -142,8 +123,7 @@ public class LicenseServiceImpl implements LicenseService {
                 .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy", "id", pharmacyId));
 
         pharmacy.setSubscriptionExpiresAt(expiration.toInstant());
-        // A real renewal is a legitimate reference point - reset the watermark
-        // to now so a rollback attempted before this renewal doesn't linger.
+        // Reset the watermark so a rollback attempted before this renewal doesn't linger.
         pharmacy.setLicenseLastSeenAt(Instant.now());
         pharmacy.setSubscriptionStatus(Pharmacy.SubscriptionStatus.ACTIVE);
         pharmacyRepository.save(pharmacy);

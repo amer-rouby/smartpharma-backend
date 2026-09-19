@@ -22,8 +22,7 @@ public class LicenseController {
 
     private final LicenseService licenseService;
 
-    // Any authenticated role can check status - the app needs to know whether
-    // to lock itself down right after any user logs in, not just the admin.
+    // Any authenticated role can check status, not just admin.
     @GetMapping("/status")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<LicenseStatusResponse>> getStatus() {
@@ -31,9 +30,7 @@ public class LicenseController {
         return ResponseEntity.ok(ApiResponse.success(licenseService.getStatus(pharmacyId)));
     }
 
-    // ADMIN-only, same convention as other pharmacy-wide settings writes (e.g.
-    // PharmacySettingsController.updatePharmacySettings) - renewing isn't
-    // something a pharmacist/staff account should be able to trigger.
+    // ADMIN-only, same convention as other pharmacy-wide settings writes.
     @PostMapping("/renew")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<LicenseStatusResponse>> renew(@Valid @RequestBody LicenseRenewRequest request) {
@@ -43,9 +40,7 @@ public class LicenseController {
         return ResponseEntity.ok(ApiResponse.success(status, "Subscription renewed successfully"));
     }
 
-    // Vendor-only: signs a new code with the private key. Only meaningful on
-    // this internal, never-shipped instance (license.private-key-path unset
-    // everywhere else, so this fails closed on any customer-facing build).
+    // Vendor-only: fails closed unless license.private-key-path is set.
     @PostMapping("/generate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<LicenseGenerateResponse>> generate(@Valid @RequestBody LicenseGenerateRequest request) {
