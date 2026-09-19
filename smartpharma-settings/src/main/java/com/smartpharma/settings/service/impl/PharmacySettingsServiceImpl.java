@@ -1,0 +1,92 @@
+package com.smartpharma.settings.service.impl;
+
+import com.smartpharma.settings.dto.request.PharmacySettingsRequest;
+import com.smartpharma.settings.dto.response.PharmacySettingsResponse;
+import com.smartpharma.common.entity.Pharmacy;
+import com.smartpharma.settings.entity.PharmacySettings;
+import com.smartpharma.common.repository.PharmacyRepository;
+import com.smartpharma.settings.repository.PharmacySettingsRepository;
+import com.smartpharma.settings.service.PharmacySettingsService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class PharmacySettingsServiceImpl implements PharmacySettingsService {
+
+    private final PharmacySettingsRepository settingsRepository;
+    private final PharmacyRepository pharmacyRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public PharmacySettingsResponse getSettings(Long pharmacyId) {
+        PharmacySettings settings = settingsRepository.findByPharmacyId(pharmacyId)
+                .orElseGet(() -> createDefaultSettings(pharmacyId));
+
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+
+        return PharmacySettingsResponse.fromEntity(settings, pharmacy.getName());
+    }
+
+    @Override
+    @Transactional
+    public PharmacySettingsResponse updateSettings(Long pharmacyId, PharmacySettingsRequest request) {
+        PharmacySettings settings = settingsRepository.findByPharmacyId(pharmacyId)
+                .orElseGet(() -> createDefaultSettings(pharmacyId));
+
+        settings.setAddress(request.getAddress());
+        settings.setPhone(request.getPhone());
+        settings.setEmail(request.getEmail());
+        settings.setLicenseNumber(request.getLicenseNumber());
+        settings.setTaxNumber(request.getTaxNumber());
+        settings.setCommercialRegister(request.getCommercialRegister());
+        settings.setLogoUrl(request.getLogoUrl());
+        settings.setCurrency(request.getCurrency());
+        settings.setTimezone(request.getTimezone());
+        settings.setDateFormat(request.getDateFormat());
+        settings.setTimeFormat(request.getTimeFormat());
+        if (request.getEnabledPaymentMethods() != null && !request.getEnabledPaymentMethods().isBlank()) {
+            settings.setEnabledPaymentMethods(request.getEnabledPaymentMethods());
+        }
+        if (request.getLargeSaleThreshold() != null) {
+            settings.setLargeSaleThreshold(request.getLargeSaleThreshold());
+        }
+        if (request.getLargeExpenseThreshold() != null) {
+            settings.setLargeExpenseThreshold(request.getLargeExpenseThreshold());
+        }
+        if (request.getRequirePrescriptionUpload() != null) {
+            settings.setRequirePrescriptionUpload(request.getRequirePrescriptionUpload());
+        }
+
+        if (request.getPharmacyName() != null && !request.getPharmacyName().isBlank()) {
+            Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                    .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+            pharmacy.setName(request.getPharmacyName());
+            pharmacyRepository.save(pharmacy);
+        }
+
+        PharmacySettings saved = settingsRepository.save(settings);
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+
+        log.info("Pharmacy settings updated for pharmacyId: {}", pharmacyId);
+        return PharmacySettingsResponse.fromEntity(saved, pharmacy.getName());
+    }
+
+    private PharmacySettings createDefaultSettings(Long pharmacyId) {
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+
+        return PharmacySettings.builder()
+                .pharmacy(pharmacy)
+                .currency("EGP")
+                .timezone("Africa/Cairo")
+                .dateFormat("dd/MM/yyyy")
+                .timeFormat("24h")
+                .build();
+    }
+}

@@ -1,0 +1,72 @@
+package com.smartpharma.settings.dto.request;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class PharmacySettingsRequest {
+
+    @NotBlank(message = "Pharmacy name is required")
+    @Size(max = 100)
+    private String pharmacyName;
+
+    @Size(max = 255)
+    private String address;
+
+    @Size(max = 50)
+    private String phone;
+
+    @Email(message = "Invalid email address")
+    @Size(max = 100)
+    private String email;
+
+    @Size(max = 50)
+    private String licenseNumber;
+
+    @Size(max = 50)
+    private String taxNumber;
+
+    @Size(max = 100)
+    private String commercialRegister;
+
+    @Size(max = 255)
+    private String logoUrl;
+
+    @Size(max = 20)
+    @Builder.Default
+    private String currency = "EGP";
+
+    @Size(max = 50)
+    @Builder.Default
+    private String timezone = "Africa/Cairo";
+
+    @Size(max = 20)
+    @Builder.Default
+    private String dateFormat = "dd/MM/yyyy";
+
+    @Size(max = 20)
+    @Builder.Default
+    private String timeFormat = "24h";
+
+    @Size(max = 255)
+    private String enabledPaymentMethods;
+
+    @Builder.Default
+    private BigDecimal largeSaleThreshold = BigDecimal.valueOf(5000);
+
+    @Builder.Default
+    private BigDecimal largeExpenseThreshold = BigDecimal.valueOf(2000);
+
+    @Builder.Default
+    private Boolean requirePrescriptionUpload = true;
+}
