@@ -1,0 +1,123 @@
+package com.smartpharma.catalog.entity;
+
+
+import com.smartpharma.common.entity.Pharmacy;
+import com.smartpharma.common.entity.User;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "stock_batches", indexes = {
+        @Index(name = "idx_stock_batches_product", columnList = "product_id"),
+        @Index(name = "idx_stock_batches_pharmacy", columnList = "pharmacy_id"),
+        @Index(name = "idx_stock_batches_expiry", columnList = "expiry_date"),
+        @Index(name = "idx_stock_batches_status", columnList = "status")
+})
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockBatch {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pharmacy_id", nullable = false)
+    private Pharmacy pharmacy;
+
+    @Column(name = "batch_number", nullable = false, length = 100)
+    private String batchNumber;
+
+    @Column(name = "quantity_current", nullable = false)
+    private Integer quantityCurrent;
+
+    @Column(name = "quantity_initial", nullable = false)
+    private Integer quantityInitial;
+
+    @Column(name = "expiry_date", nullable = false)
+    private LocalDate expiryDate;
+
+    @Column(name = "production_date")
+    private LocalDate productionDate;
+
+    @Column(name = "buy_price", precision = 10, scale = 2)
+    private BigDecimal buyPrice;
+
+    @Column(name = "sell_price", precision = 10, scale = 2)
+    private BigDecimal sellPrice;
+
+    @Column(name = "location", length = 100)
+    private String location;
+
+    @Column(name = "shelf", length = 50)
+    private String shelf;
+
+    @Column(name = "warehouse", length = 100)
+    private String warehouse;
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
+    private BatchStatus status = BatchStatus.ACTIVE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
+    private User updatedBy;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    /**
+     * Optimistic-locking version. Without this, two concurrent sales reading the same
+     * batch's quantityCurrent before either writes back can silently oversell stock
+     * (lost update). Hibernate rejects a stale write with an OptimisticLockException
+     * instead, so the caller can retry against the fresh quantity.
+     */
+    @Version
+    @Column(name = "version")
+    private Long version;
+
+    public boolean isExpired() {
+        return expiryDate != null && expiryDate.isBefore(LocalDate.now());
+    }
+
+    public boolean isExpiringSoon(int days) {
+        if (expiryDate == null) return false;
+        return expiryDate.isAfter(LocalDate.now()) &&
+                expiryDate.isBefore(LocalDate.now().plusDays(days));
+    }
+
+    public enum BatchStatus {
+        ACTIVE,
+        EXPIRED,
+        DISCARDED,
+        LOW
+    }
+}

@@ -1,0 +1,28 @@
+package com.smartpharma.catalog.service;
+
+import com.smartpharma.catalog.dto.request.CategoryRequest;
+import com.smartpharma.catalog.dto.response.CategoryResponse;
+import org.springframework.data.domain.Page;
+
+import java.util.List;
+
+public interface CategoryService {
+
+    List<CategoryResponse> getAllCategories(Long pharmacyId);
+
+    Page<CategoryResponse> getCategoriesPage(Long pharmacyId, int page, int size, String search);
+
+    CategoryResponse getCategory(Long id, Long pharmacyId);
+
+    CategoryResponse createCategory(CategoryRequest request);
+
+    CategoryResponse updateCategory(Long id, CategoryRequest request, Long pharmacyId);
+
+    void deleteCategory(Long id, Long pharmacyId);
+
+    List<CategoryResponse> searchCategories(Long pharmacyId, String query);
+
+    Long getCategoriesCount(Long pharmacyId);
+
+    List<CategoryResponse> getActiveCategories(Long pharmacyId);
+}
