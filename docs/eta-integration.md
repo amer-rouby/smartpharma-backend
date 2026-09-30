@@ -31,7 +31,12 @@ Official references used:
    every `eta.submission.interval-ms` (default 2 minutes). ETA accepts a
    receipt up to 24 hours after issue, so an ETA or network outage does not
    block sales.
-4. The sale details dialog shows the receipt status, UUID and QR code, and
+4. `EtaReceiptStatusPoller` reads back each submission's validation result
+   (`GET /api/v1/receiptsubmissions/{uuid}/details`) every
+   `eta.status.interval-ms` (default 5 minutes): `Valid` receipts become
+   `ACCEPTED`, `Invalid`/`Cancelled` ones `REJECTED` with ETA's reasons
+   (Arabic first).
+5. The sale details dialog shows the receipt status, UUID and QR code, and
    prints the QR on the invoice.
 
 A sale that can't be turned into a valid receipt (missing taxpayer data,
@@ -43,12 +48,11 @@ chain does not move, and "Retry" issues it once the data is fixed.
 | Status | Meaning |
 |---|---|
 | `PENDING` | Issued, waiting to be sent |
-| `SUBMITTED` | ETA accepted it into a submission (`long_id` set) |
-| `REJECTED` | ETA refused it - fix the data, then Retry re-issues it with `referenceOldUUID` |
+| `SUBMITTED` | ETA took it for processing (`long_id` set), validation pending |
+| `ACCEPTED` | ETA validated it as `Valid` |
+| `REJECTED` | ETA refused it at submission or validated it as `Invalid` - fix the data, then Retry re-issues it with `referenceOldUUID` |
 | `ERROR` | Not issued, or not delivered (network, auth, 5xx) - retried automatically up to `eta.submission.max-attempts` |
 
-`ACCEPTED` exists in the enum but is not set yet: `SUBMITTED` means ETA took
-the receipt for processing; polling the final validation result is phase 2.
 
 ## Configuration
 
@@ -59,6 +63,7 @@ Server environment variables:
 | `ETA_CREDENTIALS_KEY` | **Required.** Base64 of 32 random bytes. Encrypts the per-pharmacy client secret and POS pre-shared keys (AES-256-GCM). Changing it makes stored secrets unreadable. Generate with `openssl rand -base64 32`. |
 | `ETA_SUBMISSION_INTERVAL_MS` | Retry timer, default `120000` |
 | `ETA_SUBMISSION_MAX_ATTEMPTS` | Automatic delivery attempts per receipt, default `50` |
+| `ETA_STATUS_INTERVAL_MS` | How often validation results are read back, default `300000` |
 
 Per pharmacy (Settings -> E-Receipt (ETA), ADMIN only):
 

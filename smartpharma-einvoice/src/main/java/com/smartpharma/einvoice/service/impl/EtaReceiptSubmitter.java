@@ -1,11 +1,10 @@
 package com.smartpharma.einvoice.service.impl;
 
+import com.smartpharma.common.exception.LocalizedException;
 import com.smartpharma.einvoice.entity.EInvoiceSubmission;
 import com.smartpharma.einvoice.entity.EtaPosDevice;
-import com.smartpharma.einvoice.entity.EtaTaxpayerProfile;
 import com.smartpharma.einvoice.repository.EInvoiceSubmissionRepository;
 import com.smartpharma.einvoice.repository.EtaPosDeviceRepository;
-import com.smartpharma.einvoice.repository.EtaTaxpayerProfileRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -43,7 +42,7 @@ public class EtaReceiptSubmitter {
 
     private final EInvoiceSubmissionRepository submissionRepository;
     private final EtaPosDeviceRepository deviceRepository;
-    private final EtaTaxpayerProfileRepository profileRepository;
+    private final EtaCredentialsResolver credentialsResolver;
     private final EtaSecretCipher cipher;
     private final EtaApiClient apiClient;
     private final TransactionTemplate tx;
@@ -55,14 +54,14 @@ public class EtaReceiptSubmitter {
 
     public EtaReceiptSubmitter(EInvoiceSubmissionRepository submissionRepository,
                                EtaPosDeviceRepository deviceRepository,
-                               EtaTaxpayerProfileRepository profileRepository,
+                               EtaCredentialsResolver credentialsResolver,
                                EtaSecretCipher cipher,
                                EtaApiClient apiClient,
                                TransactionTemplate tx,
                                @Value("${eta.submission.max-attempts:50}") int maxAttempts) {
         this.submissionRepository = submissionRepository;
         this.deviceRepository = deviceRepository;
-        this.profileRepository = profileRepository;
+        this.credentialsResolver = credentialsResolver;
         this.cipher = cipher;
         this.apiClient = apiClient;
         this.tx = tx;
@@ -130,19 +129,13 @@ public class EtaReceiptSubmitter {
         if (rows.isEmpty()) {
             return null;
         }
-        Long pharmacyId = device.getPharmacy().getId();
-        EtaTaxpayerProfile profile = profileRepository.findByPharmacyId(pharmacyId).orElse(null);
-        String problem = profile == null ? "ETA taxpayer settings are not saved"
-                : blank(profile.getClientId()) || profile.getClientSecretEncrypted() == null
-                ? "ETA client ID / secret are not set" : null;
-        if (problem != null) {
-            rows.forEach(row -> row.recordError(EInvoiceSubmission.Status.ERROR, problem));
+        EtaApiClient.PosCredentials credentials;
+        try {
+            credentials = credentialsResolver.resolve(device);
+        } catch (LocalizedException e) {
+            rows.forEach(row -> row.recordError(EInvoiceSubmission.Status.ERROR, e.getMessage()));
             return null;
         }
-        EtaApiClient.PosCredentials credentials = new EtaApiClient.PosCredentials(
-                profile.getEnvironment(), profile.getClientId(), cipher.decrypt(profile.getClientSecretEncrypted()),
-                device.getSerialNumber(), device.getOsVersion(), device.getModelFramework(),
-                cipher.decrypt(device.getPresharedKeyEncrypted()));
         List<Pending> pending = rows.stream()
                 .map(row -> new Pending(row.getId(), row.getEtaUuid(), row.getReceiptJson()))
                 .toList();
@@ -220,7 +213,4 @@ public class EtaReceiptSubmitter {
                 accepted.size(), rejected.size());
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.isBlank();
-    }
 }

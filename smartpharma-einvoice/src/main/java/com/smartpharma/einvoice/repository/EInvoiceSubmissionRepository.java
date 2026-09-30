@@ -31,6 +31,31 @@ public interface EInvoiceSubmissionRepository extends JpaRepository<EInvoiceSubm
                                              @Param("statuses") Collection<EInvoiceSubmission.Status> statuses,
                                              @Param("maxAttempts") int maxAttempts);
 
+    // Submissions ETA accepted for processing whose receipts' final validity
+    // (Valid/Invalid) hasn't been read back yet: [deviceId, submissionUuid].
+    @Query("""
+        SELECT DISTINCT e.posDevice.id, e.submissionUuid FROM EInvoiceSubmission e
+        WHERE e.status = :status
+          AND e.submissionUuid IS NOT NULL
+    """)
+    List<Object[]> findDeviceSubmissionPairs(@Param("status") EInvoiceSubmission.Status status);
+
+    default List<Object[]> findSubmissionsAwaitingValidation() {
+        return findDeviceSubmissionPairs(EInvoiceSubmission.Status.SUBMITTED);
+    }
+
+    @Query("""
+        SELECT e FROM EInvoiceSubmission e
+        WHERE e.submissionUuid = :submissionUuid
+          AND e.status = :status
+    """)
+    List<EInvoiceSubmission> findBySubmissionUuidAndStatus(@Param("submissionUuid") String submissionUuid,
+                                                          @Param("status") EInvoiceSubmission.Status status);
+
+    default List<EInvoiceSubmission> findSubmittedBySubmissionUuid(String submissionUuid) {
+        return findBySubmissionUuidAndStatus(submissionUuid, EInvoiceSubmission.Status.SUBMITTED);
+    }
+
     @Query("""
         SELECT DISTINCT e.posDevice.id FROM EInvoiceSubmission e
         WHERE e.status IN :statuses

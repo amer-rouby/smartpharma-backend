@@ -30,6 +30,7 @@ public class EtaSettingsServiceImpl implements EtaSettingsService {
     private final PharmacyRepository pharmacyRepository;
     private final EtaSecretCipher cipher;
     private final EtaApiClient apiClient;
+    private final EtaCredentialsResolver credentialsResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -116,17 +117,9 @@ public class EtaSettingsServiceImpl implements EtaSettingsService {
     @Override
     @Transactional(readOnly = true)
     public String testConnection(Long pharmacyId, Long deviceId) {
-        EtaTaxpayerProfile profile = profileRepository.findByPharmacyId(pharmacyId)
-                .orElseThrow(() -> invalid("ETA_SETTINGS_MISSING", "Save the ETA taxpayer settings first"));
-        if (profile.getClientId() == null || profile.getClientSecretEncrypted() == null) {
-            throw invalid("ETA_CREDENTIALS_MISSING", "ETA client ID and secret are required");
-        }
         EtaPosDevice device = deviceRepository.findByIdAndPharmacyId(deviceId, pharmacyId)
                 .orElseThrow(() -> new LocalizedException(HttpStatus.NOT_FOUND, "ETA_DEVICE_NOT_FOUND", "POS device not found"));
-        EtaApiClient.PosCredentials credentials = new EtaApiClient.PosCredentials(
-                profile.getEnvironment(), profile.getClientId(), cipher.decrypt(profile.getClientSecretEncrypted()),
-                device.getSerialNumber(), device.getOsVersion(), device.getModelFramework(),
-                cipher.decrypt(device.getPresharedKeyEncrypted()));
+        EtaApiClient.PosCredentials credentials = credentialsResolver.resolve(device);
         apiClient.forget(credentials);
         try {
             apiClient.authenticate(credentials);
@@ -134,7 +127,7 @@ public class EtaSettingsServiceImpl implements EtaSettingsService {
             throw new LocalizedException(HttpStatus.BAD_GATEWAY, "ETA_AUTH_FAILED", e.getMessage(),
                     Map.of("detail", e.getMessage()));
         }
-        return "Authenticated with ETA " + profile.getEnvironment().name();
+        return "Authenticated with ETA " + credentials.environment().name();
     }
 
     // Presence and lengths are enforced by @Valid on EtaPosDeviceRequest.

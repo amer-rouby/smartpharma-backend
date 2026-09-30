@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 // ETA eReceipt HTTP calls:
 //  - POST {identity}/connect/token  (client_credentials + POS headers)
 //  - POST {api}/api/v1/receiptsubmissions
+//  - GET  {api}/api/v1/receiptsubmissions/{uuid}/details  (validation outcome)
 // See https://sdk.invoicing.eta.gov.eg/ereceiptapi/01-authenticate-pos/ and
 // https://sdk.invoicing.eta.gov.eg/ereceiptapi/02-submit-receipt/
 @Component
@@ -32,6 +33,7 @@ public class EtaApiClient {
 
     // Refresh a bit early so a token can't expire mid-request.
     private static final long TOKEN_SAFETY_SECONDS = 60;
+    private static final int DETAILS_PAGE_SIZE = 100;
 
     private final RestClient http;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -137,6 +139,66 @@ public class EtaApiClient {
         } catch (ResourceAccessException e) {
             return SubmitResult.failed("ETA API unreachable: " + e.getMessage(), true);
         }
+    }
+
+    // Validation outcome of one receipt from GET receiptsubmissions/{uuid}/details.
+    public record ReceiptOutcome(String uuid, String status, String errors) {
+    }
+
+    // overallStatus: InProgress, Valid or Invalid. failure set = no answer.
+    public record SubmissionDetails(String overallStatus, List<ReceiptOutcome> receipts, int totalPages,
+                                    String failure) {
+    }
+
+    public SubmissionDetails getSubmissionDetails(PosCredentials credentials, String submissionUuid, int pageNo) {
+        String token;
+        try {
+            token = authenticate(credentials);
+        } catch (EtaAuthenticationException e) {
+            return new SubmissionDetails(null, List.of(), 0, e.getMessage());
+        }
+        try {
+            JsonNode body = http.get()
+                    .uri(credentials.environment().apiUrl() + "/api/v1/receiptsubmissions/{uuid}/details?PageNo={page}&PageSize={size}",
+                            submissionUuid, pageNo, DETAILS_PAGE_SIZE)
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .body(JsonNode.class);
+            return parseSubmissionDetails(body);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 401) {
+                forget(credentials);
+            }
+            return new SubmissionDetails(null, List.of(), 0, describe(e));
+        } catch (ResourceAccessException e) {
+            return new SubmissionDetails(null, List.of(), 0, "ETA API unreachable: " + e.getMessage());
+        }
+    }
+
+    // Shape from https://sdk.invoicing.eta.gov.eg/ereceiptapi/06-get-receipt-submission/
+    SubmissionDetails parseSubmissionDetails(JsonNode body) {
+        if (body == null) {
+            return new SubmissionDetails(null, List.of(), 0, "ETA returned an empty submission details response");
+        }
+        List<ReceiptOutcome> receipts = new ArrayList<>();
+        for (JsonNode receipt : body.path("receipts")) {
+            List<String> errors = new ArrayList<>();
+            for (JsonNode step : receipt.path("errors")) {
+                JsonNode error = step.path("error");
+                String en = error.path("error").asText("");
+                String ar = error.path("errorAr").asText("");
+                String path = error.path("propertyPath").asText("");
+                String text = (ar.isBlank() ? en : ar + (en.isBlank() ? "" : " / " + en))
+                        + (path.isBlank() ? "" : " [" + path + "]");
+                if (!text.isBlank()) {
+                    errors.add(text);
+                }
+            }
+            receipts.add(new ReceiptOutcome(receipt.path("uuid").asText(null), receipt.path("status").asText(null),
+                    errors.isEmpty() ? null : String.join("; ", errors)));
+        }
+        return new SubmissionDetails(body.path("status").asText(null), receipts,
+                body.path("metadata").path("totalPages").asInt(1), null);
     }
 
     SubmitResult parseSubmission(JsonNode body) {

@@ -39,6 +39,33 @@ class EtaApiClientTest {
         });
     }
 
+    // Shape from https://sdk.invoicing.eta.gov.eg/ereceiptapi/06-get-receipt-submission/
+    @Test
+    void parsesSubmissionDetailsWithArabicErrorsFirst() throws Exception {
+        String body = """
+                {"submissionUuid":"SUB1","status":"Invalid",
+                 "receipts":[
+                   {"uuid":"aaa","status":"Valid","errors":[]},
+                   {"uuid":"bbb","status":"Invalid","errors":[{"stepId":"20","stepName":"Step 04",
+                     "error":{"propertyPath":"$.itemData[*].taxableItems[*].taxType","errorCode":"CV307",
+                              "error":"ItemCode [W001] doesn't belong to ParentCode [T3]",
+                              "errorAr":"ItemCode [W001] لا ينتمي إلى ParentCode [T3]"}}]}],
+                 "metadata":{"totalPages":2,"totalCount":150,"currentPageNo":1}}
+                """;
+
+        EtaApiClient.SubmissionDetails details = new EtaApiClient().parseSubmissionDetails(mapper.readTree(body));
+
+        assertThat(details.failure()).isNull();
+        assertThat(details.overallStatus()).isEqualTo("Invalid");
+        assertThat(details.totalPages()).isEqualTo(2);
+        assertThat(details.receipts()).hasSize(2);
+        assertThat(details.receipts().get(0).errors()).isNull();
+        assertThat(details.receipts().get(1).errors())
+                .startsWith("ItemCode [W001] لا ينتمي")
+                .contains("doesn't belong")
+                .contains("$.itemData[*].taxableItems[*].taxType");
+    }
+
     @Test
     void cipherRoundTripsAndRefusesWithoutKey() {
         String key = Base64.getEncoder().encodeToString(new byte[32]);
