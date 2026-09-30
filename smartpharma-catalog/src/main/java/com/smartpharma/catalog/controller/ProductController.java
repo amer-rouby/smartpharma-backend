@@ -1,6 +1,8 @@
 package com.smartpharma.catalog.controller;
 
+import com.smartpharma.catalog.dto.request.BulkPriceUpdateRequest;
 import com.smartpharma.catalog.dto.request.ProductRequest;
+import com.smartpharma.catalog.dto.response.BulkPriceUpdateResponse;
 import com.smartpharma.common.dto.ApiResponse;
 import com.smartpharma.catalog.dto.response.ProductResponse;
 import com.smartpharma.catalog.service.ProductService;
@@ -188,6 +190,20 @@ public class ProductController {
         return ResponseEntity.ok(
                 ApiResponse.success(products, "Low stock products retrieved")
         );
+    }
+
+    // ADMIN only: one call can reprice every product in the pharmacy.
+    @PostMapping("/bulk-price")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<BulkPriceUpdateResponse>> updatePricesInBulk(
+            @Valid @RequestBody BulkPriceUpdateRequest request) {
+
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        log.info("POST /api/products/bulk-price - pharmacyId: {}, mode: {}, apply: {}",
+                pharmacyId, request.getMode(), request.isApply());
+
+        BulkPriceUpdateResponse response = productService.updatePricesInBulk(request, pharmacyId);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping("/calculate-sell-price")

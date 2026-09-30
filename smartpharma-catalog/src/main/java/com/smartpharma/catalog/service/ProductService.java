@@ -1,6 +1,8 @@
 package com.smartpharma.catalog.service;
 
+import com.smartpharma.catalog.dto.request.BulkPriceUpdateRequest;
 import com.smartpharma.catalog.dto.request.ProductRequest;
+import com.smartpharma.catalog.dto.response.BulkPriceUpdateResponse;
 import com.smartpharma.catalog.dto.response.ProductResponse;
 import org.springframework.data.domain.Page;
 
@@ -26,4 +28,6 @@ public interface ProductService {
     List<ProductResponse> searchProducts(Long pharmacyId, String query);
 
     List<ProductResponse> getLowStockProducts(Long pharmacyId);
+
+    BulkPriceUpdateResponse updatePricesInBulk(BulkPriceUpdateRequest request, Long pharmacyId);
 }
