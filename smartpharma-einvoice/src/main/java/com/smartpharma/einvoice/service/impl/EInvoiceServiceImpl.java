@@ -1,57 +1,44 @@
 package com.smartpharma.einvoice.service.impl;
 
+import com.smartpharma.common.exception.LocalizedException;
 import com.smartpharma.einvoice.dto.response.EInvoiceSubmissionResponse;
 import com.smartpharma.einvoice.entity.EInvoiceSubmission;
-import com.smartpharma.sales.entity.SaleTransaction;
-import com.smartpharma.common.exception.LocalizedException;
 import com.smartpharma.einvoice.repository.EInvoiceSubmissionRepository;
-import com.smartpharma.sales.repository.SaleTransactionRepository;
 import com.smartpharma.einvoice.service.EInvoiceService;
-import com.smartpharma.einvoice.service.EtaIntegrationService;
-import com.smartpharma.einvoice.service.EtaSubmissionResult;
-import com.smartpharma.settings.service.SmartFeatureSettingsService;
+import com.smartpharma.sales.repository.SaleTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
+// Manual actions on a sale's ETA receipt. Deliberately not @Transactional:
+// issuing runs in its own transaction and delivery must not hold one open
+// while waiting on ETA.
 @Service
 @RequiredArgsConstructor
 public class EInvoiceServiceImpl implements EInvoiceService {
 
     private final EInvoiceSubmissionRepository eInvoiceSubmissionRepository;
     private final SaleTransactionRepository saleTransactionRepository;
-    private final EtaIntegrationService etaIntegrationService;
-    private final SmartFeatureSettingsService smartFeatureSettingsService;
+    private final EtaReceiptIssuer issuer;
+    private final EtaReceiptSubmitter submitter;
 
+    // Issues the receipt if it wasn't issued yet, then sends whatever is pending.
     @Override
-    @Transactional
     public EInvoiceSubmissionResponse submit(Long saleId, Long pharmacyId) {
         checkEnabled(pharmacyId);
-        SaleTransaction sale = findSale(saleId, pharmacyId);
-
-        EInvoiceSubmission submission = eInvoiceSubmissionRepository.findBySaleTransactionId(saleId)
-                .orElseGet(() -> EInvoiceSubmission.builder().saleTransaction(sale).build());
-
-        attemptSubmission(submission);
-        return EInvoiceSubmissionResponse.fromEntity(eInvoiceSubmissionRepository.save(submission));
+        EInvoiceSubmission submission = issuer.issue(saleId, pharmacyId, false);
+        return deliverAndReload(submission, false);
     }
 
+    // Also re-issues a rejected receipt (as a new receipt referencing the old
+    // UUID) and resets the attempt counter so a stopped receipt is sent again.
     @Override
-    @Transactional
     public EInvoiceSubmissionResponse retry(Long saleId, Long pharmacyId) {
         checkEnabled(pharmacyId);
-        findSale(saleId, pharmacyId);
-
-        EInvoiceSubmission submission = eInvoiceSubmissionRepository.findBySaleTransactionId(saleId)
-                .orElseThrow(() -> new LocalizedException(HttpStatus.NOT_FOUND, "EINVOICE_SUBMISSION_NOT_FOUND",
-                        "No e-invoice submission exists yet for this sale"));
-
-        submission.setRetryCount(submission.getRetryCount() + 1);
-        attemptSubmission(submission);
-        return EInvoiceSubmissionResponse.fromEntity(eInvoiceSubmissionRepository.save(submission));
+        findSubmission(saleId, pharmacyId);
+        EInvoiceSubmission submission = issuer.issue(saleId, pharmacyId, true);
+        return deliverAndReload(submission, true);
     }
 
     @Override
@@ -64,27 +51,33 @@ public class EInvoiceServiceImpl implements EInvoiceService {
                 .orElse(null);
     }
 
-    private SaleTransaction findSale(Long saleId, Long pharmacyId) {
-        return saleTransactionRepository.findByIdAndPharmacyId(saleId, pharmacyId)
+    private EInvoiceSubmissionResponse deliverAndReload(EInvoiceSubmission submission, boolean resetAttempts) {
+        if (submission.isIssued() && submission.getPosDevice() != null) {
+            if (resetAttempts && submission.getStatus() == EInvoiceSubmission.Status.ERROR) {
+                EInvoiceSubmission row = eInvoiceSubmissionRepository.findById(submission.getId()).orElseThrow();
+                row.setRetryCount(0);
+                eInvoiceSubmissionRepository.save(row);
+            }
+            submitter.deliverDevice(submission.getPosDevice().getId());
+        }
+        return EInvoiceSubmissionResponse.fromEntity(
+                eInvoiceSubmissionRepository.findById(submission.getId()).orElse(submission));
+    }
+
+    private void findSale(Long saleId, Long pharmacyId) {
+        saleTransactionRepository.findByIdAndPharmacyId(saleId, pharmacyId)
                 .orElseThrow(() -> new LocalizedException(HttpStatus.NOT_FOUND, "SALE_NOT_FOUND", "Sale not found"));
     }
 
-    private void attemptSubmission(EInvoiceSubmission submission) {
-        EtaSubmissionResult result = etaIntegrationService.submit(submission.getSaleTransaction());
-        submission.setSubmittedAt(LocalDateTime.now());
-        if (result.success()) {
-            submission.setStatus(EInvoiceSubmission.Status.SUBMITTED);
-            submission.setEtaUuid(result.etaUuid());
-            submission.setErrorMessage(null);
-        } else {
-            submission.setStatus(EInvoiceSubmission.Status.ERROR);
-            submission.setErrorMessage(result.errorMessage());
-        }
+    private void findSubmission(Long saleId, Long pharmacyId) {
+        findSale(saleId, pharmacyId);
+        eInvoiceSubmissionRepository.findBySaleTransactionId(saleId)
+                .orElseThrow(() -> new LocalizedException(HttpStatus.NOT_FOUND, "EINVOICE_SUBMISSION_NOT_FOUND",
+                        "No e-receipt exists yet for this sale"));
     }
 
     private void checkEnabled(Long pharmacyId) {
-        Boolean enabled = smartFeatureSettingsService.getOrCreate(pharmacyId).getEInvoiceEnabled();
-        if (enabled != null && !enabled) {
+        if (!issuer.isEnabled(pharmacyId)) {
             throw new LocalizedException(HttpStatus.FORBIDDEN, "FEATURE_DISABLED_EINVOICE",
                     "E-invoice (ETA) feature is disabled for this pharmacy");
         }

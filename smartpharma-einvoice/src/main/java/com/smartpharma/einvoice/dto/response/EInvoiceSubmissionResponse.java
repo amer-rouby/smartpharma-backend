@@ -20,6 +20,11 @@ public class EInvoiceSubmissionResponse {
     private LocalDateTime submittedAt;
     private String errorMessage;
     private Integer retryCount;
+    private String receiptNumber;
+    private String dateTimeIssued;
+    private String qrContent;
+    private String longId;
+    private String submissionUuid;
 
     public static EInvoiceSubmissionResponse fromEntity(EInvoiceSubmission submission) {
         return EInvoiceSubmissionResponse.builder()
@@ -30,6 +35,11 @@ public class EInvoiceSubmissionResponse {
                 .submittedAt(submission.getSubmittedAt())
                 .errorMessage(submission.getErrorMessage())
                 .retryCount(submission.getRetryCount())
+                .receiptNumber(submission.getReceiptNumber())
+                .dateTimeIssued(submission.getDateTimeIssued())
+                .qrContent(submission.getQrContent())
+                .longId(submission.getLongId())
+                .submissionUuid(submission.getSubmissionUuid())
                 .build();
     }
 }
