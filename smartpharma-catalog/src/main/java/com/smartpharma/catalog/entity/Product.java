@@ -1,6 +1,7 @@
 package com.smartpharma.catalog.entity;
 
 
+import com.smartpharma.catalog.util.IngredientKey;
 import com.smartpharma.common.entity.Pharmacy;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
@@ -20,7 +21,8 @@ import java.util.Map;
 @Table(name = "products", schema = "smartpharma", indexes = {
         @Index(name = "idx_products_pharmacy", columnList = "pharmacy_id"),
         @Index(name = "idx_products_barcode", columnList = "barcode"),
-        @Index(name = "idx_products_code", columnList = "code")
+        @Index(name = "idx_products_code", columnList = "code"),
+        @Index(name = "idx_products_ingredient", columnList = "pharmacy_id, ingredient_key")
 })
 @Where(clause = "deleted_at IS NULL")
 @Data
@@ -42,6 +44,16 @@ public class Product {
 
     @Column(length = 255)
     private String scientificName;
+
+    // What the pharmacist typed as the active ingredient; null = take it from
+    // the scientific name.
+    @Column(name = "active_ingredient", length = 255)
+    private String activeIngredient;
+
+    // Normalized substance(s) (IngredientKey): products sharing it are
+    // alternatives for each other. Always derived, never edited directly.
+    @Column(name = "ingredient_key", length = 255)
+    private String ingredientKey;
 
     @Column(length = 100)
     private String barcode;
@@ -105,6 +117,12 @@ public class Product {
     @Builder.Default
     @JsonIgnoreProperties({"product"})
     private List<StockBatch> stockBatches = new ArrayList<>();
+
+    @PrePersist
+    @PreUpdate
+    void deriveIngredientKey() {
+        ingredientKey = IngredientKey.of(activeIngredient != null ? activeIngredient : scientificName);
+    }
 
     @Transient
     public Integer getTotalStock() {
