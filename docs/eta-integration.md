@@ -59,6 +59,23 @@ e-receipts on a sale at or above the threshold without both is refused with
   It's built from the original's stored JSON, so items, VAT and totals are
   exactly what ETA has, and it joins the device chain like any receipt. ETA
   accepts returns up to 540 days after the sale.
+- **Returning some items** (`POST /api/sales/{id}/returns`) records a
+  `sale_returns` row (with its items), puts the units back in the batch they
+  were sold from unless `restock=false` (damaged/expired), and refunds their
+  shelf value minus their share of the sale's discount (in proportion; the
+  return that brings back the last items gets the exact remainder). The sale
+  itself isn't changed: `sales_transactions.returned_amount` accumulates the
+  refunds and revenue queries use `total_amount - returned_amount`. After
+  commit (`SaleReturnedEvent`) a return receipt for just those items is
+  issued: `einvoice_submissions.sale_return_id` set, receipt number
+  `R<n>-<original>`, lines copied from the original receipt with the
+  returned quantity (same net unit price and VAT rate, netSale/VAT/total
+  recomputed) and the discount share as `extraReceiptDiscountData`. If the
+  sales receipt isn't issued yet (or was rejected), the return row is kept as
+  `ERROR` and issued by Retry once the sales receipt is.
+- A sale with returns **can't be cancelled** (`409 SALE_HAS_RETURNS`) -
+  cancelling reverses the whole receipt, which would reverse the returned
+  items twice. Return the remaining items instead.
 - **Editing a sale** that changes the discount, payment method or customer
   phone publishes `SaleAmendingEvent` synchronously; if an issued, non-rejected
   receipt exists the update is refused with `409 SALE_HAS_ETA_RECEIPT`
@@ -159,14 +176,15 @@ Each of these is refused with a clear message instead of being sent wrong:
 
 Known gaps, not handled yet:
 
-- Only whole-sale returns: SmartPharma has no partial (per-item) returns yet.
-- A return receipt ETA rejects is retried automatically if the failure was
-  transient, but there's no screen to re-issue it (a cancelled sale isn't
-  shown in the sales list).
 - Production runs with `ddl-auto=validate`, which doesn't create the ETA
   tables/columns: the schema has to exist before deploying (e.g. start once
   against the production database with `ddl-auto=update`, or run the DDL
-  it generates).
+  it generates). Returns added `sale_returns`, `sale_return_items`,
+  `sales_transactions.returned_amount` and
+  `einvoice_submissions.sale_return_id`.
+- Returned amounts are netted out of the sale's own date in revenue
+  reports (like a cancelled sale), not booked on the day of the return; the
+  top-selling products figures still count returned units.
 - Batch signatures are sent empty: ETA's SDK states batch signature
   validation is not deployed yet.
 - `receiptType` `s` / version `1.2` and the UUID procedure follow the docs;
@@ -179,6 +197,17 @@ Receipts (`ADMIN`/`MANAGER`, `403` when `eInvoiceEnabled` is off):
 - `GET /api/e-invoice/{saleId}` - receipt status for a sale.
 - `POST /api/e-invoice/{saleId}/submit` - issue if needed, then send pending receipts.
 - `POST /api/e-invoice/{saleId}/retry` - re-issue a rejected receipt / resend a failed one.
+- `GET /api/e-invoice/{saleId}/returns` - the sale's return receipts.
+- `GET /api/e-invoice/attention` - rejected or failed receipts, sales and
+  returns, including returns of cancelled sales (Sales -> "E-receipts
+  needing attention" in the app).
+- `POST /api/e-invoice/submissions/{id}/retry` - retry / re-issue any
+  receipt by its own id.
+
+Returns (`ADMIN`/`PHARMACIST` to create, also `MANAGER` to read):
+
+- `POST /api/sales/{id}/returns` - `{items: [{saleItemId, quantity}], reason, restock}`.
+- `GET /api/sales/{id}/returns`.
 
 Settings (`ADMIN`):
 

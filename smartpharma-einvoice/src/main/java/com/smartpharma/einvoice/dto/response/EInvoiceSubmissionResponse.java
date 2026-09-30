@@ -15,6 +15,13 @@ import java.time.LocalDateTime;
 public class EInvoiceSubmissionResponse {
     private Long id;
     private Long saleTransactionId;
+    // SALE or RETURN.
+    private String documentType;
+    // For the return of some items: the SaleReturn it's for (null otherwise).
+    private Long saleReturnId;
+    // Filled by the "needs attention" list, which also shows cancelled sales.
+    private String invoiceNumber;
+    private Boolean saleCancelled;
     private String status;
     private String etaUuid;
     private LocalDateTime submittedAt;
@@ -30,6 +37,9 @@ public class EInvoiceSubmissionResponse {
         return EInvoiceSubmissionResponse.builder()
                 .id(submission.getId())
                 .saleTransactionId(submission.getSaleTransaction().getId())
+                .documentType(submission.getDocumentType() == null
+                        ? EInvoiceSubmission.DocumentType.SALE.name() : submission.getDocumentType().name())
+                .saleReturnId(submission.getSaleReturn() == null ? null : submission.getSaleReturn().getId())
                 .status(submission.getStatus().name())
                 .etaUuid(submission.getEtaUuid())
                 .submittedAt(submission.getSubmittedAt())

@@ -57,6 +57,13 @@ public class SaleTransaction {
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    // Refunded so far through SaleReturn (partial returns); revenue is
+    // totalAmount - returnedAmount. Nullable with a default so ddl-auto=update
+    // can add it to a table that already has rows.
+    @Column(name = "returned_amount", precision = 10, scale = 2, columnDefinition = "NUMERIC(10,2) DEFAULT 0.00")
+    @Builder.Default
+    private BigDecimal returnedAmount = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 20, nullable = false)
     @Builder.Default

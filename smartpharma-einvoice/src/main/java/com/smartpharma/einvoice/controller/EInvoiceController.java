@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 // No try/catch - a disabled feature flag or missing sale/submission throws
 // LocalizedException, handled globally with the correct status/error code.
 @RestController
@@ -19,6 +21,27 @@ import org.springframework.web.bind.annotation.*;
 public class EInvoiceController {
 
     private final EInvoiceService eInvoiceService;
+
+    @GetMapping("/attention")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<List<EInvoiceSubmissionResponse>>> getNeedingAttention() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        return ResponseEntity.ok(ApiResponse.success(eInvoiceService.getNeedingAttention(pharmacyId)));
+    }
+
+    @PostMapping("/submissions/{submissionId}/retry")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<EInvoiceSubmissionResponse>> retrySubmission(@PathVariable Long submissionId) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        return ResponseEntity.ok(ApiResponse.success(eInvoiceService.retrySubmission(submissionId, pharmacyId)));
+    }
+
+    @GetMapping("/{saleId}/returns")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<List<EInvoiceSubmissionResponse>>> getReturnsForSale(@PathVariable Long saleId) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        return ResponseEntity.ok(ApiResponse.success(eInvoiceService.getReturnsForSale(saleId, pharmacyId)));
+    }
 
     @GetMapping("/{saleId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")

@@ -25,6 +25,8 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -234,6 +236,20 @@ public final class EtaReceiptBuilder {
     // are exactly what ETA already has for the original.
     public static BuiltReceipt buildReturn(String originalJson, String originalUuid, String receiptNumber,
                                            String previousUuid, String referenceOldUuid, Instant issuedAt) {
+        return buildReturn(originalJson, originalUuid, receiptNumber, previousUuid, referenceOldUuid, issuedAt,
+                null, null);
+    }
+
+    // A partial return reverses only some lines of the original: returned
+    // quantities keyed by the line's internalCode (the product id), spread over
+    // the original's lines for that product in order. Each returned line keeps
+    // the original's net unit price and VAT rate, with netSale, VAT and total
+    // recomputed for the returned quantity the same way the sale computed them;
+    // `discount` is the returned items' share of the sale-level discount. With
+    // returnedQuantities null the whole receipt is reversed as it is.
+    public static BuiltReceipt buildReturn(String originalJson, String originalUuid, String receiptNumber,
+                                           String previousUuid, String referenceOldUuid, Instant issuedAt,
+                                           Map<String, Integer> returnedQuantities, BigDecimal discount) {
         ObjectNode original;
         try {
             original = (ObjectNode) MAPPER.readTree(originalJson);
@@ -267,16 +283,105 @@ public final class EtaReceiptBuilder {
         documentType.put("receiptType", RETURN_RECEIPT_TYPE);
         documentType.put("typeVersion", TYPE_VERSION);
 
-        original.fields().forEachRemaining(field -> {
-            if (!field.getKey().equals("header") && !field.getKey().equals("documentType")) {
-                receipt.set(field.getKey(), field.getValue());
-            }
-        });
+        if (returnedQuantities == null) {
+            original.fields().forEachRemaining(field -> {
+                if (!field.getKey().equals("header") && !field.getKey().equals("documentType")) {
+                    receipt.set(field.getKey(), field.getValue());
+                }
+            });
+        } else {
+            copyPartial(original, receipt, returnedQuantities,
+                    money(discount == null ? BigDecimal.ZERO : discount));
+        }
 
         String uuid = EtaCanonicalSerializer.sha256Hex(EtaCanonicalSerializer.serialize(receipt));
         header.put("uuid", uuid);
         return new BuiltReceipt(toJson(receipt), uuid, receiptNumber, dateTimeIssued,
-                original.path("totalAmount").decimalValue().toPlainString());
+                receipt.path("totalAmount").decimalValue().toPlainString());
+    }
+
+    // Copies the original's body in its order, replacing the lines and every
+    // total with those of the returned quantities.
+    private static void copyPartial(ObjectNode original, ObjectNode receipt, Map<String, Integer> returnedQuantities,
+                                    BigDecimal discount) {
+        Map<String, Integer> left = new HashMap<>(returnedQuantities);
+        ArrayNode itemData = NODES.arrayNode();
+        BigDecimal netTotal = BigDecimal.ZERO;
+        BigDecimal vatTotal = BigDecimal.ZERO;
+        BigDecimal linesTotal = BigDecimal.ZERO;
+        boolean anyVatLine = false;
+        for (JsonNode line : original.path("itemData")) {
+            String code = line.path("internalCode").asText();
+            int wanted = left.getOrDefault(code, 0);
+            int quantity = Math.min(wanted, line.path("quantity").decimalValue().intValue());
+            if (quantity <= 0) {
+                continue;
+            }
+            left.put(code, wanted - quantity);
+
+            ObjectNode returned = line.deepCopy();
+            BigDecimal qty = BigDecimal.valueOf(quantity);
+            BigDecimal netSale = line.path("unitPrice").decimalValue().multiply(qty);
+            BigDecimal vat = BigDecimal.ZERO;
+            returned.put("quantity", qty);
+            returned.put("netSale", netSale);
+            returned.put("totalSale", netSale);
+            for (JsonNode taxable : returned.path("taxableItems")) {
+                vat = netSale.multiply(taxable.path("rate").decimalValue())
+                        .divide(BigDecimal.valueOf(100), ETA_SCALE, RoundingMode.HALF_UP);
+                ((ObjectNode) taxable).put("amount", vat);
+                anyVatLine = true;
+            }
+            BigDecimal total = returned.has("taxableItems") ? netSale.add(vat) : netSale;
+            returned.put("total", total);
+            itemData.add(returned);
+
+            netTotal = netTotal.add(netSale);
+            vatTotal = vatTotal.add(vat);
+            linesTotal = linesTotal.add(total);
+        }
+        left.forEach((code, quantity) -> {
+            if (quantity > 0) {
+                throw new EtaReceiptException("item " + code + ": " + quantity
+                        + " more returned than the original receipt has");
+            }
+        });
+        if (itemData.isEmpty()) {
+            throw new EtaReceiptException("a return receipt needs at least one returned item");
+        }
+        BigDecimal totalAmount = linesTotal.subtract(discount);
+        if (discount.signum() < 0 || totalAmount.signum() < 0) {
+            throw new EtaReceiptException("returned discount " + discount + " is negative or larger than "
+                    + "the returned items total " + linesTotal);
+        }
+
+        // Same field order as build(): discount after totalSales, VAT total
+        // after totalAmount.
+        for (Iterator<Map.Entry<String, JsonNode>> it = original.fields(); it.hasNext(); ) {
+            Map.Entry<String, JsonNode> field = it.next();
+            switch (field.getKey()) {
+                case "header", "documentType", "extraReceiptDiscountData", "taxTotals" -> { }
+                case "itemData" -> receipt.set("itemData", itemData);
+                case "totalSales" -> {
+                    receipt.put("totalSales", netTotal);
+                    if (discount.signum() > 0) {
+                        ObjectNode extra = receipt.putArray("extraReceiptDiscountData").addObject();
+                        extra.put("amount", discount);
+                        extra.put("description", "Discount");
+                    }
+                }
+                case "netAmount" -> receipt.put("netAmount", netTotal);
+                case "totalAmount" -> {
+                    receipt.put("totalAmount", totalAmount);
+                    if (anyVatLine) {
+                        ObjectNode taxTotal = receipt.putArray("taxTotals").addObject();
+                        taxTotal.put("taxType", "T1");
+                        taxTotal.put("amount", vatTotal);
+                    }
+                }
+                default -> receipt.set(field.getKey(), field.getValue());
+            }
+        }
     }
 
     // VAT for one product: its own subtype, else the pharmacy default; null

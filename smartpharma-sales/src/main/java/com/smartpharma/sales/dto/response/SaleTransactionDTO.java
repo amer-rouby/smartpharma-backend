@@ -19,6 +19,8 @@ public class SaleTransactionDTO {
     private String invoiceNumber;
     private BigDecimal subtotal;
     private BigDecimal totalAmount;
+    // Refunded through returns so far (the sale's net is totalAmount - this).
+    private BigDecimal returnedAmount;
     private BigDecimal discountAmount;
     private String paymentMethod;
     private String customerPhone;
@@ -45,6 +47,7 @@ public class SaleTransactionDTO {
         private String productName;
         private String barcode;
         private Integer quantity;
+        private Integer returnedQuantity;
         private BigDecimal unitPrice;
         private BigDecimal totalPrice;
         private String category;
