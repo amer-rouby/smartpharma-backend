@@ -21,6 +21,8 @@ import com.smartpharma.payments.entity.enums.PaymentMethod;
 import com.smartpharma.common.exception.LocalizedException;
 import com.smartpharma.common.exception.ResourceNotFoundException;
 import com.smartpharma.settings.repository.PharmacySettingsRepository;
+import com.smartpharma.sales.event.SaleAmendingEvent;
+import com.smartpharma.sales.event.SaleCancelledEvent;
 import com.smartpharma.sales.event.SaleCompletedEvent;
 import com.smartpharma.sales.service.SaleTransactionService;
 import lombok.RequiredArgsConstructor;
@@ -175,6 +177,11 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .orElseThrow(() -> new ResourceNotFoundException("SALE_NOT_FOUND", "Sale not found: " + id));
         validatePharmacyAccess(entity, pharmacyId);
 
+        if (changesChargedAmounts(entity, request)) {
+            // Synchronous on purpose: a listener can refuse the change by throwing.
+            eventPublisher.publishEvent(new SaleAmendingEvent(pharmacyId, id));
+        }
+
         Optional.ofNullable(request.getDiscountAmount()).ifPresent(entity::setDiscountAmount);
         Optional.ofNullable(request.getPaymentMethod())
                 .ifPresent(pm -> entity.setPaymentMethod(PaymentMethod.valueOf(pm.toUpperCase())));
@@ -196,7 +203,18 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         validatePharmacyAccess(sale, pharmacyId);
         sale.markAsDeleted();
         saleTransactionRepository.save(sale);
+        eventPublisher.publishEvent(new SaleCancelledEvent(pharmacyId, id));
         log.info("Sale deleted successfully | id: {}", id);
+    }
+
+    private static boolean changesChargedAmounts(SaleTransaction sale, SaleRequest request) {
+        boolean discount = request.getDiscountAmount() != null
+                && (sale.getDiscountAmount() == null || request.getDiscountAmount().compareTo(sale.getDiscountAmount()) != 0);
+        boolean payment = request.getPaymentMethod() != null
+                && !request.getPaymentMethod().equalsIgnoreCase(String.valueOf(sale.getPaymentMethod()));
+        boolean phone = request.getCustomerPhone() != null
+                && !request.getCustomerPhone().equals(sale.getCustomerPhone());
+        return discount || payment || phone;
     }
 
     @Override

@@ -16,6 +16,8 @@ import com.smartpharma.sales.entity.SaleTransaction;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -220,6 +222,50 @@ class EtaReceiptBuilderTest {
             assertThat(r.path("totalAmount").decimalValue().subtract(sale.getTotalAmount()).abs())
                     .isLessThanOrEqualTo(new BigDecimal("0.05"));
         }
+    }
+
+    @Test
+    void returnReceiptReversesTheOriginalExactly() throws Exception {
+        EtaTaxpayerProfile vatRegistered = profile();
+        vatRegistered.setDefaultTaxSubtype("V009");
+        EtaReceiptBuilder.BuiltReceipt original = EtaReceiptBuilder.build(
+                sale(new BigDecimal("1.00"), item(1L, "Sunscreen", "6221000000010", "BOX", 2, "11.40")),
+                vatRegistered, "POS-1", "", null, "EGP", CAIRO);
+        Instant issued = Instant.parse(original.dateTimeIssued()).plus(Duration.ofDays(3));
+
+        EtaReceiptBuilder.BuiltReceipt ret = EtaReceiptBuilder.buildReturn(original.json(), original.uuid(),
+                "R-INV-1001", original.uuid(), null, issued);
+
+        ObjectNode sent = (ObjectNode) reader.readTree(ret.json());
+        JsonNode header = sent.path("header");
+        assertThat(sent.path("documentType").path("receiptType").asText()).isEqualTo("r");
+        assertThat(sent.path("documentType").path("typeVersion").asText()).isEqualTo("1.2");
+        assertThat(header.path("referenceUUID").asText()).isEqualTo(original.uuid());
+        assertThat(header.path("previousUUID").asText()).isEqualTo(original.uuid());
+        assertThat(header.path("receiptNumber").asText()).isEqualTo("R-INV-1001");
+        assertThat(header.path("dateTimeIssued").asText()).isEqualTo(ret.dateTimeIssued());
+        // Items, VAT and totals are copied verbatim - same text, not recomputed.
+        JsonNode originalTree = reader.readTree(original.json());
+        assertThat(sent.path("itemData")).isEqualTo(originalTree.path("itemData"));
+        assertThat(sent.path("taxTotals")).isEqualTo(originalTree.path("taxTotals"));
+        assertThat(ret.json()).contains("\"totalAmount\":21.80000");
+        assertThat(ret.totalAmount()).isEqualTo(original.totalAmount());
+        // Its UUID is the hash of its own text with an empty uuid, like any receipt.
+        ((ObjectNode) sent.get("header")).put("uuid", "");
+        assertThat(EtaCanonicalSerializer.sha256Hex(EtaCanonicalSerializer.serialize(sent))).isEqualTo(ret.uuid());
+        assertThat(ret.uuid()).isNotEqualTo(original.uuid());
+    }
+
+    @Test
+    void returnIsRefusedPastEtasWindow() {
+        EtaReceiptBuilder.BuiltReceipt original = EtaReceiptBuilder.build(
+                sale(BigDecimal.ZERO, item(1L, "Panadol", "6221000000010", "BOX", 1, "10.00")),
+                profile(), "POS-1", "", null, "EGP", CAIRO);
+        Instant tooLate = Instant.parse(original.dateTimeIssued())
+                .plus(Duration.ofDays(EtaReceiptBuilder.MAX_RETURN_DAYS + 1));
+
+        assertThatThrownBy(() -> EtaReceiptBuilder.buildReturn(original.json(), original.uuid(), "R-INV-1001",
+                "", null, tooLate)).hasMessageContaining("540");
     }
 
     @Test

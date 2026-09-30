@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -77,16 +78,10 @@ public class EtaReceiptIssuer {
             return submissionRepository.save(submission);
         }
 
-        // Locks the device row until commit - the chain head below is read
-        // and advanced atomically with saving this receipt.
-        List<EtaPosDevice> devices = deviceRepository.findActiveForUpdate(pharmacyId);
-        if (devices.size() != 1) {
-            submission.recordError(EInvoiceSubmission.Status.ERROR, devices.isEmpty()
-                    ? "No active ETA POS device is registered"
-                    : "More than one active ETA POS device - keep exactly one active");
+        EtaPosDevice device = lockActiveDevice(pharmacyId, submission);
+        if (device == null) {
             return submissionRepository.save(submission);
         }
-        EtaPosDevice device = devices.get(0);
 
         String currency = pharmacySettingsRepository.findByPharmacyId(pharmacyId)
                 .map(s -> s.getCurrency()).orElse("EGP");
@@ -104,23 +99,93 @@ public class EtaReceiptIssuer {
             return submissionRepository.save(submission);
         }
 
+        markIssued(submission, device, profile, built, previousUuid);
+        log.info("ETA receipt issued | sale {} | uuid {} | device {}", saleId, built.uuid(), device.getSerialNumber());
+        return submissionRepository.save(submission);
+    }
+
+    // Issues the return receipt reversing a cancelled sale's receipt. Nothing
+    // to reverse when the sale never got a receipt ETA could have (not issued,
+    // or rejected). With reissueRejected, a return ETA rejected is rebuilt.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Optional<EInvoiceSubmission> issueReturn(Long saleId, Long pharmacyId, boolean reissueRejected) {
+        EInvoiceSubmission original = submissionRepository.findBySaleTransactionId(saleId).orElse(null);
+        if (original == null || !original.isIssued()
+                || original.getStatus() == EInvoiceSubmission.Status.REJECTED
+                || !pharmacyId.equals(original.getPosDevice().getPharmacy().getId())) {
+            return Optional.empty();
+        }
+
+        EInvoiceSubmission returnReceipt = submissionRepository.findReturnOf(original.getId())
+                .orElseGet(() -> EInvoiceSubmission.builder()
+                        .saleTransaction(original.getSaleTransaction())
+                        .documentType(EInvoiceSubmission.DocumentType.RETURN)
+                        .originalSubmission(original)
+                        .build());
+        boolean rejected = returnReceipt.getStatus() == EInvoiceSubmission.Status.REJECTED;
+        if (returnReceipt.isIssued() && !(reissueRejected && rejected)) {
+            return Optional.of(returnReceipt);
+        }
+        String referenceOldUuid = rejected ? returnReceipt.getEtaUuid() : null;
+
+        EtaTaxpayerProfile profile = profileRepository.findByPharmacyId(pharmacyId).orElse(null);
+        if (profile == null) {
+            returnReceipt.recordError(EInvoiceSubmission.Status.ERROR, "ETA taxpayer settings are not saved yet");
+            return Optional.of(submissionRepository.save(returnReceipt));
+        }
+        EtaPosDevice device = lockActiveDevice(pharmacyId, returnReceipt);
+        if (device == null) {
+            return Optional.of(submissionRepository.save(returnReceipt));
+        }
+        String previousUuid = device.getLastReceiptUuid() == null ? "" : device.getLastReceiptUuid();
+
+        EtaReceiptBuilder.BuiltReceipt built;
+        try {
+            built = EtaReceiptBuilder.buildReturn(original.getReceiptJson(), original.getEtaUuid(),
+                    "R-" + original.getReceiptNumber(), previousUuid, referenceOldUuid, Instant.now());
+        } catch (EtaReceiptException e) {
+            returnReceipt.recordError(EInvoiceSubmission.Status.ERROR, "Return receipt not issued: " + e.getMessage());
+            log.warn("ETA return receipt not issued for sale {}: {}", saleId, e.getMessage());
+            return Optional.of(submissionRepository.save(returnReceipt));
+        }
+
+        markIssued(returnReceipt, device, profile, built, previousUuid);
+        log.info("ETA return receipt issued | sale {} | uuid {} | reverses {}", saleId, built.uuid(),
+                original.getEtaUuid());
+        return Optional.of(submissionRepository.save(returnReceipt));
+    }
+
+    // Locks the pharmacy's single active device row until commit, so the chain
+    // head read by the caller is advanced atomically with saving its receipt.
+    // Records why on the row and returns null when there isn't exactly one.
+    private EtaPosDevice lockActiveDevice(Long pharmacyId, EInvoiceSubmission row) {
+        List<EtaPosDevice> devices = deviceRepository.findActiveForUpdate(pharmacyId);
+        if (devices.size() != 1) {
+            row.recordError(EInvoiceSubmission.Status.ERROR, devices.isEmpty()
+                    ? "No active ETA POS device is registered"
+                    : "More than one active ETA POS device - keep exactly one active");
+            return null;
+        }
+        return devices.get(0);
+    }
+
+    private void markIssued(EInvoiceSubmission row, EtaPosDevice device, EtaTaxpayerProfile profile,
+                            EtaReceiptBuilder.BuiltReceipt built, String previousUuid) {
         device.setLastReceiptUuid(built.uuid());
         deviceRepository.save(device);
 
-        submission.setPosDevice(device);
-        submission.setEtaUuid(built.uuid());
-        submission.setPreviousUuid(previousUuid);
-        submission.setReceiptNumber(built.receiptNumber());
-        submission.setDateTimeIssued(built.dateTimeIssued());
-        submission.setReceiptJson(built.json());
-        submission.setQrContent(EtaQrCode.content(profile.getEnvironment(), built.uuid(), built.dateTimeIssued(),
+        row.setPosDevice(device);
+        row.setEtaUuid(built.uuid());
+        row.setPreviousUuid(previousUuid);
+        row.setReceiptNumber(built.receiptNumber());
+        row.setDateTimeIssued(built.dateTimeIssued());
+        row.setReceiptJson(built.json());
+        row.setQrContent(EtaQrCode.content(profile.getEnvironment(), built.uuid(), built.dateTimeIssued(),
                 built.totalAmount(), profile.getRin()));
-        submission.setSubmissionUuid(null);
-        submission.setLongId(null);
-        submission.setSubmittedAt(null);
-        submission.setRetryCount(0);
-        submission.recordError(EInvoiceSubmission.Status.PENDING, null);
-        log.info("ETA receipt issued | sale {} | uuid {} | device {}", saleId, built.uuid(), device.getSerialNumber());
-        return submissionRepository.save(submission);
+        row.setSubmissionUuid(null);
+        row.setLongId(null);
+        row.setSubmittedAt(null);
+        row.setRetryCount(0);
+        row.recordError(EInvoiceSubmission.Status.PENDING, null);
     }
 }

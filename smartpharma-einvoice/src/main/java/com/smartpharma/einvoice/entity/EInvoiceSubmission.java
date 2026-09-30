@@ -9,9 +9,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-// The ETA e-receipt issued for a sale and its submission state. One row per
-// sale (unique FK) - a retry updates the same row and bumps retryCount rather
-// than creating a new submission each time.
+// An ETA e-receipt and its submission state: the sales receipt of a sale
+// and, if the sale is later cancelled, its return receipt (a second row for
+// the same sale, pointing at the first). A retry updates the same row and
+// bumps retryCount rather than creating a new submission each time.
 //
 // receiptJson is the exact receipt text sent to ETA: the UUID is a hash of
 // it, so it's stored once at issue time and never rebuilt from the sale.
@@ -32,13 +33,34 @@ public class EInvoiceSubmission {
         PENDING, SUBMITTED, ACCEPTED, REJECTED, ERROR
     }
 
+    // SALE = ETA receipt type "s", RETURN = type "r".
+    public enum DocumentType {
+        SALE, RETURN
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sale_transaction_id", nullable = false, unique = true)
+    // Not unique any more (a sale can have a SALE and a RETURN row); databases
+    // created before returns keep the old unique constraint until
+    // EInvoiceReturnReceiptBackfill drops it at startup.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sale_transaction_id", nullable = false)
+    @ToString.Exclude
     private SaleTransaction saleTransaction;
+
+    // Nullable for rows written before returns existed; the backfill sets them to SALE.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", length = 10)
+    @Builder.Default
+    private DocumentType documentType = DocumentType.SALE;
+
+    // For a RETURN: the SALE receipt it reverses.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "original_submission_id")
+    @ToString.Exclude
+    private EInvoiceSubmission originalSubmission;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

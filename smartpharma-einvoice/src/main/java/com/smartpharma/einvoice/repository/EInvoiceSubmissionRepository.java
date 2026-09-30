@@ -14,8 +14,18 @@ public interface EInvoiceSubmissionRepository extends JpaRepository<EInvoiceSubm
     @Query("""
         SELECT e FROM EInvoiceSubmission e
         WHERE e.saleTransaction.id = :saleTransactionId
+          AND e.documentType = :documentType
     """)
-    Optional<EInvoiceSubmission> findBySaleTransactionId(@Param("saleTransactionId") Long saleTransactionId);
+    Optional<EInvoiceSubmission> findBySaleAndType(@Param("saleTransactionId") Long saleTransactionId,
+                                                   @Param("documentType") EInvoiceSubmission.DocumentType documentType);
+
+    // The sales receipt of a sale (a cancelled sale also has a RETURN row).
+    default Optional<EInvoiceSubmission> findBySaleTransactionId(Long saleTransactionId) {
+        return findBySaleAndType(saleTransactionId, EInvoiceSubmission.DocumentType.SALE);
+    }
+
+    @Query("SELECT e FROM EInvoiceSubmission e WHERE e.originalSubmission.id = :originalId")
+    Optional<EInvoiceSubmission> findReturnOf(@Param("originalId") Long originalId);
 
     // Issued receipts still waiting to reach ETA, oldest first so a batch
     // follows the device's chain order.

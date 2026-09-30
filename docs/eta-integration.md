@@ -39,6 +39,23 @@ Official references used:
 5. The sale details dialog shows the receipt status, UUID and QR code, and
    prints the QR on the invoice.
 
+## Cancelled and edited sales
+
+- **Deleting a sale** publishes `SaleCancelledEvent`. If the sale has an
+  issued receipt that ETA didn't reject, a **return receipt** (type `r`,
+  version `1.2`) is issued after commit: a second `einvoice_submissions` row
+  for the same sale (`document_type = RETURN`, `original_submission_id` set)
+  with `referenceUUID` = the original's UUID and receipt number `R-<original>`.
+  It's built from the original's stored JSON, so items, VAT and totals are
+  exactly what ETA has, and it joins the device chain like any receipt. ETA
+  accepts returns up to 540 days after the sale.
+- **Editing a sale** that changes the discount, payment method or customer
+  phone publishes `SaleAmendingEvent` synchronously; if an issued, non-rejected
+  receipt exists the update is refused with `409 SALE_HAS_ETA_RECEIPT`
+  (cancel and sell again instead). Notes can still be edited.
+- `EInvoiceReturnReceiptBackfill` (startup) drops the old unique constraint
+  on `einvoice_submissions.sale_transaction_id` and marks older rows as `SALE`.
+
 A sale that can't be turned into a valid receipt (missing taxpayer data,
 product without an ETA code, ...) is recorded as `ERROR` with the reason; the
 chain does not move, and "Retry" issues it once the data is fixed.
@@ -113,8 +130,14 @@ Each of these is refused with a clear message instead of being sent wrong:
 
 Known gaps, not handled yet:
 
-- Editing or deleting a sale after its receipt was issued does not issue a
-  return receipt - the receipt at ETA keeps the original values (phase 3).
+- Only whole-sale returns: SmartPharma has no partial (per-item) returns yet.
+- A return receipt ETA rejects is retried automatically if the failure was
+  transient, but there's no screen to re-issue it (a cancelled sale isn't
+  shown in the sales list).
+- Production runs with `ddl-auto=validate`, which doesn't create the ETA
+  tables/columns: the schema has to exist before deploying (e.g. start once
+  against the production database with `ddl-auto=update`, or run the DDL
+  it generates).
 - Batch signatures are sent empty: ETA's SDK states batch signature
   validation is not deployed yet.
 - `receiptType` `s` / version `1.2` and the UUID procedure follow the docs;

@@ -3,6 +3,8 @@ package com.smartpharma.einvoice.service.impl;
 import com.smartpharma.einvoice.util.EtaCanonicalSerializer;
 import com.smartpharma.einvoice.exception.EtaReceiptException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -17,6 +19,8 @@ import com.smartpharma.sales.entity.SaleTransaction;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -40,7 +44,10 @@ public final class EtaReceiptBuilder {
     // Lowercase as written in both the receipt v1.2 spec ("must be 's'") and
     // the submission API ("s (for receipt), r (for return receipt)").
     public static final String RECEIPT_TYPE = "s";
+    public static final String RETURN_RECEIPT_TYPE = "r";
     public static final String TYPE_VERSION = "1.2";
+    // ETA: "Maximum allowed days to issue a return receipt is 540 days".
+    static final long MAX_RETURN_DAYS = 540;
 
     private static final BigDecimal BUYER_ID_THRESHOLD = new BigDecimal("150000");
     private static final BigDecimal STANDARD_VAT_RATE = new BigDecimal("14.00");
@@ -59,6 +66,7 @@ public final class EtaReceiptBuilder {
     private static final JsonNodeFactory NODES = JsonNodeFactory.withExactBigDecimals(true);
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .setNodeFactory(NODES)
+            .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
             .enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN)
             .disable(SerializationFeature.INDENT_OUTPUT);
 
@@ -209,6 +217,58 @@ public final class EtaReceiptBuilder {
 
         return new BuiltReceipt(toJson(receipt), uuid, sale.getInvoiceNumber(), dateTimeIssued,
                 totalAmount.toPlainString());
+    }
+
+    // Return receipt (type r, v1.2) reversing a whole issued sales receipt -
+    // https://sdk.invoicing.eta.gov.eg/documents/return-receipt-v1-2/ has the
+    // same structure plus header.referenceUUID. It's built from the original's
+    // stored text, not from the (now cancelled) sale, so items, VAT and totals
+    // are exactly what ETA already has for the original.
+    public static BuiltReceipt buildReturn(String originalJson, String originalUuid, String receiptNumber,
+                                           String previousUuid, String referenceOldUuid, Instant issuedAt) {
+        ObjectNode original;
+        try {
+            original = (ObjectNode) MAPPER.readTree(originalJson);
+        } catch (JsonProcessingException e) {
+            throw new EtaReceiptException("original receipt text can't be read: " + e.getOriginalMessage());
+        }
+        JsonNode originalHeader = original.path("header");
+        String originalIssued = originalHeader.path("dateTimeIssued").asText();
+        String dateTimeIssued = ISSUED_FORMAT.format(issuedAt.atOffset(ZoneOffset.UTC));
+        if (Duration.between(Instant.parse(originalIssued), issuedAt).toDays() > MAX_RETURN_DAYS) {
+            throw new EtaReceiptException("the sale is older than " + MAX_RETURN_DAYS
+                    + " days, the latest ETA accepts a return receipt for");
+        }
+        if (receiptNumber.length() > 50) {
+            throw new EtaReceiptException("return receipt number is longer than 50 characters");
+        }
+
+        ObjectNode receipt = NODES.objectNode();
+        ObjectNode header = receipt.putObject("header");
+        header.put("dateTimeIssued", dateTimeIssued);
+        header.put("receiptNumber", receiptNumber);
+        header.put("uuid", "");
+        header.put("previousUUID", previousUuid == null ? "" : previousUuid);
+        header.put("referenceUUID", originalUuid);
+        if (referenceOldUuid != null && !referenceOldUuid.isBlank()) {
+            header.put("referenceOldUUID", referenceOldUuid);
+        }
+        header.set("currency", originalHeader.path("currency"));
+
+        ObjectNode documentType = receipt.putObject("documentType");
+        documentType.put("receiptType", RETURN_RECEIPT_TYPE);
+        documentType.put("typeVersion", TYPE_VERSION);
+
+        original.fields().forEachRemaining(field -> {
+            if (!field.getKey().equals("header") && !field.getKey().equals("documentType")) {
+                receipt.set(field.getKey(), field.getValue());
+            }
+        });
+
+        String uuid = EtaCanonicalSerializer.sha256Hex(EtaCanonicalSerializer.serialize(receipt));
+        header.put("uuid", uuid);
+        return new BuiltReceipt(toJson(receipt), uuid, receiptNumber, dateTimeIssued,
+                original.path("totalAmount").decimalValue().toPlainString());
     }
 
     // VAT for one product: its own subtype, else the pharmacy default; null
