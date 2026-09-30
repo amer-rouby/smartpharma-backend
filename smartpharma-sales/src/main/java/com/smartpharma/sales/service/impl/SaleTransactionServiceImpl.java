@@ -142,10 +142,12 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .notes(request.getNotes())
                 .build();
 
+        // A queued offline sale carries the time it was rung up.
+        boolean offlineSale = clientSaleId != null && request.getSoldAt() != null;
         List<SaleItem> saleItems = new ArrayList<>();
         boolean requiresPrescription = false;
         for (SaleItemRequest itemRequest : request.getItems()) {
-            SaleItem saleItem = processSaleItem(itemRequest, sale);
+            SaleItem saleItem = processSaleItem(itemRequest, sale, pharmacy.getId(), offlineSale);
             saleItems.add(saleItem);
             if (Boolean.TRUE.equals(saleItem.getProduct().getPrescriptionRequired())) {
                 requiresPrescription = true;
@@ -460,9 +462,13 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         return Sort.by(direction, sortBy);
     }
 
-    private SaleItem processSaleItem(SaleItemRequest itemRequest, SaleTransaction sale) {
-        Product product = productRepository.findById(itemRequest.getProductId())
+    private SaleItem processSaleItem(SaleItemRequest itemRequest, SaleTransaction sale,
+                                     Long pharmacyId, boolean offlineSale) {
+        // Scoped to the pharmacy: an id from another pharmacy is "not found",
+        // never sold out of that pharmacy's stock.
+        Product product = productRepository.findByIdAndPharmacyId(itemRequest.getProductId(), pharmacyId)
                 .orElseThrow(() -> new ResourceNotFoundException("PRODUCT_NOT_FOUND", "Product not found: " + itemRequest.getProductId()));
+        BigDecimal unitPrice = resolveUnitPrice(product, itemRequest.getUnitPrice(), offlineSale);
 
         StockBatch selectedBatch = selectStockBatch(product.getId(), itemRequest.getQuantity());
         if (selectedBatch == null) {
@@ -475,13 +481,41 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .product(product)
                 .batch(selectedBatch)
                 .quantity(itemRequest.getQuantity())
-                .unitPrice(itemRequest.getUnitPrice())
+                .unitPrice(unitPrice)
                 .transaction(sale)
                 .build();
 
         saleItem.calculateTotalPrice();
         deductStock(selectedBatch, itemRequest.getQuantity());
         return saleItem;
+    }
+
+    /**
+     * The price charged is always the product's current sell price - the one in
+     * the request is only what the cashier's screen showed, used to notice a
+     * stale cart. A live sale with a different price is refused so the POS
+     * reloads prices and the cashier sees the real total before charging. A
+     * queued offline sale is recorded at the current price: there is no price
+     * history to check the old one against, and trusting it would let anyone
+     * post a back-dated "offline" sale at any price.
+     */
+    static BigDecimal resolveUnitPrice(Product product, BigDecimal requestedPrice, boolean offlineSale) {
+        BigDecimal price = product.getSellPrice();
+        if (price == null || price.signum() <= 0) {
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "SALE_PRODUCT_NO_PRICE",
+                    "Product has no sell price: " + product.getName(),
+                    Map.of("productName", product.getName()));
+        }
+        if (requestedPrice != null && requestedPrice.compareTo(price) != 0) {
+            if (!offlineSale) {
+                throw new LocalizedException(HttpStatus.CONFLICT, "SALE_PRICE_CHANGED",
+                        "Price of " + product.getName() + " is " + price + ", not " + requestedPrice,
+                        Map.of("productName", product.getName(), "price", price.toPlainString()));
+            }
+            log.info("Offline sale item {} recorded at the current price {} instead of {}",
+                    product.getId(), price, requestedPrice);
+        }
+        return price;
     }
 
     private StockBatch selectStockBatch(Long productId, Integer requestedQuantity) {
