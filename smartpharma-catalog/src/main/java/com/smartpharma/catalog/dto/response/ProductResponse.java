@@ -18,6 +18,8 @@ public class ProductResponse {
     private Long pharmacyId;
     private String name;
     private String scientificName;
+    private String activeIngredient;
+    private String ingredientKey;
     private String barcode;
     private String category;
     private String etaItemType;

@@ -99,6 +99,7 @@ public class ProductServiceImpl implements ProductService {
                 .pharmacy(pharmacy)
                 .name(request.getName())
                 .scientificName(request.getScientificName())
+                .activeIngredient(blankToNull(request.getActiveIngredient()))
                 .barcode(request.getBarcode())
                 .category(request.getCategory())
                 .etaItemType(blankToNull(request.getEtaItemType()))
@@ -156,6 +157,9 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new RuntimeException("Product not found"));
         product.setName(request.getName());
         product.setScientificName(request.getScientificName());
+        if (request.getActiveIngredient() != null) {
+            product.setActiveIngredient(blankToNull(request.getActiveIngredient()));
+        }
         product.setBarcode(request.getBarcode());
         product.setCategory(request.getCategory());
         if (request.getEtaItemType() != null) product.setEtaItemType(blankToNull(request.getEtaItemType()));
@@ -189,7 +193,8 @@ public class ProductServiceImpl implements ProductService {
 
         product.setExtraAttributes(request.getExtraAttributes());
 
-        Product updated = productRepository.save(product);
+        // Flush so @PreUpdate re-derives ingredientKey before the response is built.
+        Product updated = productRepository.saveAndFlush(product);
         log.info("Product updated: id={}, name={}, buyPrice={}, sellPrice={}",
                 updated.getId(), updated.getName(), updated.getBuyPrice(), updated.getSellPrice());
 
@@ -238,6 +243,8 @@ public class ProductServiceImpl implements ProductService {
                 .pharmacyId(product.getPharmacy() != null ? product.getPharmacy().getId() : null)
                 .name(product.getName())
                 .scientificName(product.getScientificName())
+                .activeIngredient(product.getActiveIngredient())
+                .ingredientKey(product.getIngredientKey())
                 .barcode(product.getBarcode())
                 .category(product.getCategory())
                 .etaItemType(product.getEtaItemType())

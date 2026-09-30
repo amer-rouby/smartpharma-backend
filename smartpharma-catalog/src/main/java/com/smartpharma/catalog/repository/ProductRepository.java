@@ -26,7 +26,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         AND (:search IS NULL OR :search = '' OR
             LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
             LOWER(p.barcode) LIKE LOWER(CONCAT('%', :search, '%')) OR
-            LOWER(p.scientificName) LIKE LOWER(CONCAT('%', :search, '%')))
+            LOWER(p.scientificName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+            LOWER(p.activeIngredient) LIKE LOWER(CONCAT('%', :search, '%')))
         AND (:category IS NULL OR :category = '' OR p.category = :category)
         """)
     Page<Product> searchAndFilter(@Param("pharmacyId") Long pharmacyId, @Param("search") String search,
