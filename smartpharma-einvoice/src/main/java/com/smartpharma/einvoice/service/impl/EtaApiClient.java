@@ -4,6 +4,7 @@ import com.smartpharma.einvoice.entity.enums.EtaEnvironment;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
 
 // ETA eReceipt HTTP calls:
 //  - POST {identity}/connect/token  (client_credentials + POS headers)
@@ -38,12 +40,21 @@ public class EtaApiClient {
     private final RestClient http;
     private final ObjectMapper mapper = new ObjectMapper();
     private final Map<String, CachedToken> tokens = new ConcurrentHashMap<>();
+    // Maps ETA's base URLs to where requests actually go - identity in
+    // production; tests point both at a local ETA simulator.
+    private final UnaryOperator<String> baseUrl;
 
+    @Autowired
     public EtaApiClient() {
+        this(UnaryOperator.identity());
+    }
+
+    EtaApiClient(UnaryOperator<String> baseUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10_000);
         factory.setReadTimeout(60_000);
         this.http = RestClient.builder().requestFactory(factory).build();
+        this.baseUrl = baseUrl;
     }
 
     public record PosCredentials(EtaEnvironment environment, String clientId, String clientSecret,
@@ -81,7 +92,7 @@ public class EtaApiClient {
         JsonNode body;
         try {
             body = http.post()
-                    .uri(credentials.environment().identityUrl() + "/connect/token")
+                    .uri(baseUrl.apply(credentials.environment().identityUrl()) + "/connect/token")
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .header("posserial", credentials.posSerial())
                     .header("pososversion", credentials.posOsVersion())
@@ -119,7 +130,7 @@ public class EtaApiClient {
 
         try {
             JsonNode body = http.post()
-                    .uri(credentials.environment().apiUrl() + "/api/v1/receiptsubmissions")
+                    .uri(baseUrl.apply(credentials.environment().apiUrl()) + "/api/v1/receiptsubmissions")
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + token)
                     .body(batchJson)
@@ -159,7 +170,7 @@ public class EtaApiClient {
         }
         try {
             JsonNode body = http.get()
-                    .uri(credentials.environment().apiUrl() + "/api/v1/receiptsubmissions/{uuid}/details?PageNo={page}&PageSize={size}",
+                    .uri(baseUrl.apply(credentials.environment().apiUrl()) + "/api/v1/receiptsubmissions/{uuid}/details?PageNo={page}&PageSize={size}",
                             submissionUuid, pageNo, DETAILS_PAGE_SIZE)
                     .header("Authorization", "Bearer " + token)
                     .retrieve()

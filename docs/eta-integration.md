@@ -129,6 +129,26 @@ decision for the pharmacy's accountant, not something the code assumes.
 PREPROD uses certificates issued by ETA's own test root CA. Import it into the
 JVM truststore used by the backend - never disable TLS verification.
 
+## Testing without ETA
+
+`EtaSimulator` (test sources) is a local HTTP stand-in for the three ETA
+endpoints used - token, submission and submission details - answering in
+the documented shapes. It validates independently of `EtaReceiptBuilder`:
+structure at submission (type `s`/`r`, version `1.2`, 9-digit RIN, device
+serial), then the Main Calculations rules with ETA's ±0.5 tolerance, the
+per-device `previousUUID` chain and return references, answering
+`InProgress` on the first details call and `Valid`/`Invalid` (with Arabic
+and English errors) after.
+
+`EtaSimulatorCycleTest` runs the real `EtaApiClient`, `EtaReceiptSubmitter`
+and `EtaReceiptStatusPoller` against it over HTTP: token reuse and bad
+credentials, two sales plus a return submitted and validated, a receipt with
+wrong totals rejected with ETA's reason, an outage retried, and a broken
+chain caught. Breaking the receipt type or the VAT math makes it fail.
+
+It proves the code matches our reading of the SDK docs - not that ETA
+reads them the same way; that still needs PREPROD.
+
 ## Deliberate phase-1 limits
 
 Each of these is refused with a clear message instead of being sent wrong:
