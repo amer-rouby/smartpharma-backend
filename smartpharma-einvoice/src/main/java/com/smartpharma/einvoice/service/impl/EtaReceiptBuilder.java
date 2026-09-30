@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-// Builds an ETA sales receipt (document type S, version 1.2) for a sale and
+// Builds an ETA sales receipt (document type s, version 1.2) for a sale and
 // computes its UUID. Structure and rules follow
 // https://sdk.invoicing.eta.gov.eg/documents/receipt-v1-2/ and the "Main
 // Calculations" page.
@@ -37,7 +37,9 @@ import java.util.regex.Pattern;
 // has a sale-level one, sent as extraReceiptDiscountData).
 public final class EtaReceiptBuilder {
 
-    public static final String RECEIPT_TYPE = "S";
+    // Lowercase as written in both the receipt v1.2 spec ("must be 's'") and
+    // the submission API ("s (for receipt), r (for return receipt)").
+    public static final String RECEIPT_TYPE = "s";
     public static final String TYPE_VERSION = "1.2";
 
     private static final BigDecimal BUYER_ID_THRESHOLD = new BigDecimal("150000");

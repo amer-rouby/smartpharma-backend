@@ -2,7 +2,7 @@
 
 ## Status: phase 1 implemented, not yet verified against ETA pre-production
 
-Sales are issued as ETA **e-receipts** (B2C, receipt type `S`, version `1.2`)
+Sales are issued as ETA **e-receipts** (B2C, receipt type `s`, version `1.2`)
 and sent to the ETA eReceipt API. Everything is gated behind the
 `eInvoiceEnabled` smart feature flag (off by default).
 
@@ -112,7 +112,7 @@ Known gaps, not handled yet:
   return receipt - the receipt at ETA keeps the original values (phase 3).
 - Batch signatures are sent empty: ETA's SDK states batch signature
   validation is not deployed yet.
-- `receiptType` `S` / version `1.2` and the UUID procedure follow the docs;
+- `receiptType` `s` / version `1.2` and the UUID procedure follow the docs;
   they have only been unit-tested, not accepted by ETA PREPROD yet.
 
 ## API endpoints

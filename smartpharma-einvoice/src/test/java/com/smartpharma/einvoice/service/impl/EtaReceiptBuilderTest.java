@@ -70,7 +70,7 @@ class EtaReceiptBuilderTest {
         assertThat(r.path("totalAmount").decimalValue()).isEqualByComparingTo("50.00");
         assertThat(r.path("paymentMethod").asText()).isEqualTo("C");
         assertThat(r.path("header").path("previousUUID").asText()).isEmpty();
-        assertThat(r.path("documentType").path("receiptType").asText()).isEqualTo("S");
+        assertThat(r.path("documentType").path("receiptType").asText()).isEqualTo("s");
         assertThat(r.path("documentType").path("typeVersion").asText()).isEqualTo("1.2");
         // Money keeps two decimals in the text sent - the UUID depends on it.
         assertThat(EtaReceiptBuilder.build(sale, profile(), "POS-1", "", null, "EGP", CAIRO).json())
