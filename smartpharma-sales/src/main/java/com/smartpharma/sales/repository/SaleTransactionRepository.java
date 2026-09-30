@@ -28,6 +28,10 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     @Query("SELECT st FROM SaleTransaction st WHERE st.id = :id AND st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
     Optional<SaleTransaction> findByIdAndPharmacyId(@Param("id") Long id, @Param("pharmacyId") Long pharmacyId);
 
+    @Query("SELECT st FROM SaleTransaction st WHERE st.pharmacy.id = :pharmacyId AND st.clientSaleId = :clientSaleId")
+    Optional<SaleTransaction> findByPharmacyIdAndClientSaleId(@Param("pharmacyId") Long pharmacyId,
+                                                             @Param("clientSaleId") String clientSaleId);
+
     List<SaleTransaction> findByPharmacyIdAndTransactionDateBetween(
             Long pharmacyId,
             LocalDateTime startDate,
