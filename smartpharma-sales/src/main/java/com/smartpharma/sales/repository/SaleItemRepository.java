@@ -47,6 +47,20 @@ public interface SaleItemRepository extends JpaRepository<SaleItem, Long> {
                                                              @Param("startDate") LocalDateTime startDate,
                                                              @Param("endDate") LocalDateTime endDate);
 
+    // Units sold per product in one query: [productId, quantity]. Products
+    // with no sales in the range aren't returned.
+    @Query("""
+        SELECT si.product.id, SUM(si.quantity) FROM SaleItem si
+        JOIN si.transaction t
+        WHERE t.pharmacy.id = :pharmacyId
+        AND t.deletedAt IS NULL
+        AND t.transactionDate BETWEEN :startDate AND :endDate
+        GROUP BY si.product.id
+    """)
+    List<Object[]> sumQuantityPerProductByPharmacyIdAndDateRange(@Param("pharmacyId") Long pharmacyId,
+                                                                @Param("startDate") LocalDateTime startDate,
+                                                                @Param("endDate") LocalDateTime endDate);
+
     @Query("""
         SELECT si FROM SaleItem si 
         JOIN si.transaction t 
