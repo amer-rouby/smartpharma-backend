@@ -7,6 +7,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 // The pharmacy as an ETA taxpayer: the seller block of every receipt plus the
@@ -62,6 +63,14 @@ public class EtaTaxpayerProfile {
 
     @Column(name = "postal_code", length = 30)
     private String postalCode;
+
+    // VAT applied to products that don't set their own - see Product.etaTaxSubtype.
+    // Null = no tax lines on the receipt (a pharmacy that isn't VAT-registered).
+    @Column(name = "default_tax_subtype", length = 10)
+    private String defaultTaxSubtype;
+
+    @Column(name = "default_tax_rate", precision = 5, scale = 2)
+    private BigDecimal defaultTaxRate;
 
     @Column(name = "client_id", length = 100)
     private String clientId;

@@ -60,6 +60,15 @@ public class Product {
     @Column(name = "eta_item_code", length = 100)
     private String etaItemCode;
 
+    // VAT (ETA tax type T1) subtype: V009 general, V010 other rate, V003
+    // exempt, V004 not subject. Null = use the pharmacy's ETA default.
+    @Column(name = "eta_tax_subtype", length = 10)
+    private String etaTaxSubtype;
+
+    // Percentage, only for V010 (V009 is always 14).
+    @Column(name = "eta_tax_rate", precision = 5, scale = 2)
+    private BigDecimal etaTaxRate;
+
     @Column(length = 50)
     @Builder.Default
     private String unitType = "BOX";

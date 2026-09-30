@@ -22,6 +22,8 @@ public class ProductResponse {
     private String category;
     private String etaItemType;
     private String etaItemCode;
+    private String etaTaxSubtype;
+    private BigDecimal etaTaxRate;
     private String unitType;
     private Integer minStockLevel;
     private Boolean prescriptionRequired;

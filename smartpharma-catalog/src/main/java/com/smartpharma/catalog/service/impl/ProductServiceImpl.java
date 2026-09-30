@@ -94,6 +94,8 @@ public class ProductServiceImpl implements ProductService {
                 .category(request.getCategory())
                 .etaItemType(blankToNull(request.getEtaItemType()))
                 .etaItemCode(blankToNull(request.getEtaItemCode()))
+                .etaTaxSubtype(blankToNull(request.getEtaTaxSubtype()))
+                .etaTaxRate("V010".equals(request.getEtaTaxSubtype()) ? request.getEtaTaxRate() : null)
                 .unitType(request.getUnitType())
                 .minStockLevel(request.getMinStockLevel())
                 .prescriptionRequired(request.getPrescriptionRequired())
@@ -149,6 +151,11 @@ public class ProductServiceImpl implements ProductService {
         product.setCategory(request.getCategory());
         if (request.getEtaItemType() != null) product.setEtaItemType(blankToNull(request.getEtaItemType()));
         if (request.getEtaItemCode() != null) product.setEtaItemCode(blankToNull(request.getEtaItemCode()));
+        if (request.getEtaTaxSubtype() != null) {
+            product.setEtaTaxSubtype(blankToNull(request.getEtaTaxSubtype()));
+            // A rate only means something for V010 ("other rate").
+            product.setEtaTaxRate("V010".equals(request.getEtaTaxSubtype()) ? request.getEtaTaxRate() : null);
+        }
         product.setUnitType(request.getUnitType());
         product.setMinStockLevel(request.getMinStockLevel());
         product.setPrescriptionRequired(request.getPrescriptionRequired());
@@ -226,6 +233,8 @@ public class ProductServiceImpl implements ProductService {
                 .category(product.getCategory())
                 .etaItemType(product.getEtaItemType())
                 .etaItemCode(product.getEtaItemCode())
+                .etaTaxSubtype(product.getEtaTaxSubtype())
+                .etaTaxRate(product.getEtaTaxRate())
                 .unitType(product.getUnitType())
                 .minStockLevel(product.getMinStockLevel())
                 .prescriptionRequired(product.getPrescriptionRequired())

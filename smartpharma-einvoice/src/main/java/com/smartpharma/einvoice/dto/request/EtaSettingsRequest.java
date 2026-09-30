@@ -1,5 +1,7 @@
 package com.smartpharma.einvoice.dto.request;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -7,6 +9,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
 
 // Field limits mirror the ETA receipt v1.2 seller/branchAddress structure.
 // clientSecret: null keeps the stored one, so the UI never has to read it back.
@@ -54,6 +58,14 @@ public class EtaSettingsRequest {
 
     @Size(max = 30)
     private String postalCode;
+
+    // Empty = the pharmacy isn't VAT-registered: receipts carry no tax lines.
+    @Pattern(regexp = "^$|V003|V004|V009|V010", message = "VAT subtype must be V003, V004, V009 or V010")
+    private String defaultTaxSubtype;
+
+    @DecimalMin(value = "0.00", message = "VAT rate can't be negative")
+    @DecimalMax(value = "100.00", message = "VAT rate can't exceed 100")
+    private BigDecimal defaultTaxRate;
 
     @NotBlank(message = "ETA client ID is required")
     @Size(max = 100)

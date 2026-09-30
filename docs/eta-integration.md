@@ -72,6 +72,28 @@ Per pharmacy (Settings -> E-Receipt (ETA), ADMIN only):
 Per product: ETA code type (`GS1`/`EGS`) and code. When empty, a barcode that
 is a valid GTIN is sent as a GS1 code.
 
+## VAT (tax type `T1`)
+
+Each product line gets a VAT subtype from the product, else from the
+pharmacy default in the ETA settings. With neither set, the line has no tax
+item (a pharmacy that isn't VAT-registered).
+
+| Subtype | Meaning | Rate |
+|---|---|---|
+| `V009` | General goods | 14% |
+| `V010` | Other rate | set on the product / default |
+| `V003` | Exempt | 0 |
+| `V004` | Not subject to VAT | 0 |
+
+SmartPharma prices are what the customer pays, i.e. VAT-inclusive. The
+receipt splits the net unit price out of the shelf price (5 decimals, ETA's
+precision) and adds VAT back, so each line total lands on the shelf price
+within a fraction of a piaster. `EtaReceiptBuilderTest` checks the ETA
+"Main Calculations" identities on 200 random sales.
+
+Which subtype applies to medicines versus cosmetics or supplements is a tax
+decision for the pharmacy's accountant, not something the code assumes.
+
 PREPROD uses certificates issued by ETA's own test root CA. Import it into the
 JVM truststore used by the backend - never disable TLS verification.
 
@@ -79,8 +101,6 @@ JVM truststore used by the backend - never disable TLS verification.
 
 Each of these is refused with a clear message instead of being sent wrong:
 
-- No tax lines (`taxableItems`): per-product VAT setup is phase 2. Pharmacies
-  selling VAT-able items must not switch the feature on until then.
 - EGP only.
 - No buyer national ID capture, so sales of 150,000 EGP or more are refused.
 - No per-item discounts (SmartPharma only has the sale-level discount, sent as

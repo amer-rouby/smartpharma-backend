@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 // Never carries the client secret - only whether one is stored.
 @Data
 @Builder
@@ -22,6 +24,8 @@ public class EtaSettingsResponse {
     private String street;
     private String buildingNumber;
     private String postalCode;
+    private String defaultTaxSubtype;
+    private BigDecimal defaultTaxRate;
     private String clientId;
     private boolean clientSecretSet;
     private boolean credentialsKeyConfigured;
@@ -38,6 +42,8 @@ public class EtaSettingsResponse {
                 .street(p.getStreet())
                 .buildingNumber(p.getBuildingNumber())
                 .postalCode(p.getPostalCode())
+                .defaultTaxSubtype(p.getDefaultTaxSubtype())
+                .defaultTaxRate(p.getDefaultTaxRate())
                 .clientId(p.getClientId())
                 .clientSecretSet(p.getClientSecretEncrypted() != null)
                 .credentialsKeyConfigured(credentialsKeyConfigured)

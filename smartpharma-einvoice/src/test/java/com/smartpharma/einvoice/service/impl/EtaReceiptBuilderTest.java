@@ -136,6 +136,101 @@ class EtaReceiptBuilderTest {
         assertThat(EtaReceiptBuilder.paymentCode(PaymentMethod.INSTAPAY)).isEqualTo("O");
     }
 
+    @Test
+    void splitsStandardVatOutOfTheShelfPrice() throws Exception {
+        SaleItem cosmetic = item(1L, "Sunscreen", "6221000000010", "BOX", 2, "11.40");
+        cosmetic.getProduct().setEtaTaxSubtype("V009");
+
+        JsonNode r = reader.readTree(EtaReceiptBuilder.build(sale(BigDecimal.ZERO, cosmetic), profile(), "POS-1",
+                "", null, "EGP", CAIRO).json());
+
+        JsonNode line = r.path("itemData").get(0);
+        assertThat(line.path("unitPrice").decimalValue()).isEqualByComparingTo("10.00000");
+        assertThat(line.path("netSale").decimalValue()).isEqualByComparingTo("20.00000");
+        JsonNode tax = line.path("taxableItems").get(0);
+        assertThat(tax.path("taxType").asText()).isEqualTo("T1");
+        assertThat(tax.path("subType").asText()).isEqualTo("V009");
+        assertThat(tax.path("rate").decimalValue()).isEqualByComparingTo("14");
+        assertThat(tax.path("amount").decimalValue()).isEqualByComparingTo("2.80000");
+        assertThat(line.path("total").decimalValue()).isEqualByComparingTo("22.80");
+        assertThat(r.path("taxTotals").get(0).path("amount").decimalValue()).isEqualByComparingTo("2.80");
+        assertThat(r.path("totalAmount").decimalValue()).isEqualByComparingTo("22.80");
+    }
+
+    @Test
+    void pharmacyDefaultAppliesUnlessTheProductOverridesIt() throws Exception {
+        EtaTaxpayerProfile vatRegistered = profile();
+        vatRegistered.setDefaultTaxSubtype("V009");
+        SaleItem generic = item(1L, "Vitamin C", "6221000000010", "BOX", 1, "11.40");
+        SaleItem medicine = item(2L, "Panadol", "6221000000010", "BOX", 1, "20.00");
+        medicine.getProduct().setEtaTaxSubtype("V003");
+        SaleItem reduced = item(3L, "Baby milk", "6221000000010", "BOX", 1, "10.50");
+        reduced.getProduct().setEtaTaxSubtype("V010");
+        reduced.getProduct().setEtaTaxRate(new BigDecimal("5"));
+
+        JsonNode r = reader.readTree(EtaReceiptBuilder.build(sale(BigDecimal.ZERO, generic, medicine, reduced),
+                vatRegistered, "POS-1", "", null, "EGP", CAIRO).json());
+
+        JsonNode items = r.path("itemData");
+        assertThat(items.get(0).path("taxableItems").get(0).path("subType").asText()).isEqualTo("V009");
+        JsonNode exempt = items.get(1).path("taxableItems").get(0);
+        assertThat(exempt.path("subType").asText()).isEqualTo("V003");
+        assertThat(exempt.path("amount").decimalValue()).isEqualByComparingTo("0");
+        assertThat(items.get(1).path("total").decimalValue()).isEqualByComparingTo("20.00");
+        JsonNode other = items.get(2).path("taxableItems").get(0);
+        assertThat(other.path("rate").decimalValue()).isEqualByComparingTo("5");
+        assertThat(items.get(2).path("unitPrice").decimalValue()).isEqualByComparingTo("10.00000");
+        assertThat(r.path("taxTotals").get(0).path("amount").decimalValue()).isEqualByComparingTo("1.90");
+    }
+
+    // Checks the ETA "Main Calculations" identities on many awkward prices
+    // rather than a few hand-picked ones.
+    @Test
+    void everyLineSatisfiesEtaCalculationRules() throws Exception {
+        EtaTaxpayerProfile vatRegistered = profile();
+        vatRegistered.setDefaultTaxSubtype("V009");
+        java.util.Random random = new java.util.Random(42);
+        for (int run = 0; run < 200; run++) {
+            List<SaleItem> items = new ArrayList<>();
+            for (int i = 0; i < 1 + random.nextInt(5); i++) {
+                String price = BigDecimal.valueOf(1 + random.nextInt(99_999), 2).toPlainString();
+                items.add(item((long) i, "Item " + i, "6221000000010", "BOX", 1 + random.nextInt(9), price));
+            }
+            BigDecimal discount = BigDecimal.valueOf(random.nextInt(300), 2);
+            SaleTransaction sale = sale(discount, items.toArray(SaleItem[]::new));
+
+            JsonNode r = reader.readTree(EtaReceiptBuilder.build(sale, vatRegistered, "POS-1", "", null, "EGP", CAIRO).json());
+
+            BigDecimal sumTotals = BigDecimal.ZERO;
+            BigDecimal sumTax = BigDecimal.ZERO;
+            for (JsonNode line : r.path("itemData")) {
+                BigDecimal qty = line.path("quantity").decimalValue();
+                BigDecimal netSale = line.path("netSale").decimalValue();
+                BigDecimal tax = line.path("taxableItems").get(0).path("amount").decimalValue();
+                assertThat(line.path("totalSale").decimalValue())
+                        .isEqualByComparingTo(qty.multiply(line.path("unitPrice").decimalValue()));
+                assertThat(tax.subtract(netSale.multiply(new BigDecimal("0.14"))).abs())
+                        .isLessThanOrEqualTo(new BigDecimal("0.00001"));
+                assertThat(line.path("total").decimalValue()).isEqualByComparingTo(netSale.add(tax));
+                sumTotals = sumTotals.add(line.path("total").decimalValue());
+                sumTax = sumTax.add(tax);
+            }
+            assertThat(r.path("taxTotals").get(0).path("amount").decimalValue()).isEqualByComparingTo(sumTax);
+            assertThat(r.path("totalAmount").decimalValue()).isEqualByComparingTo(sumTotals.subtract(discount));
+            assertThat(r.path("totalAmount").decimalValue().subtract(sale.getTotalAmount()).abs())
+                    .isLessThanOrEqualTo(new BigDecimal("0.05"));
+        }
+    }
+
+    @Test
+    void otherRateWithoutARateIsRefused() {
+        SaleItem reduced = item(1L, "Baby milk", "6221000000010", "BOX", 1, "10.50");
+        reduced.getProduct().setEtaTaxSubtype("V010");
+
+        assertThatThrownBy(() -> EtaReceiptBuilder.build(sale(BigDecimal.ZERO, reduced), profile(), "POS-1", "", null,
+                "EGP", CAIRO)).hasMessageContaining("V010");
+    }
+
     private static EtaTaxpayerProfile profile() {
         return EtaTaxpayerProfile.builder()
                 .environment(EtaEnvironment.PREPROD)

@@ -30,17 +30,20 @@ import java.util.regex.Pattern;
 // https://sdk.invoicing.eta.gov.eg/documents/receipt-v1-2/ and the "Main
 // Calculations" page.
 //
-// Deliberate phase-1 limits, each rejected with a clear message rather than
-// sent wrong: no tax lines (taxableItems is optional and pharmacy VAT setup
-// comes later), EGP only, no buyer ID (so sales of 150,000 EGP or more are
-// refused), no per-item discounts (SmartPharma only has a sale-level one,
-// sent as extraReceiptDiscountData).
+// VAT (tax type T1) comes from the product, else the pharmacy default; with
+// neither set the line has no tax item. Deliberate limits, each rejected with
+// a clear message rather than sent wrong: EGP only, no buyer ID (so sales of
+// 150,000 EGP or more are refused), no per-item discounts (SmartPharma only
+// has a sale-level one, sent as extraReceiptDiscountData).
 public final class EtaReceiptBuilder {
 
     public static final String RECEIPT_TYPE = "S";
     public static final String TYPE_VERSION = "1.2";
 
     private static final BigDecimal BUYER_ID_THRESHOLD = new BigDecimal("150000");
+    private static final BigDecimal STANDARD_VAT_RATE = new BigDecimal("14.00");
+    private static final BigDecimal TOTAL_TOLERANCE = new BigDecimal("0.05");
+    private static final int ETA_SCALE = 5;
     private static final DateTimeFormatter ISSUED_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
     private static final Pattern RIN = Pattern.compile("\\d{9}");
     private static final Pattern MOBILE = Pattern.compile("\\+?\\d{8,15}");
@@ -126,15 +129,19 @@ public final class EtaReceiptBuilder {
 
         ArrayNode itemData = receipt.putArray("itemData");
         BigDecimal totalSales = BigDecimal.ZERO;
+        BigDecimal netAmount = BigDecimal.ZERO;
+        BigDecimal linesTotal = BigDecimal.ZERO;
+        BigDecimal vatTotal = BigDecimal.ZERO;
+        boolean anyVatLine = false;
         for (SaleItem item : sale.getItems()) {
             Product product = item.getProduct();
             String[] code = itemCode(product, problems);
-            BigDecimal quantity = BigDecimal.valueOf(item.getQuantity());
-            BigDecimal unitPrice = money(item.getUnitPrice());
-            BigDecimal lineTotal = money(unitPrice.multiply(quantity));
+            Vat vat = vat(product, profile, problems);
             if (item.getQuantity() == null || item.getQuantity() <= 0) {
                 problems.add("item " + product.getName() + " has a non-positive quantity");
+                continue;
             }
+            Line calc = line(item.getQuantity(), item.getUnitPrice(), vat);
 
             ObjectNode line = itemData.addObject();
             line.put("internalCode", String.valueOf(product.getId()));
@@ -142,23 +149,38 @@ public final class EtaReceiptBuilder {
             line.put("itemType", code[0]);
             line.put("itemCode", code[1]);
             line.put("unitType", UNIT_TYPES.getOrDefault(upper(product.getUnitType()), "EA"));
-            line.put("quantity", quantity);
-            line.put("unitPrice", unitPrice);
-            line.put("netSale", lineTotal);
-            line.put("totalSale", lineTotal);
-            line.put("total", lineTotal);
-            totalSales = totalSales.add(lineTotal);
+            line.put("quantity", BigDecimal.valueOf(item.getQuantity()));
+            line.put("unitPrice", calc.unitPrice());
+            line.put("netSale", calc.netSale());
+            line.put("totalSale", calc.netSale());
+            line.put("total", calc.total());
+            if (vat != null) {
+                ObjectNode taxable = line.putArray("taxableItems").addObject();
+                taxable.put("taxType", "T1");
+                taxable.put("amount", calc.vat());
+                taxable.put("subType", vat.subtype());
+                taxable.put("rate", vat.rate());
+                anyVatLine = true;
+            }
+            totalSales = totalSales.add(calc.netSale());
+            netAmount = netAmount.add(calc.netSale());
+            vatTotal = vatTotal.add(calc.vat());
+            linesTotal = linesTotal.add(calc.total());
         }
 
         BigDecimal discount = money(sale.getDiscountAmount() == null ? BigDecimal.ZERO : sale.getDiscountAmount());
-        BigDecimal totalAmount = totalSales.subtract(discount);
+        BigDecimal totalAmount = linesTotal.subtract(discount);
         if (discount.signum() < 0 || totalAmount.signum() < 0) {
-            problems.add("sale discount " + discount + " is negative or larger than the items total " + totalSales);
+            problems.add("sale discount " + discount + " is negative or larger than the items total " + linesTotal);
         }
         if (totalAmount.compareTo(BUYER_ID_THRESHOLD) >= 0) {
             problems.add("sales of 150,000 EGP or more need the buyer's national ID, which isn't captured yet");
         }
-        if (sale.getTotalAmount() != null && money(sale.getTotalAmount()).compareTo(totalAmount) != 0) {
+        // Splitting VAT out of tax-inclusive prices rounds each line to 5
+        // decimals, so the receipt total can drift a fraction of a piaster
+        // from the sale total - more than that means the sale itself is off.
+        if (sale.getTotalAmount() != null
+                && money(sale.getTotalAmount()).subtract(totalAmount).abs().compareTo(TOTAL_TOLERANCE) > 0) {
             problems.add("sale total " + sale.getTotalAmount() + " doesn't match its items minus discount (" + totalAmount + ")");
         }
         if (!problems.isEmpty()) {
@@ -171,8 +193,13 @@ public final class EtaReceiptBuilder {
             extra.put("amount", discount);
             extra.put("description", "Discount");
         }
-        receipt.put("netAmount", totalSales);
+        receipt.put("netAmount", netAmount);
         receipt.put("totalAmount", totalAmount);
+        if (anyVatLine) {
+            ObjectNode taxTotal = receipt.putArray("taxTotals").addObject();
+            taxTotal.put("taxType", "T1");
+            taxTotal.put("amount", vatTotal);
+        }
         receipt.put("paymentMethod", paymentCode(sale.getPaymentMethod()));
 
         String uuid = EtaCanonicalSerializer.sha256Hex(EtaCanonicalSerializer.serialize(receipt));
@@ -180,6 +207,58 @@ public final class EtaReceiptBuilder {
 
         return new BuiltReceipt(toJson(receipt), uuid, sale.getInvoiceNumber(), dateTimeIssued,
                 totalAmount.toPlainString());
+    }
+
+    // VAT for one product: its own subtype, else the pharmacy default; null
+    // when neither is set (receipt carries no tax line for it).
+    record Vat(String subtype, BigDecimal rate) {
+    }
+
+    record Line(BigDecimal unitPrice, BigDecimal netSale, BigDecimal vat, BigDecimal total) {
+    }
+
+    static Vat vat(Product product, EtaTaxpayerProfile profile, List<String> problems) {
+        boolean own = notBlank(product.getEtaTaxSubtype());
+        String subtype = own ? product.getEtaTaxSubtype() : profile.getDefaultTaxSubtype();
+        if (!notBlank(subtype)) {
+            return null;
+        }
+        return switch (subtype) {
+            case "V009" -> new Vat(subtype, STANDARD_VAT_RATE);
+            case "V003", "V004" -> new Vat(subtype, BigDecimal.ZERO.setScale(2));
+            case "V010" -> {
+                BigDecimal rate = own ? product.getEtaTaxRate() : profile.getDefaultTaxRate();
+                if (rate == null || rate.signum() <= 0) {
+                    problems.add("product " + product.getName() + " uses VAT subtype V010 but has no rate");
+                    yield null;
+                }
+                yield new Vat(subtype, rate.setScale(2, RoundingMode.HALF_UP));
+            }
+            default -> {
+                problems.add("product " + product.getName() + " has unknown VAT subtype " + subtype);
+                yield null;
+            }
+        };
+    }
+
+    // SmartPharma prices are what the customer pays, i.e. VAT-inclusive, while
+    // ETA wants the net unit price with VAT added on top. So the net price is
+    // split out of the shelf price (5 decimals, ETA's precision) and
+    // total = netSale + VAT lands back on the shelf price within rounding.
+    static Line line(int quantity, BigDecimal shelfPrice, Vat vat) {
+        BigDecimal qty = BigDecimal.valueOf(quantity);
+        if (vat == null || vat.rate().signum() == 0) {
+            BigDecimal unit = money(shelfPrice);
+            BigDecimal net = money(unit.multiply(qty));
+            BigDecimal zero = BigDecimal.ZERO.setScale(ETA_SCALE);
+            return new Line(unit, net, zero, net);
+        }
+        BigDecimal hundred = BigDecimal.valueOf(100);
+        BigDecimal unitNet = shelfPrice.multiply(hundred)
+                .divide(hundred.add(vat.rate()), ETA_SCALE, RoundingMode.HALF_UP);
+        BigDecimal netSale = unitNet.multiply(qty);
+        BigDecimal vatAmount = netSale.multiply(vat.rate()).divide(hundred, ETA_SCALE, RoundingMode.HALF_UP);
+        return new Line(unitNet, netSale, vatAmount, netSale.add(vatAmount));
     }
 
     // ETA payment method codes: C cash, V visa, O others.

@@ -60,6 +60,9 @@ public class EtaSettingsServiceImpl implements EtaSettingsService {
         profile.setStreet(trim(request.getStreet()));
         profile.setBuildingNumber(trim(request.getBuildingNumber()));
         profile.setPostalCode(trim(request.getPostalCode()));
+        String taxSubtype = trim(request.getDefaultTaxSubtype());
+        profile.setDefaultTaxSubtype(taxSubtype);
+        profile.setDefaultTaxRate("V010".equals(taxSubtype) ? request.getDefaultTaxRate() : null);
         profile.setClientId(trim(request.getClientId()));
         if (request.getClientSecret() != null && !request.getClientSecret().isBlank()) {
             profile.setClientSecretEncrypted(cipher.encrypt(request.getClientSecret().trim()));
