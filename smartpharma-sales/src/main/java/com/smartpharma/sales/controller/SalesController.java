@@ -9,6 +9,7 @@ import com.smartpharma.common.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -98,6 +99,16 @@ public class SalesController {
                     throw new RuntimeException("This item was just sold by another transaction. Please try again.");
                 }
                 log.debug("Concurrent stock update detected, retrying sale creation (attempt {}/{})", attempt, maxAttempts);
+            } catch (DataIntegrityViolationException ex) {
+                // Two sends of the same offline sale raced past the duplicate
+                // check; the unique (pharmacy, clientSaleId) index stopped the
+                // second. Retrying finds the first one and returns it.
+                boolean offlineDuplicate = request.getClientSaleId() != null && !request.getClientSaleId().isBlank();
+                if (!offlineDuplicate || attempt == maxAttempts) {
+                    throw ex;
+                }
+                log.debug("Duplicate offline sale {} raced another send, returning the recorded one",
+                        request.getClientSaleId());
             }
         }
         throw new IllegalStateException("unreachable");

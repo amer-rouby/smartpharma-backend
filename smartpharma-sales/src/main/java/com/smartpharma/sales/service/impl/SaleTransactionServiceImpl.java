@@ -40,9 +40,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -50,6 +53,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class SaleTransactionServiceImpl implements SaleTransactionService {
+
+    // Offline POS limits - see resolveSaleTime.
+    private static final Duration MAX_OFFLINE_AGE = Duration.ofHours(72);
+    private static final Duration MAX_CLOCK_SKEW = Duration.ofMinutes(5);
 
     private final SaleTransactionRepository saleTransactionRepository;
     private final ProductRepository productRepository;
@@ -103,6 +110,20 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User not found: " + currentUserId));
 
+        // Idempotent for the offline POS: the same device sale sent twice
+        // (e.g. the response was lost) returns the first one, not a duplicate.
+        String clientSaleId = blankToNull(request.getClientSaleId());
+        if (clientSaleId != null) {
+            Optional<SaleTransaction> existing =
+                    saleTransactionRepository.findByPharmacyIdAndClientSaleId(pharmacy.getId(), clientSaleId);
+            if (existing.isPresent()) {
+                log.info("Sale {} already recorded as id {} - returning it instead of a duplicate",
+                        clientSaleId, existing.get().getId());
+                return mapToDTO(existing.get());
+            }
+        }
+        LocalDateTime transactionDate = resolveSaleTime(request.getSoldAt(), clientSaleId);
+
         String paymentMethodValue = Optional.ofNullable(request.getPaymentMethod()).orElse("CASH").toUpperCase();
         validatePaymentMethodEnabled(request.getPharmacyId(), paymentMethodValue);
 
@@ -112,6 +133,8 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .invoiceNumber(generateInvoiceNumber())
                 .discountAmount(Optional.ofNullable(request.getDiscountAmount()).orElse(BigDecimal.ZERO))
                 .customerPhone(request.getCustomerPhone())
+                .clientSaleId(clientSaleId)
+                .transactionDate(transactionDate)
                 .buyerNationalId(blankToNull(request.getBuyerNationalId()))
                 .buyerName(blankToNull(request.getBuyerName()))
                 .prescriptionImageUrl(request.getPrescriptionImageUrl())
@@ -213,6 +236,23 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         saleTransactionRepository.save(sale);
         eventPublisher.publishEvent(new SaleCancelledEvent(pharmacyId, id));
         log.info("Sale deleted successfully | id: {}", id);
+    }
+
+    // When the sale happened. Online sales use the server clock; a sale made
+    // offline keeps the time it was rung up, if that's plausible: not in the
+    // future (a few minutes of clock skew allowed) and not older than the
+    // offline window, so a device can't backdate sales freely.
+    static LocalDateTime resolveSaleTime(Instant soldAt, String clientSaleId) {
+        Instant now = Instant.now();
+        if (soldAt == null || clientSaleId == null) {
+            return LocalDateTime.now();
+        }
+        if (soldAt.isAfter(now.plus(MAX_CLOCK_SKEW)) || soldAt.isBefore(now.minus(MAX_OFFLINE_AGE))) {
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "SALE_OFFLINE_TIME_INVALID",
+                    "An offline sale can only be recorded within " + MAX_OFFLINE_AGE.toHours() + " hours of when it was made",
+                    Map.of("hours", MAX_OFFLINE_AGE.toHours()));
+        }
+        return LocalDateTime.ofInstant(soldAt, ZoneId.systemDefault());
     }
 
     private static String blankToNull(String value) {

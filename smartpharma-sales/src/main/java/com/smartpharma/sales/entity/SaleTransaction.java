@@ -72,6 +72,12 @@ public class SaleTransaction {
     @Column(name = "buyer_name", length = 100)
     private String buyerName;
 
+    // Set by the POS for every sale (a UUID made on the device), so a sale
+    // queued while offline and sent again after a dropped response is only
+    // recorded once. Unique per pharmacy - see SaleClientIdUniquenessBackfill.
+    @Column(name = "client_sale_id", length = 36)
+    private String clientSaleId;
+
     @Column(name = "notes", length = 500)
     private String notes;
 

@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -35,6 +36,15 @@ public class SaleRequest {
     private String buyerName;
 
     private String prescriptionImageUrl;
+
+    // Offline POS: a device-made UUID that makes retries idempotent, and
+    // when the sale actually happened (only honoured together with
+    // clientSaleId, and only within the offline window).
+    @Pattern(regexp = "^$|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            message = "Client sale ID must be a UUID")
+    private String clientSaleId;
+
+    private Instant soldAt;
 
     private String paymentMethod = "CASH";
 
