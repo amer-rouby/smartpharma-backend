@@ -39,6 +39,16 @@ Official references used:
 5. The sale details dialog shows the receipt status, UUID and QR code, and
    prints the QR on the invoice.
 
+## Buyer national ID
+
+ETA requires the buyer's national ID and name on receipts of 150,000 EGP or
+more. The POS asks for both (optional below the threshold, validated as 14
+digits starting with 2 or 3); they're stored on the sale (`buyer_national_id`,
+`buyer_name`) and sent in the receipt's `buyer` block. The sales module
+publishes `SaleCreatingEvent` synchronously before saving, and with
+e-receipts on a sale at or above the threshold without both is refused with
+`400 BUYER_ID_REQUIRED` - at the till, before any stock is committed.
+
 ## Cancelled and edited sales
 
 - **Deleting a sale** publishes `SaleCancelledEvent`. If the sale has an
@@ -124,7 +134,6 @@ JVM truststore used by the backend - never disable TLS verification.
 Each of these is refused with a clear message instead of being sent wrong:
 
 - EGP only.
-- No buyer national ID capture, so sales of 150,000 EGP or more are refused.
 - No per-item discounts (SmartPharma only has the sale-level discount, sent as
   `extraReceiptDiscountData`).
 

@@ -225,6 +225,24 @@ class EtaReceiptBuilderTest {
     }
 
     @Test
+    void largeSaleCarriesTheBuyersNationalIdAndName() throws Exception {
+        SaleTransaction large = sale(BigDecimal.ZERO, item(1L, "Device", "6221000000010", "BOX", 1, "150000.00"));
+        large.setBuyerNationalId("29001011234567");
+        large.setBuyerName("Ahmed Ali");
+
+        JsonNode buyer = reader.readTree(EtaReceiptBuilder.build(large, profile(), "POS-1", "", null, "EGP", CAIRO)
+                .json()).path("buyer");
+
+        assertThat(buyer.path("type").asText()).isEqualTo("P");
+        assertThat(buyer.path("id").asText()).isEqualTo("29001011234567");
+        assertThat(buyer.path("name").asText()).isEqualTo("Ahmed Ali");
+
+        large.setBuyerName(null);
+        assertThatThrownBy(() -> EtaReceiptBuilder.build(large, profile(), "POS-1", "", null, "EGP", CAIRO))
+                .hasMessageContaining("national ID and name");
+    }
+
+    @Test
     void returnReceiptReversesTheOriginalExactly() throws Exception {
         EtaTaxpayerProfile vatRegistered = profile();
         vatRegistered.setDefaultTaxSubtype("V009");

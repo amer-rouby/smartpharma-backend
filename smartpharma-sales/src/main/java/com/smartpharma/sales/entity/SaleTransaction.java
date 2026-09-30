@@ -65,6 +65,13 @@ public class SaleTransaction {
     @Column(name = "customer_phone", length = 20)
     private String customerPhone;
 
+    // Buyer identity for the ETA e-receipt - required by ETA from 150,000 EGP.
+    @Column(name = "buyer_national_id", length = 14)
+    private String buyerNationalId;
+
+    @Column(name = "buyer_name", length = 100)
+    private String buyerName;
+
     @Column(name = "notes", length = 500)
     private String notes;
 

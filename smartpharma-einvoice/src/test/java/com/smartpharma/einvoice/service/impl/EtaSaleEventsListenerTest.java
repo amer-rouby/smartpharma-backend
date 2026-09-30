@@ -4,8 +4,10 @@ import com.smartpharma.common.exception.LocalizedException;
 import com.smartpharma.einvoice.entity.EInvoiceSubmission;
 import com.smartpharma.einvoice.repository.EInvoiceSubmissionRepository;
 import com.smartpharma.sales.event.SaleAmendingEvent;
+import com.smartpharma.sales.event.SaleCreatingEvent;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -16,7 +18,27 @@ import static org.mockito.Mockito.when;
 class EtaSaleEventsListenerTest {
 
     private final EInvoiceSubmissionRepository repository = mock(EInvoiceSubmissionRepository.class);
-    private final EtaSaleEventsListener listener = new EtaSaleEventsListener(null, null, repository);
+    private final EtaReceiptIssuer issuer = mock(EtaReceiptIssuer.class);
+    private final EtaSaleEventsListener listener = new EtaSaleEventsListener(issuer, null, repository);
+
+    @Test
+    void largeSaleNeedsTheBuyerIdOnlyWhenEReceiptsAreOn() {
+        BigDecimal large = new BigDecimal("150000.00");
+        when(issuer.isEnabled(1L)).thenReturn(true);
+        when(issuer.isEnabled(2L)).thenReturn(false);
+
+        assertThatThrownBy(() -> listener.onSaleCreating(new SaleCreatingEvent(1L, large, null, null)))
+                .isInstanceOf(LocalizedException.class)
+                .hasMessageContaining("national ID and name");
+        assertThatThrownBy(() -> listener.onSaleCreating(new SaleCreatingEvent(1L, large, "29001011234567", " ")))
+                .isInstanceOf(LocalizedException.class);
+        assertThatCode(() -> listener.onSaleCreating(new SaleCreatingEvent(1L, large, "29001011234567", "Ahmed Ali")))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> listener.onSaleCreating(new SaleCreatingEvent(1L, new BigDecimal("149999.99"), null, null)))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> listener.onSaleCreating(new SaleCreatingEvent(2L, large, null, null)))
+                .doesNotThrowAnyException();
+    }
 
     @Test
     void refusesToAmendASaleWhoseReceiptWasIssued() {

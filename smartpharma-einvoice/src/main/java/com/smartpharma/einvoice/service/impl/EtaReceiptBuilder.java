@@ -36,8 +36,8 @@ import java.util.regex.Pattern;
 //
 // VAT (tax type T1) comes from the product, else the pharmacy default; with
 // neither set the line has no tax item. Deliberate limits, each rejected with
-// a clear message rather than sent wrong: EGP only, no buyer ID (so sales of
-// 150,000 EGP or more are refused), no per-item discounts (SmartPharma only
+// a clear message rather than sent wrong: EGP only, a buyer national ID and
+// name from 150,000 EGP (ETA's threshold), no per-item discounts (SmartPharma only
 // has a sale-level one, sent as extraReceiptDiscountData).
 public final class EtaReceiptBuilder {
 
@@ -49,7 +49,8 @@ public final class EtaReceiptBuilder {
     // ETA: "Maximum allowed days to issue a return receipt is 540 days".
     static final long MAX_RETURN_DAYS = 540;
 
-    private static final BigDecimal BUYER_ID_THRESHOLD = new BigDecimal("150000");
+    // From this total ETA requires the buyer's ID and name on a receipt.
+    public static final BigDecimal BUYER_ID_THRESHOLD = new BigDecimal("150000");
     private static final BigDecimal STANDARD_VAT_RATE = new BigDecimal("14.00");
     private static final BigDecimal TOTAL_TOLERANCE = new BigDecimal("0.05");
     private static final int ETA_SCALE = 5;
@@ -132,6 +133,12 @@ public final class EtaReceiptBuilder {
 
         ObjectNode buyer = receipt.putObject("buyer");
         buyer.put("type", "P");
+        if (notBlank(sale.getBuyerNationalId())) {
+            buyer.put("id", sale.getBuyerNationalId());
+        }
+        if (notBlank(sale.getBuyerName())) {
+            buyer.put("name", truncate(sale.getBuyerName(), 100));
+        }
         String phone = sale.getCustomerPhone() == null ? null : sale.getCustomerPhone().replaceAll("[\\s-]", "");
         if (phone != null && MOBILE.matcher(phone).matches()) {
             buyer.put("mobileNumber", phone);
@@ -183,8 +190,9 @@ public final class EtaReceiptBuilder {
         if (discount.signum() < 0 || totalAmount.signum() < 0) {
             problems.add("sale discount " + discount + " is negative or larger than the items total " + linesTotal);
         }
-        if (totalAmount.compareTo(BUYER_ID_THRESHOLD) >= 0) {
-            problems.add("sales of 150,000 EGP or more need the buyer's national ID, which isn't captured yet");
+        if (totalAmount.compareTo(BUYER_ID_THRESHOLD) >= 0
+                && (!notBlank(sale.getBuyerNationalId()) || !notBlank(sale.getBuyerName()))) {
+            problems.add("sales of 150,000 EGP or more need the buyer's national ID and name");
         }
         // Splitting VAT out of tax-inclusive prices rounds each line to 5
         // decimals, so the receipt total can drift a fraction of a piaster

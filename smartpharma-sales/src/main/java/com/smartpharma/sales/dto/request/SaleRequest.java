@@ -3,6 +3,8 @@ package com.smartpharma.sales.dto.request;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -24,6 +26,13 @@ public class SaleRequest {
     private String notes;
 
     private String customerPhone;
+
+    // Egyptian national ID: 14 digits, the first being the century (2 = 1900s, 3 = 2000s).
+    @Pattern(regexp = "^$|[23]\\d{13}", message = "National ID must be 14 digits starting with 2 or 3")
+    private String buyerNationalId;
+
+    @Size(max = 100, message = "Buyer name is too long")
+    private String buyerName;
 
     private String prescriptionImageUrl;
 
