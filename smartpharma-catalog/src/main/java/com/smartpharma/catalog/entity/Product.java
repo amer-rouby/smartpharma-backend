@@ -52,6 +52,14 @@ public class Product {
     @Column(length = 100)
     private String category;
 
+    // ETA e-receipt item coding: GS1 or EGS plus the code registered with ETA.
+    // When empty, a barcode that is a valid GTIN is sent as GS1 instead.
+    @Column(name = "eta_item_type", length = 10)
+    private String etaItemType;
+
+    @Column(name = "eta_item_code", length = 100)
+    private String etaItemCode;
+
     @Column(length = 50)
     @Builder.Default
     private String unitType = "BOX";

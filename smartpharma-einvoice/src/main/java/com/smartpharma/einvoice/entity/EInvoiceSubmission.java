@@ -9,9 +9,14 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-// Tracks the Egyptian Tax Authority (ETA) e-invoice submission for a sale.
-// One row per sale (unique FK) - a retry updates the same row and bumps
-// retryCount rather than creating a new submission each time.
+// The ETA e-receipt issued for a sale and its submission state. One row per
+// sale (unique FK) - a retry updates the same row and bumps retryCount rather
+// than creating a new submission each time.
+//
+// receiptJson is the exact receipt text sent to ETA: the UUID is a hash of
+// it, so it's stored once at issue time and never rebuilt from the sale.
+// PENDING = issued, waiting to be sent; ERROR = not issued or not delivered
+// (retryable); REJECTED = ETA refused it, needs a corrected re-issue.
 @Entity
 @Table(name = "einvoice_submissions", schema = "smartpharma", indexes = {
         @Index(name = "idx_einvoice_sale", columnList = "sale_transaction_id"),
@@ -43,9 +48,39 @@ public class EInvoiceSubmission {
     @Column(name = "eta_uuid", length = 100)
     private String etaUuid;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pos_device_id")
+    @ToString.Exclude
+    private EtaPosDevice posDevice;
+
+    @Column(name = "receipt_number", length = 50)
+    private String receiptNumber;
+
+    // UTC, formatted exactly as sent (yyyy-MM-ddTHH:mm:ssZ).
+    @Column(name = "date_time_issued", length = 25)
+    private String dateTimeIssued;
+
+    @Column(name = "previous_uuid", length = 64)
+    private String previousUuid;
+
+    @Column(name = "receipt_json", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String receiptJson;
+
+    @Column(name = "qr_content", length = 500)
+    private String qrContent;
+
+    @Column(name = "submission_uuid", length = 50)
+    private String submissionUuid;
+
+    @Column(name = "long_id", length = 200)
+    private String longId;
+
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
+    // Existing column is VARCHAR(500) and ddl-auto=update never widens it,
+    // so recordError() truncates instead.
     @Column(name = "error_message", length = 500)
     private String errorMessage;
 
@@ -60,4 +95,13 @@ public class EInvoiceSubmission {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public void recordError(Status status, String message) {
+        this.status = status;
+        this.errorMessage = message == null || message.length() <= 500 ? message : message.substring(0, 497) + "...";
+    }
+
+    public boolean isIssued() {
+        return receiptJson != null && etaUuid != null;
+    }
 }

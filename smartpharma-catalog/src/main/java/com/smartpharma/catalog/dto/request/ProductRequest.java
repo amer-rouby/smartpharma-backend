@@ -29,6 +29,11 @@ public class ProductRequest {
 
     private String category;
 
+    // Null leaves the stored value unchanged on update; blank clears it.
+    private String etaItemType;
+
+    private String etaItemCode;
+
     @Builder.Default
     private String unitType = "BOX";
 

@@ -92,6 +92,8 @@ public class ProductServiceImpl implements ProductService {
                 .scientificName(request.getScientificName())
                 .barcode(request.getBarcode())
                 .category(request.getCategory())
+                .etaItemType(blankToNull(request.getEtaItemType()))
+                .etaItemCode(blankToNull(request.getEtaItemCode()))
                 .unitType(request.getUnitType())
                 .minStockLevel(request.getMinStockLevel())
                 .prescriptionRequired(request.getPrescriptionRequired())
@@ -145,6 +147,8 @@ public class ProductServiceImpl implements ProductService {
         product.setScientificName(request.getScientificName());
         product.setBarcode(request.getBarcode());
         product.setCategory(request.getCategory());
+        if (request.getEtaItemType() != null) product.setEtaItemType(blankToNull(request.getEtaItemType()));
+        if (request.getEtaItemCode() != null) product.setEtaItemCode(blankToNull(request.getEtaItemCode()));
         product.setUnitType(request.getUnitType());
         product.setMinStockLevel(request.getMinStockLevel());
         product.setPrescriptionRequired(request.getPrescriptionRequired());
@@ -220,6 +224,8 @@ public class ProductServiceImpl implements ProductService {
                 .scientificName(product.getScientificName())
                 .barcode(product.getBarcode())
                 .category(product.getCategory())
+                .etaItemType(product.getEtaItemType())
+                .etaItemCode(product.getEtaItemCode())
                 .unitType(product.getUnitType())
                 .minStockLevel(product.getMinStockLevel())
                 .prescriptionRequired(product.getPrescriptionRequired())
@@ -229,5 +235,9 @@ public class ProductServiceImpl implements ProductService {
                 .totalStock(product.getTotalStock())
                 .createdAt(product.getCreatedAt())
                 .build();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

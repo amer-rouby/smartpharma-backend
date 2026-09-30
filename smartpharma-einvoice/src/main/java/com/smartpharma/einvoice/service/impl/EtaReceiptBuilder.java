@@ -1,0 +1,269 @@
+package com.smartpharma.einvoice.service.impl;
+
+import com.smartpharma.einvoice.util.EtaCanonicalSerializer;
+import com.smartpharma.einvoice.exception.EtaReceiptException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.smartpharma.catalog.entity.Product;
+import com.smartpharma.einvoice.entity.EtaTaxpayerProfile;
+import com.smartpharma.payments.entity.enums.PaymentMethod;
+import com.smartpharma.sales.entity.SaleItem;
+import com.smartpharma.sales.entity.SaleTransaction;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+// Builds an ETA sales receipt (document type S, version 1.2) for a sale and
+// computes its UUID. Structure and rules follow
+// https://sdk.invoicing.eta.gov.eg/documents/receipt-v1-2/ and the "Main
+// Calculations" page.
+//
+// Deliberate phase-1 limits, each rejected with a clear message rather than
+// sent wrong: no tax lines (taxableItems is optional and pharmacy VAT setup
+// comes later), EGP only, no buyer ID (so sales of 150,000 EGP or more are
+// refused), no per-item discounts (SmartPharma only has a sale-level one,
+// sent as extraReceiptDiscountData).
+public final class EtaReceiptBuilder {
+
+    public static final String RECEIPT_TYPE = "S";
+    public static final String TYPE_VERSION = "1.2";
+
+    private static final BigDecimal BUYER_ID_THRESHOLD = new BigDecimal("150000");
+    private static final DateTimeFormatter ISSUED_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
+    private static final Pattern RIN = Pattern.compile("\\d{9}");
+    private static final Pattern MOBILE = Pattern.compile("\\+?\\d{8,15}");
+    private static final Map<String, String> UNIT_TYPES = Map.of(
+            "BOX", "BOX",
+            "BOTTLE", "BO",
+            "PACKET", "PA");
+
+    // Exact decimals: the default node factory would turn 10.50 into 10.5,
+    // and the UUID is a hash of the text exactly as sent.
+    private static final JsonNodeFactory NODES = JsonNodeFactory.withExactBigDecimals(true);
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .setNodeFactory(NODES)
+            .enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN)
+            .disable(SerializationFeature.INDENT_OUTPUT);
+
+    private EtaReceiptBuilder() {
+    }
+
+    public record BuiltReceipt(String json, String uuid, String receiptNumber, String dateTimeIssued,
+                               String totalAmount) {
+    }
+
+    public static BuiltReceipt build(SaleTransaction sale, EtaTaxpayerProfile profile, String deviceSerial,
+                                     String previousUuid, String referenceOldUuid, String currency,
+                                     ZoneId saleZone) {
+        List<String> problems = new ArrayList<>();
+        validateProfile(profile, problems);
+        if (currency != null && !"EGP".equalsIgnoreCase(currency)) {
+            problems.add("pharmacy currency is " + currency + " - only EGP receipts are supported");
+        }
+        if (sale.getInvoiceNumber() == null || sale.getInvoiceNumber().length() > 50) {
+            problems.add("sale invoice number is missing or longer than 50 characters");
+        }
+        if (sale.getItems() == null || sale.getItems().isEmpty()) {
+            problems.add("sale has no items");
+        }
+        if (!problems.isEmpty()) {
+            throw new EtaReceiptException(String.join("; ", problems));
+        }
+
+        String dateTimeIssued = sale.getTransactionDate().atZone(saleZone)
+                .withZoneSameInstant(ZoneOffset.UTC).format(ISSUED_FORMAT);
+
+        ObjectNode receipt = NODES.objectNode();
+
+        ObjectNode header = receipt.putObject("header");
+        header.put("dateTimeIssued", dateTimeIssued);
+        header.put("receiptNumber", sale.getInvoiceNumber());
+        header.put("uuid", "");
+        header.put("previousUUID", previousUuid == null ? "" : previousUuid);
+        if (referenceOldUuid != null && !referenceOldUuid.isBlank()) {
+            header.put("referenceOldUUID", referenceOldUuid);
+        }
+        header.put("currency", "EGP");
+
+        ObjectNode documentType = receipt.putObject("documentType");
+        documentType.put("receiptType", RECEIPT_TYPE);
+        documentType.put("typeVersion", TYPE_VERSION);
+
+        ObjectNode seller = receipt.putObject("seller");
+        seller.put("rin", profile.getRin());
+        seller.put("companyTradeName", profile.getCompanyTradeName());
+        seller.put("branchCode", profile.getBranchCode());
+        ObjectNode address = seller.putObject("branchAddress");
+        address.put("country", "EG");
+        address.put("governate", profile.getGovernate());
+        address.put("regionCity", profile.getRegionCity());
+        address.put("street", profile.getStreet());
+        address.put("buildingNumber", profile.getBuildingNumber());
+        if (notBlank(profile.getPostalCode())) {
+            address.put("postalCode", profile.getPostalCode());
+        }
+        seller.put("deviceSerialNumber", deviceSerial);
+        seller.put("activityCode", profile.getActivityCode());
+
+        ObjectNode buyer = receipt.putObject("buyer");
+        buyer.put("type", "P");
+        String phone = sale.getCustomerPhone() == null ? null : sale.getCustomerPhone().replaceAll("[\\s-]", "");
+        if (phone != null && MOBILE.matcher(phone).matches()) {
+            buyer.put("mobileNumber", phone);
+        }
+
+        ArrayNode itemData = receipt.putArray("itemData");
+        BigDecimal totalSales = BigDecimal.ZERO;
+        for (SaleItem item : sale.getItems()) {
+            Product product = item.getProduct();
+            String[] code = itemCode(product, problems);
+            BigDecimal quantity = BigDecimal.valueOf(item.getQuantity());
+            BigDecimal unitPrice = money(item.getUnitPrice());
+            BigDecimal lineTotal = money(unitPrice.multiply(quantity));
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                problems.add("item " + product.getName() + " has a non-positive quantity");
+            }
+
+            ObjectNode line = itemData.addObject();
+            line.put("internalCode", String.valueOf(product.getId()));
+            line.put("description", truncate(product.getName(), 500));
+            line.put("itemType", code[0]);
+            line.put("itemCode", code[1]);
+            line.put("unitType", UNIT_TYPES.getOrDefault(upper(product.getUnitType()), "EA"));
+            line.put("quantity", quantity);
+            line.put("unitPrice", unitPrice);
+            line.put("netSale", lineTotal);
+            line.put("totalSale", lineTotal);
+            line.put("total", lineTotal);
+            totalSales = totalSales.add(lineTotal);
+        }
+
+        BigDecimal discount = money(sale.getDiscountAmount() == null ? BigDecimal.ZERO : sale.getDiscountAmount());
+        BigDecimal totalAmount = totalSales.subtract(discount);
+        if (discount.signum() < 0 || totalAmount.signum() < 0) {
+            problems.add("sale discount " + discount + " is negative or larger than the items total " + totalSales);
+        }
+        if (totalAmount.compareTo(BUYER_ID_THRESHOLD) >= 0) {
+            problems.add("sales of 150,000 EGP or more need the buyer's national ID, which isn't captured yet");
+        }
+        if (sale.getTotalAmount() != null && money(sale.getTotalAmount()).compareTo(totalAmount) != 0) {
+            problems.add("sale total " + sale.getTotalAmount() + " doesn't match its items minus discount (" + totalAmount + ")");
+        }
+        if (!problems.isEmpty()) {
+            throw new EtaReceiptException(String.join("; ", problems));
+        }
+
+        receipt.put("totalSales", totalSales);
+        if (discount.signum() > 0) {
+            ObjectNode extra = receipt.putArray("extraReceiptDiscountData").addObject();
+            extra.put("amount", discount);
+            extra.put("description", "Discount");
+        }
+        receipt.put("netAmount", totalSales);
+        receipt.put("totalAmount", totalAmount);
+        receipt.put("paymentMethod", paymentCode(sale.getPaymentMethod()));
+
+        String uuid = EtaCanonicalSerializer.sha256Hex(EtaCanonicalSerializer.serialize(receipt));
+        header.put("uuid", uuid);
+
+        return new BuiltReceipt(toJson(receipt), uuid, sale.getInvoiceNumber(), dateTimeIssued,
+                totalAmount.toPlainString());
+    }
+
+    // ETA payment method codes: C cash, V visa, O others.
+    static String paymentCode(PaymentMethod method) {
+        if (method == null) {
+            return "C";
+        }
+        return switch (method) {
+            case CASH -> "C";
+            case VISA, MASTERCARD -> "V";
+            default -> "O";
+        };
+    }
+
+    // [itemType, itemCode] - the ETA code set on the product, else a barcode
+    // that is a valid GTIN (sent as GS1).
+    static String[] itemCode(Product product, List<String> problems) {
+        String type = upper(product.getEtaItemType());
+        String code = product.getEtaItemCode();
+        if (notBlank(code)) {
+            if (!"GS1".equals(type) && !"EGS".equals(type)) {
+                problems.add("product " + product.getName() + " has ETA code " + code + " but item type isn't GS1 or EGS");
+            }
+            return new String[]{type, code.trim()};
+        }
+        String barcode = product.getBarcode() == null ? null : product.getBarcode().trim();
+        if (isValidGtin(barcode)) {
+            return new String[]{"GS1", barcode};
+        }
+        problems.add("product " + product.getName() + " has no ETA item code and no valid GTIN barcode");
+        return new String[]{"", ""};
+    }
+
+    static boolean isValidGtin(String value) {
+        if (value == null || !value.matches("\\d{8}|\\d{12,14}")) {
+            return false;
+        }
+        int sum = 0;
+        for (int i = value.length() - 2, weight = 3; i >= 0; i--, weight = 4 - weight) {
+            sum += (value.charAt(i) - '0') * weight;
+        }
+        return (10 - sum % 10) % 10 == value.charAt(value.length() - 1) - '0';
+    }
+
+    private static void validateProfile(EtaTaxpayerProfile profile, List<String> problems) {
+        if (profile.getRin() == null || !RIN.matcher(profile.getRin()).matches()) {
+            problems.add("tax registration number (RIN) must be 9 digits");
+        }
+        require(profile.getCompanyTradeName(), "company trade name", problems);
+        require(profile.getBranchCode(), "branch code", problems);
+        require(profile.getActivityCode(), "activity code", problems);
+        require(profile.getGovernate(), "governorate", problems);
+        require(profile.getRegionCity(), "region/city", problems);
+        require(profile.getStreet(), "street", problems);
+        require(profile.getBuildingNumber(), "building number", problems);
+    }
+
+    private static void require(String value, String label, List<String> problems) {
+        if (!notBlank(value)) {
+            problems.add(label + " is required");
+        }
+    }
+
+    private static BigDecimal money(BigDecimal value) {
+        return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static boolean notBlank(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static String upper(String value) {
+        return value == null ? null : value.trim().toUpperCase();
+    }
+
+    private static String truncate(String value, int max) {
+        return value == null || value.length() <= max ? value : value.substring(0, max);
+    }
+
+    private static String toJson(ObjectNode receipt) {
+        try {
+            return MAPPER.writeValueAsString(receipt);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to write ETA receipt JSON", e);
+        }
+    }
+}

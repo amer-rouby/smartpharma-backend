@@ -20,6 +20,8 @@ public class ProductResponse {
     private String scientificName;
     private String barcode;
     private String category;
+    private String etaItemType;
+    private String etaItemCode;
     private String unitType;
     private Integer minStockLevel;
     private Boolean prescriptionRequired;
