@@ -1,6 +1,8 @@
 package com.smartpharma.catalog.service.impl;
 
+import com.smartpharma.catalog.dto.request.BulkPriceUpdateRequest;
 import com.smartpharma.catalog.dto.request.ProductRequest;
+import com.smartpharma.catalog.dto.response.BulkPriceUpdateResponse;
 import com.smartpharma.catalog.dto.response.ProductResponse;
 import com.smartpharma.common.entity.Pharmacy;
 import com.smartpharma.catalog.entity.Product;
@@ -9,12 +11,14 @@ import com.smartpharma.common.repository.PharmacyRepository;
 import com.smartpharma.catalog.repository.ProductRepository;
 import com.smartpharma.catalog.repository.StockBatchRepository;
 import com.smartpharma.catalog.service.ProductService;
+import com.smartpharma.common.exception.LocalizedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,8 +26,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -244,6 +253,111 @@ public class ProductServiceImpl implements ProductService {
                 .totalStock(product.getTotalStock())
                 .createdAt(product.getCreatedAt())
                 .build();
+    }
+
+    // Previews (apply=false) or applies many sell-price changes at once. The
+    // preview and the apply compute the same thing, so what the admin reviewed
+    // is exactly what gets saved.
+    @Override
+    @Transactional
+    public BulkPriceUpdateResponse updatePricesInBulk(BulkPriceUpdateRequest request, Long pharmacyId) {
+        // Keyed by id: Product's Lombok hashCode covers its batches (which point
+        // back at the product) and changes when the price is set.
+        Map<Long, PriceTarget> newPrices = new LinkedHashMap<>();
+        List<String> notFound = new ArrayList<>();
+
+        if ("PERCENT".equals(request.getMode())) {
+            if (request.getPercent() == null) {
+                throw new LocalizedException(HttpStatus.BAD_REQUEST, "BULK_PRICE_PERCENT_REQUIRED",
+                        "A percentage is required");
+            }
+            BigDecimal factor = BigDecimal.valueOf(100).add(request.getPercent())
+                    .divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
+            for (Product product : percentTargets(request, pharmacyId)) {
+                BigDecimal current = product.getSellPrice() != null ? product.getSellPrice() : BigDecimal.ZERO;
+                newPrices.put(product.getId(), new PriceTarget(product, roundPrice(current.multiply(factor), request.getRoundTo())));
+            }
+        } else {
+            if (request.getItems() == null || request.getItems().isEmpty()) {
+                throw new LocalizedException(HttpStatus.BAD_REQUEST, "BULK_PRICE_ITEMS_REQUIRED",
+                        "The price list is empty");
+            }
+            List<Product> products = productRepository.findByPharmacyId(pharmacyId);
+            Map<Long, Product> byId = products.stream().collect(Collectors.toMap(Product::getId, p -> p));
+            Map<String, Product> byBarcode = products.stream()
+                    .filter(p -> p.getBarcode() != null && !p.getBarcode().isBlank())
+                    .collect(Collectors.toMap(p -> p.getBarcode().trim(), p -> p, (a, b) -> a));
+            for (BulkPriceUpdateRequest.PriceListItem item : request.getItems()) {
+                Product product = item.getProductId() != null ? byId.get(item.getProductId())
+                        : item.getBarcode() != null ? byBarcode.get(item.getBarcode().trim()) : null;
+                if (product == null) {
+                    notFound.add(item.getProductId() != null ? "#" + item.getProductId() : String.valueOf(item.getBarcode()));
+                    continue;
+                }
+                newPrices.put(product.getId(), new PriceTarget(product, item.getSellPrice().setScale(2, RoundingMode.HALF_UP)));
+            }
+        }
+
+        List<BulkPriceUpdateResponse.PriceChange> changes = new ArrayList<>();
+        int unchanged = 0;
+        for (PriceTarget target : newPrices.values()) {
+            Product product = target.product();
+            BigDecimal oldPrice = product.getSellPrice();
+            BigDecimal newPrice = target.newPrice();
+            if (oldPrice != null && oldPrice.compareTo(newPrice) == 0) {
+                unchanged++;
+                continue;
+            }
+            changes.add(BulkPriceUpdateResponse.PriceChange.builder()
+                    .productId(product.getId())
+                    .productName(product.getName())
+                    .barcode(product.getBarcode())
+                    .oldPrice(oldPrice)
+                    .newPrice(newPrice)
+                    .belowCost(product.getBuyPrice() != null && newPrice.compareTo(product.getBuyPrice()) < 0)
+                    .build());
+            if (request.isApply()) {
+                product.setSellPrice(newPrice);
+            }
+        }
+
+        if (request.isApply() && !changes.isEmpty()) {
+            productRepository.saveAll(newPrices.values().stream().map(PriceTarget::product).toList());
+            log.info("Bulk price update | pharmacy {} | mode {} | {} product(s) changed", pharmacyId,
+                    request.getMode(), changes.size());
+        }
+        return BulkPriceUpdateResponse.builder()
+                .applied(request.isApply())
+                .changedCount(changes.size())
+                .unchangedCount(unchanged)
+                .changes(changes)
+                .notFound(notFound)
+                .build();
+    }
+
+    private record PriceTarget(Product product, BigDecimal newPrice) {
+    }
+
+    private List<Product> percentTargets(BulkPriceUpdateRequest request, Long pharmacyId) {
+        List<Product> all = productRepository.findByPharmacyId(pharmacyId);
+        if (request.getProductIds() != null && !request.getProductIds().isEmpty()) {
+            Set<Long> ids = new HashSet<>(request.getProductIds());
+            return all.stream().filter(p -> ids.contains(p.getId())).toList();
+        }
+        String category = blankToNull(request.getCategory());
+        if (category != null) {
+            return all.stream().filter(p -> category.equalsIgnoreCase(p.getCategory())).toList();
+        }
+        return all;
+    }
+
+    // Rounds to the nearest multiple of step (e.g. 0.25), never below 0.01.
+    static BigDecimal roundPrice(BigDecimal price, BigDecimal step) {
+        BigDecimal rounded = step == null || step.signum() <= 0
+                ? price.setScale(2, RoundingMode.HALF_UP)
+                : price.divide(step, 0, RoundingMode.HALF_UP).multiply(step).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal minimum = new BigDecimal("0.01");
+        return rounded.compareTo(minimum) < 0 ? minimum : rounded;
     }
 
     private static String blankToNull(String value) {
