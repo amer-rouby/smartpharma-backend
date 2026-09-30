@@ -15,13 +15,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 // Suggestion-only: never writes to Product.sellPrice or any batch field. The
 // pharmacist decides whether to apply a discount; this only surfaces which
@@ -41,6 +45,7 @@ public class PricingRecommendationServiceImpl implements PricingRecommendationSe
     private static final int URGENT_DISCOUNT_PERCENT = 30;
     private static final int WARNING_DISCOUNT_PERCENT = 15;
     private static final int SLOW_MOVER_DISCOUNT_PERCENT = 10;
+    private static final int DEAD_STOCK_DISCOUNT_PERCENT = 20;
     private static final int VELOCITY_BASELINE_DAYS = 90;
     private static final int VELOCITY_RECENT_DAYS = 30;
     private static final double SLOW_MOVER_THRESHOLD_RATIO = 0.2;
@@ -112,18 +117,26 @@ public class PricingRecommendationServiceImpl implements PricingRecommendationSe
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime baselineStart = now.minusDays(VELOCITY_BASELINE_DAYS).with(LocalTime.MIN);
         LocalDateTime recentStart = now.minusDays(VELOCITY_RECENT_DAYS).with(LocalTime.MIN);
+        // Two grouped queries for all products instead of two per product.
+        Map<Long, Long> soldInBaseline = soldPerProduct(pharmacyId, baselineStart, now);
+        Map<Long, Long> soldRecently = soldPerProduct(pharmacyId, recentStart, now);
 
         for (Product product : products) {
             Integer currentStock = product.getTotalStock();
             if (currentStock == null || currentStock <= 0) continue;
 
-            Integer sold90 = saleItemRepository.sumQuantityByProductIdAndPharmacyIdAndDateRange(
-                    product.getId(), pharmacyId, baselineStart, now);
-            if (sold90 == null || sold90 <= 0) continue;
-
-            Integer sold30 = saleItemRepository.sumQuantityByProductIdAndPharmacyIdAndDateRange(
-                    product.getId(), pharmacyId, recentStart, now);
-            int recentQuantity = sold30 != null ? sold30 : 0;
+            long sold90 = soldInBaseline.getOrDefault(product.getId(), 0L);
+            if (sold90 == 0) {
+                // Not a single sale in the whole window - the worst kind of
+                // stagnant stock. Only flagged once the stock has been on the
+                // shelf for the whole window, so a new arrival isn't "dead".
+                LocalDateTime onShelfSince = oldestActiveBatch(product);
+                if (onShelfSince != null && onShelfSince.isBefore(baselineStart)) {
+                    recommendations.add(deadStock(product, currentStock));
+                }
+                continue;
+            }
+            int recentQuantity = soldRecently.getOrDefault(product.getId(), 0L).intValue();
 
             double avgMonthlyRate = sold90 / (VELOCITY_BASELINE_DAYS / 30.0);
             if (avgMonthlyRate <= 0 || recentQuantity >= avgMonthlyRate * SLOW_MOVER_THRESHOLD_RATIO) continue;
@@ -142,6 +155,41 @@ public class PricingRecommendationServiceImpl implements PricingRecommendationSe
                     .build());
         }
         return recommendations;
+    }
+
+    private Map<Long, Long> soldPerProduct(Long pharmacyId, LocalDateTime start, LocalDateTime end) {
+        Map<Long, Long> sold = new HashMap<>();
+        for (Object[] row : saleItemRepository.sumQuantityPerProductByPharmacyIdAndDateRange(pharmacyId, start, end)) {
+            sold.put((Long) row[0], ((Number) row[1]).longValue());
+        }
+        return sold;
+    }
+
+    private static LocalDateTime oldestActiveBatch(Product product) {
+        if (product.getStockBatches() == null) return null;
+        return product.getStockBatches().stream()
+                .filter(b -> b.getStatus() == StockBatch.BatchStatus.ACTIVE)
+                .filter(b -> b.getQuantityCurrent() != null && b.getQuantityCurrent() > 0)
+                .map(StockBatch::getCreatedAt)
+                .filter(Objects::nonNull)
+                .min(Comparator.naturalOrder())
+                .orElse(null);
+    }
+
+    private static PricingRecommendationDTO deadStock(Product product, int currentStock) {
+        BigDecimal buyPrice = product.getBuyPrice() != null ? product.getBuyPrice() : BigDecimal.ZERO;
+        BigDecimal tiedUp = buyPrice.multiply(BigDecimal.valueOf(currentStock));
+        return PricingRecommendationDTO.builder()
+                .productId(product.getId())
+                .productName(product.getName())
+                .productCode(product.getCode())
+                .currentStock(currentStock)
+                .reason("DEAD_STOCK")
+                .suggestedDiscountPercent(DEAD_STOCK_DISCOUNT_PERCENT)
+                .priority("MEDIUM")
+                .message(String.format("No sales in the last %d days - %d unit(s) in stock, %s tied up at cost",
+                        VELOCITY_BASELINE_DAYS, currentStock, tiedUp.toPlainString()))
+                .build();
     }
 
     private int priorityRank(String priority) {
