@@ -24,8 +24,51 @@ public interface EInvoiceSubmissionRepository extends JpaRepository<EInvoiceSubm
         return findBySaleAndType(saleTransactionId, EInvoiceSubmission.DocumentType.SALE);
     }
 
-    @Query("SELECT e FROM EInvoiceSubmission e WHERE e.originalSubmission.id = :originalId")
+    // The return receipt reversing the whole original (the sale was cancelled).
+    @Query("SELECT e FROM EInvoiceSubmission e WHERE e.originalSubmission.id = :originalId AND e.saleReturn IS NULL")
     Optional<EInvoiceSubmission> findReturnOf(@Param("originalId") Long originalId);
+
+    @Query("""
+        SELECT e FROM EInvoiceSubmission e
+        WHERE e.saleTransaction.id = :saleTransactionId
+          AND e.documentType = :documentType
+        ORDER BY e.id
+    """)
+    List<EInvoiceSubmission> findAllBySaleAndType(@Param("saleTransactionId") Long saleTransactionId,
+                                                  @Param("documentType") EInvoiceSubmission.DocumentType documentType);
+
+    default List<EInvoiceSubmission> findReturnsBySaleTransactionId(Long saleTransactionId) {
+        return findAllBySaleAndType(saleTransactionId, EInvoiceSubmission.DocumentType.RETURN);
+    }
+
+    @Query("SELECT e FROM EInvoiceSubmission e WHERE e.saleReturn.id = :saleReturnId")
+    Optional<EInvoiceSubmission> findBySaleReturnId(@Param("saleReturnId") Long saleReturnId);
+
+    // Receipts of a pharmacy that need someone to act: ETA rejected them or
+    // they couldn't be issued/delivered - including returns of cancelled
+    // sales, which the sales screens no longer show. A cancelled sale's own
+    // receipt is left out: its return receipt is what matters then. Native, so
+    // the soft-delete filter on sales doesn't hide the cancelled ones:
+    // [submissionId, invoiceNumber, saleCancelled].
+    @Query(value = """
+        SELECT e.id, s.invoice_number, (s.deleted_at IS NOT NULL)
+        FROM smartpharma.einvoice_submissions e
+        JOIN smartpharma.sales_transactions s ON s.id = e.sale_transaction_id
+        WHERE s.pharmacy_id = :pharmacyId
+          AND e.status IN ('REJECTED', 'ERROR')
+          AND NOT (COALESCE(e.document_type, 'SALE') = 'SALE' AND s.deleted_at IS NOT NULL)
+        ORDER BY e.id DESC
+        LIMIT 200
+    """, nativeQuery = true)
+    List<Object[]> findNeedingAttention(@Param("pharmacyId") Long pharmacyId);
+
+    // [pharmacyId] of the sale a receipt belongs to, cancelled or not.
+    @Query(value = """
+        SELECT s.pharmacy_id FROM smartpharma.einvoice_submissions e
+        JOIN smartpharma.sales_transactions s ON s.id = e.sale_transaction_id
+        WHERE e.id = :submissionId
+    """, nativeQuery = true)
+    Optional<Long> findPharmacyIdOf(@Param("submissionId") Long submissionId);
 
     // Issued receipts still waiting to reach ETA, oldest first so a batch
     // follows the device's chain order.

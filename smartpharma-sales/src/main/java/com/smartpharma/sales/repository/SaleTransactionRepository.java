@@ -3,7 +3,9 @@ package com.smartpharma.sales.repository;
 import com.smartpharma.sales.entity.SaleTransaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -27,6 +29,12 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
 
     @Query("SELECT st FROM SaleTransaction st WHERE st.id = :id AND st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
     Optional<SaleTransaction> findByIdAndPharmacyId(@Param("id") Long id, @Param("pharmacyId") Long pharmacyId);
+
+    // Row lock for the rest of the transaction: two returns on the same sale
+    // can't both pass the "not more than was sold" check.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT st FROM SaleTransaction st WHERE st.id = :id AND st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
+    Optional<SaleTransaction> lockByIdAndPharmacyId(@Param("id") Long id, @Param("pharmacyId") Long pharmacyId);
 
     @Query("SELECT st FROM SaleTransaction st WHERE st.pharmacy.id = :pharmacyId AND st.clientSaleId = :clientSaleId")
     Optional<SaleTransaction> findByPharmacyIdAndClientSaleId(@Param("pharmacyId") Long pharmacyId,
@@ -114,11 +122,11 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("pharmacyId") Long pharmacyId,
             @Param("date") LocalDate date);
 
-    @Query("SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st WHERE st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
+    @Query("SELECT COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) FROM SaleTransaction st WHERE st.pharmacy.id = :pharmacyId AND st.deletedAt IS NULL")
     BigDecimal sumTotalAmountByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 
     @Query("""
-        SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st
+        SELECT COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
         AND st.transactionDate <= :endDate
@@ -130,7 +138,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("endDate") LocalDateTime endDate);
 
     @Query("""
-        SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st
+        SELECT COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND CAST(st.transactionDate AS date) = :date
         AND st.deletedAt IS NULL
@@ -159,7 +167,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             Pageable pageable);
 
     @Query("""
-        SELECT COALESCE(SUM(st.totalAmount), 0) FROM SaleTransaction st
+        SELECT COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
         AND st.transactionDate <= :endDate
@@ -183,7 +191,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("endDate") LocalDateTime endDate);
 
     @Query("""
-        SELECT st.paymentMethod, COALESCE(SUM(st.totalAmount), 0)
+        SELECT st.paymentMethod, COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0)
         FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
@@ -214,7 +222,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             Pageable pageable);
 
     @Query("""
-        SELECT CAST(st.transactionDate AS date), COALESCE(SUM(st.totalAmount), 0), COUNT(st)
+        SELECT CAST(st.transactionDate AS date), COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0), COUNT(st)
         FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
@@ -242,7 +250,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
 
     @Query("""
         SELECT CAST(st.transactionDate AS date) as saleDate, 
-               COALESCE(SUM(st.totalAmount), 0) as total
+               COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) as total
         FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
           AND st.deletedAt IS NULL

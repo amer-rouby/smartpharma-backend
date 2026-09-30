@@ -1,9 +1,12 @@
 package com.smartpharma.sales.controller;
 
 import com.smartpharma.sales.dto.request.SaleRequest;
+import com.smartpharma.sales.dto.request.SaleReturnRequest;
 import com.smartpharma.common.dto.ApiResponse;
+import com.smartpharma.sales.dto.response.SaleReturnDTO;
 import com.smartpharma.sales.dto.response.SaleTransactionDTO;
 import com.smartpharma.sales.dto.response.SalesReportResponse;
+import com.smartpharma.sales.service.SaleReturnService;
 import com.smartpharma.sales.service.SaleTransactionService;
 import com.smartpharma.common.util.SecurityUtils;
 import jakarta.validation.Valid;
@@ -29,6 +32,7 @@ import java.util.Map;
 public class SalesController {
 
     private final SaleTransactionService saleTransactionService;
+    private final SaleReturnService saleReturnService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
@@ -135,6 +139,28 @@ public class SalesController {
         log.info("DELETE /api/sales/{} - pharmacyId: {}", id, pharmacyId);
         saleTransactionService.deleteSale(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Sale deleted successfully"));
+    }
+
+    // Returns part (or all) of a sale's items: refunds them, puts them back in
+    // stock unless restock=false, and issues an ETA return receipt for them.
+    @PostMapping("/{id}/returns")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    public ResponseEntity<ApiResponse<SaleReturnDTO>> createReturn(
+            @PathVariable Long id,
+            @Valid @RequestBody SaleReturnRequest request,
+            Authentication authentication) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long userId = SecurityUtils.extractUserId(authentication);
+        log.info("POST /api/sales/{}/returns - pharmacyId: {}, items: {}", id, pharmacyId, request.getItems().size());
+        SaleReturnDTO response = saleReturnService.createReturn(id, request, pharmacyId, userId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Return recorded successfully"));
+    }
+
+    @GetMapping("/{id}/returns")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
+    public ResponseEntity<ApiResponse<List<SaleReturnDTO>>> getReturns(@PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        return ResponseEntity.ok(ApiResponse.success(saleReturnService.getReturns(id, pharmacyId)));
     }
 
     @GetMapping("/analytics")

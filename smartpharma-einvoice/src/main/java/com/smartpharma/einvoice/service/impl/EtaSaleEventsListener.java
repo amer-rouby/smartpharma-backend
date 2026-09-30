@@ -7,6 +7,7 @@ import com.smartpharma.sales.event.SaleAmendingEvent;
 import com.smartpharma.sales.event.SaleCancelledEvent;
 import com.smartpharma.sales.event.SaleCompletedEvent;
 import com.smartpharma.sales.event.SaleCreatingEvent;
+import com.smartpharma.sales.event.SaleReturnedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -16,8 +17,8 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 // Keeps ETA in step with sales: requires the buyer ID where ETA does, issues
-// the receipt once a sale commits and the return receipt once a sale is
-// cancelled, and refuses edits that would make an issued receipt disagree
+// the receipt once a sale commits and a return receipt once a sale is
+// cancelled or some of its items are returned, and refuses edits that would make an issued receipt disagree
 // with the sale. Issuing runs after commit and
 // never throws - a failure would otherwise surface as an error on a sale that
 // already succeeded - so problems are logged and left for the retry timer.
@@ -49,6 +50,18 @@ class EtaSaleEventsListener {
                     .ifPresent(submission -> submitter.deliverDeviceAsync(submission.getPosDevice().getId()));
         } catch (RuntimeException e) {
             log.error("ETA return receipt issuance failed for sale {}: {}", event.saleId(), e.getMessage(), e);
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    void onSaleReturned(SaleReturnedEvent event) {
+        try {
+            issuer.issuePartialReturn(event.saleReturnId(), event.pharmacyId(), false)
+                    .filter(submission -> submission.isIssued() && submission.getPosDevice() != null)
+                    .ifPresent(submission -> submitter.deliverDeviceAsync(submission.getPosDevice().getId()));
+        } catch (RuntimeException e) {
+            log.error("ETA return receipt issuance failed for return {} of sale {}: {}",
+                    event.saleReturnId(), event.saleId(), e.getMessage(), e);
         }
     }
 

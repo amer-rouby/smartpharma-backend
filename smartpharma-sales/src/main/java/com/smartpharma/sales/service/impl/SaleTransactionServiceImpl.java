@@ -12,6 +12,7 @@ import com.smartpharma.common.repository.UserRepository;
 import com.smartpharma.sales.entity.SaleItem;
 import com.smartpharma.sales.entity.SaleTransaction;
 import com.smartpharma.sales.repository.SaleItemRepository;
+import com.smartpharma.sales.repository.SaleReturnRepository;
 import com.smartpharma.sales.repository.SaleTransactionRepository;
 import com.smartpharma.sales.dto.request.SaleItemRequest;
 import com.smartpharma.sales.dto.request.SaleRequest;
@@ -63,6 +64,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     private final PharmacyRepository pharmacyRepository;
     private final StockBatchRepository stockBatchRepository;
     private final SaleItemRepository saleItemRepository;
+    private final SaleReturnRepository saleReturnRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final PharmacySettingsRepository pharmacySettingsRepository;
@@ -234,6 +236,12 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         SaleTransaction sale = saleTransactionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("SALE_NOT_FOUND", "Sale not found: " + id));
         validatePharmacyAccess(sale, pharmacyId);
+        // Cancelling reverses the whole sale (and its ETA receipt); after a
+        // partial return that would reverse the returned items twice.
+        if (saleReturnRepository.existsBySaleId(id)) {
+            throw new LocalizedException(HttpStatus.CONFLICT, "SALE_HAS_RETURNS",
+                    "Sale " + id + " has returns - return the remaining items instead of cancelling it");
+        }
         sale.markAsDeleted();
         saleTransactionRepository.save(sale);
         eventPublisher.publishEvent(new SaleCancelledEvent(pharmacyId, id));
@@ -647,11 +655,20 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
 
     private SaleTransactionDTO mapToDTO(SaleTransaction sale) {
         if (sale == null) return null;
+        // Only sales with returns pay for the extra query.
+        boolean hasReturns = sale.getReturnedAmount() != null && sale.getReturnedAmount().signum() > 0;
+        Map<Long, Integer> returned = new HashMap<>();
+        if (hasReturns) {
+            for (Object[] row : saleReturnRepository.sumReturnedQuantities(sale.getId())) {
+                returned.put((Long) row[0], ((Number) row[1]).intValue());
+            }
+        }
         return SaleTransactionDTO.builder()
                 .id(sale.getId())
                 .invoiceNumber(sale.getInvoiceNumber())
                 .subtotal(sale.getSubtotal())
                 .totalAmount(sale.getTotalAmount())
+                .returnedAmount(Optional.ofNullable(sale.getReturnedAmount()).orElse(BigDecimal.ZERO))
                 .discountAmount(sale.getDiscountAmount())
                 .paymentMethod(sale.getPaymentMethod() != null ? sale.getPaymentMethod().name() : null)
                 .customerPhone(sale.getCustomerPhone())
@@ -663,6 +680,10 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                 .items(Optional.ofNullable(sale.getItems()).orElse(Collections.emptyList()).stream()
                         .map(this::mapItemToDTO)
                         .filter(Objects::nonNull)
+                        .map(dto -> {
+                            dto.setReturnedQuantity(returned.getOrDefault(dto.getId(), 0));
+                            return dto;
+                        })
                         .collect(Collectors.toList()))
                 .build();
     }

@@ -31,6 +31,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -142,6 +143,31 @@ class EtaSimulatorCycleTest {
             assertThat(r.getErrorMessage()).isNull();
         });
         assertThat(returned.getReceiptNumber()).isEqualTo("R-INV-1");
+    }
+
+    @Test
+    void partialReturnsOfADiscountedSaleAreSubmittedThenValidated() {
+        // 3 x 11.40 with 1.00 off: returned as 1 unit, then the other 2; the
+        // discount shares (0.33 + 0.67) add up to the sale's discount.
+        EtaReceiptBuilder.BuiltReceipt sale = issueSale("INV-1", "3", "11.40", "1.00");
+        EtaReceiptBuilder.BuiltReceipt first = EtaReceiptBuilder.buildReturn(sale.json(), sale.uuid(), "R1-INV-1",
+                chainHead, null, Instant.now(), Map.of("1", 1), new BigDecimal("0.33"));
+        issue(first, EInvoiceSubmission.DocumentType.RETURN);
+        EtaReceiptBuilder.BuiltReceipt second = EtaReceiptBuilder.buildReturn(sale.json(), sale.uuid(), "R2-INV-1",
+                chainHead, null, Instant.now(), Map.of("1", 2), new BigDecimal("0.67"));
+        issue(second, EInvoiceSubmission.DocumentType.RETURN);
+
+        submitter.deliverDevice(1L);
+        String submission = rows.get(0).getSubmissionUuid();
+        poller.poll(1L, submission);
+        poller.poll(1L, submission);
+
+        assertThat(rows).allSatisfy(r -> assertThat(r.getStatus()).as(r.getReceiptNumber() + ": " + r.getErrorMessage())
+                .isEqualTo(EInvoiceSubmission.Status.ACCEPTED));
+        assertThat(new BigDecimal(first.totalAmount())).isEqualByComparingTo("11.07");
+        assertThat(new BigDecimal(second.totalAmount())).isEqualByComparingTo("22.13");
+        assertThat(new BigDecimal(first.totalAmount()).add(new BigDecimal(second.totalAmount())))
+                .isEqualByComparingTo(new BigDecimal(sale.totalAmount()));
     }
 
     @Test

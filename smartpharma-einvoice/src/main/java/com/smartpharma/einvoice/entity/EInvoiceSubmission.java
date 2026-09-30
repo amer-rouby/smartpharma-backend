@@ -1,6 +1,7 @@
 package com.smartpharma.einvoice.entity;
 
 
+import com.smartpharma.sales.entity.SaleReturn;
 import com.smartpharma.sales.entity.SaleTransaction;
 import jakarta.persistence.*;
 import lombok.*;
@@ -61,6 +62,13 @@ public class EInvoiceSubmission {
     @JoinColumn(name = "original_submission_id")
     @ToString.Exclude
     private EInvoiceSubmission originalSubmission;
+
+    // For a RETURN of some of the items (a SaleReturn); null when it reverses
+    // the whole receipt because the sale was cancelled.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sale_return_id")
+    @ToString.Exclude
+    private SaleReturn saleReturn;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
