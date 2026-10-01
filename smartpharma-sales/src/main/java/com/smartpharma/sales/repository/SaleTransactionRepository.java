@@ -126,7 +126,10 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     BigDecimal sumTotalAmountByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 
     @Query("""
-        SELECT COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) FROM SaleTransaction st
+        SELECT COALESCE(SUM(st.totalAmount), 0)
+               - (SELECT COALESCE(SUM(r.refundAmount), 0) FROM SaleReturn r
+                 WHERE r.pharmacy.id = :pharmacyId AND r.createdAt >= :startDate AND r.createdAt <= :endDate)
+        FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
         AND st.transactionDate <= :endDate
@@ -138,7 +141,10 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("endDate") LocalDateTime endDate);
 
     @Query("""
-        SELECT COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) FROM SaleTransaction st
+        SELECT COALESCE(SUM(st.totalAmount), 0)
+               - (SELECT COALESCE(SUM(r.refundAmount), 0) FROM SaleReturn r
+                  WHERE r.pharmacy.id = :pharmacyId AND CAST(r.createdAt AS date) = :date)
+        FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND CAST(st.transactionDate AS date) = :date
         AND st.deletedAt IS NULL
@@ -167,7 +173,10 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             Pageable pageable);
 
     @Query("""
-        SELECT COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) FROM SaleTransaction st
+        SELECT COALESCE(SUM(st.totalAmount), 0)
+               - (SELECT COALESCE(SUM(r.refundAmount), 0) FROM SaleReturn r
+                 WHERE r.pharmacy.id = :pharmacyId AND r.createdAt >= :startDate AND r.createdAt <= :endDate)
+        FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
         AND st.transactionDate <= :endDate
@@ -191,7 +200,10 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("endDate") LocalDateTime endDate);
 
     @Query("""
-        SELECT st.paymentMethod, COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0)
+        SELECT st.paymentMethod, COALESCE(SUM(st.totalAmount), 0)
+               - (SELECT COALESCE(SUM(r.refundAmount), 0) FROM SaleReturn r
+                  WHERE r.pharmacy.id = :pharmacyId AND r.saleTransaction.paymentMethod = st.paymentMethod
+                  AND r.createdAt >= :startDate AND r.createdAt <= :endDate)
         FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
@@ -205,7 +217,19 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("endDate") LocalDateTime endDate);
 
     @Query("""
-        SELECT si.product.id, si.product.name, SUM(si.quantity), SUM(si.totalPrice)
+        SELECT si.product.id, si.product.name,
+               SUM(si.quantity) - COALESCE((SELECT SUM(ri.quantity) FROM SaleReturnItem ri
+                   WHERE ri.saleItem.product.id = si.product.id
+                   AND ri.saleItem.transaction.pharmacy.id = :pharmacyId
+                   AND ri.saleItem.transaction.deletedAt IS NULL
+                   AND ri.saleItem.transaction.transactionDate >= :startDate
+                   AND ri.saleItem.transaction.transactionDate <= :endDate), 0) AS netQuantity,
+               SUM(si.totalPrice) - COALESCE((SELECT SUM(ri.totalPrice) FROM SaleReturnItem ri
+                   WHERE ri.saleItem.product.id = si.product.id
+                   AND ri.saleItem.transaction.pharmacy.id = :pharmacyId
+                   AND ri.saleItem.transaction.deletedAt IS NULL
+                   AND ri.saleItem.transaction.transactionDate >= :startDate
+                   AND ri.saleItem.transaction.transactionDate <= :endDate), 0)
         FROM SaleItem si
         JOIN SaleTransaction st ON si.transaction.id = st.id
         WHERE st.pharmacy.id = :pharmacyId
@@ -213,7 +237,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         AND st.transactionDate <= :endDate
         AND st.deletedAt IS NULL
         GROUP BY si.product.id, si.product.name
-        ORDER BY SUM(si.quantity) DESC
+        ORDER BY netQuantity DESC
     """)
     List<Object[]> getTopProducts(
             @Param("pharmacyId") Long pharmacyId,
@@ -222,7 +246,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             Pageable pageable);
 
     @Query("""
-        SELECT CAST(st.transactionDate AS date), COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0), COUNT(st)
+        SELECT CAST(st.transactionDate AS date), COALESCE(SUM(st.totalAmount), 0), COUNT(st)
         FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
         AND st.transactionDate >= :startDate
@@ -231,18 +255,46 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         GROUP BY CAST(st.transactionDate AS date)
         ORDER BY CAST(st.transactionDate AS date)
     """)
-    List<Object[]> getDailySales(
+    List<Object[]> getDailySalesOnly(
             @Param("pharmacyId") Long pharmacyId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
+    // [day, refunded] - refunds counted on the day of the return.
     @Query("""
-        SELECT si.product.id, si.product.name, SUM(si.quantity), SUM(si.totalPrice)
+        SELECT CAST(r.createdAt AS date), COALESCE(SUM(r.refundAmount), 0)
+        FROM SaleReturn r
+        WHERE r.pharmacy.id = :pharmacyId
+        AND r.createdAt >= :startDate
+        AND r.createdAt <= :endDate
+        GROUP BY CAST(r.createdAt AS date)
+    """)
+    List<Object[]> getDailyRefunds(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    // [day, sales - refunds of that day, orders].
+    default List<Object[]> getDailySales(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate) {
+        return DailyNet.merge(getDailySalesOnly(pharmacyId, startDate, endDate),
+                getDailyRefunds(pharmacyId, startDate, endDate), true);
+    }
+
+    @Query("""
+        SELECT si.product.id, si.product.name,
+               SUM(si.quantity) - COALESCE((SELECT SUM(ri.quantity) FROM SaleReturnItem ri
+                   WHERE ri.saleItem.product.id = si.product.id
+                   AND ri.saleItem.transaction.pharmacy.id = :pharmacyId
+                   AND ri.saleItem.transaction.deletedAt IS NULL), 0) AS netQuantity,
+               SUM(si.totalPrice) - COALESCE((SELECT SUM(ri.totalPrice) FROM SaleReturnItem ri
+                   WHERE ri.saleItem.product.id = si.product.id
+                   AND ri.saleItem.transaction.pharmacy.id = :pharmacyId
+                   AND ri.saleItem.transaction.deletedAt IS NULL), 0)
         FROM SaleItem si
         WHERE si.transaction.pharmacy.id = :pharmacyId
         AND si.transaction.deletedAt IS NULL
         GROUP BY si.product.id, si.product.name
-        ORDER BY SUM(si.quantity) DESC
+        ORDER BY netQuantity DESC
     """)
     List<Object[]> findTopSellingProducts(
             @Param("pharmacyId") Long pharmacyId,
@@ -250,7 +302,7 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
 
     @Query("""
         SELECT CAST(st.transactionDate AS date) as saleDate, 
-               COALESCE(SUM(st.totalAmount - COALESCE(st.returnedAmount, 0)), 0) as total
+               COALESCE(SUM(st.totalAmount), 0) as total
         FROM SaleTransaction st
         WHERE st.pharmacy.id = :pharmacyId
           AND st.deletedAt IS NULL
@@ -258,8 +310,26 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
         GROUP BY CAST(st.transactionDate AS date)
         ORDER BY saleDate
     """)
-    List<Object[]> findDailyRevenueByPharmacyAndDateRange(
+    List<Object[]> findDailySalesOnlyByPharmacyAndDateRange(
             @Param("pharmacyId") Long pharmacyId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    @Query("""
+        SELECT CAST(r.createdAt AS date), COALESCE(SUM(r.refundAmount), 0)
+        FROM SaleReturn r
+        WHERE r.pharmacy.id = :pharmacyId
+          AND CAST(r.createdAt AS date) BETWEEN :startDate AND :endDate
+        GROUP BY CAST(r.createdAt AS date)
+    """)
+    List<Object[]> findDailyRefundsByPharmacyAndDateRange(
+            @Param("pharmacyId") Long pharmacyId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    // [day, sales - refunds of that day].
+    default List<Object[]> findDailyRevenueByPharmacyAndDateRange(Long pharmacyId, LocalDate startDate, LocalDate endDate) {
+        return DailyNet.merge(findDailySalesOnlyByPharmacyAndDateRange(pharmacyId, startDate, endDate),
+                findDailyRefundsByPharmacyAndDateRange(pharmacyId, startDate, endDate), false);
+    }
 }
