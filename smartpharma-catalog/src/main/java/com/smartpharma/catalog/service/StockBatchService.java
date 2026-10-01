@@ -8,7 +8,8 @@ import org.springframework.data.domain.Page;
 import java.util.List;
 
 public interface StockBatchService {
-    Page<StockBatchResponse> getAllBatches(Long pharmacyId, int page, int size);
+    // search: product name/barcode/scientific name/active ingredient or batch number; blank = all.
+    Page<StockBatchResponse> getAllBatches(Long pharmacyId, int page, int size, String search);
     StockBatchResponse getBatch(Long id, Long pharmacyId);
     StockBatchResponse createBatch(StockBatchRequest request, Long pharmacyId, Long userId);
     StockBatchResponse updateBatch(Long id, StockBatchRequest request, Long pharmacyId, Long userId);

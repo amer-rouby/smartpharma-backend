@@ -52,11 +52,14 @@ public class StockBatchServiceImpl implements StockBatchService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<StockBatchResponse> getAllBatches(Long pharmacyId, int page, int size) {
-        log.debug("Fetching batches for pharmacy: {}, page: {}, size: {}", pharmacyId, page, size);
+    public Page<StockBatchResponse> getAllBatches(Long pharmacyId, int page, int size, String search) {
+        log.debug("Fetching batches for pharmacy: {}, page: {}, size: {}, search: {}", pharmacyId, page, size, search);
         Pageable pageable = PageRequest.of(page, size);
-        return stockBatchRepository.findByPharmacyIdAndStatus(pharmacyId, StockBatch.BatchStatus.ACTIVE, pageable)
-                .map(this::mapToResponse);
+        String term = search == null || search.isBlank() ? null : search.trim();
+        Page<StockBatch> batches = term == null
+                ? stockBatchRepository.listActive(pharmacyId, pageable)
+                : stockBatchRepository.searchActive(pharmacyId, term, pageable);
+        return batches.map(this::mapToResponse);
     }
 
     @Override
