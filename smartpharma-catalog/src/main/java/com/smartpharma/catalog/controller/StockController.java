@@ -31,13 +31,14 @@ public class StockController {
     public ResponseEntity<ApiResponse<Page<StockBatchResponse>>> getAllBatches(
             @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search) {
 
         pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/stock/batches - pharmacyId: {}, page: {}, size: {}", pharmacyId, page, size);
 
-        Page<StockBatchResponse> batches = stockBatchService.getAllBatches(pharmacyId, page, size);
+        Page<StockBatchResponse> batches = stockBatchService.getAllBatches(pharmacyId, page, size, search);
         return ResponseEntity.ok(ApiResponse.success(batches, "Stock batches retrieved successfully"));
     }
 

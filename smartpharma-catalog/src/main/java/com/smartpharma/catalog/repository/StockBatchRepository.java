@@ -22,6 +22,27 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
 
     Page<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status, Pageable pageable);
 
+    // Batches with stock first (earliest expiry first), empty ones last.
+    @Query("""
+        SELECT sb FROM StockBatch sb WHERE sb.pharmacy.id = :pharmacyId AND sb.status = 'ACTIVE'
+        ORDER BY CASE WHEN sb.quantityCurrent > 0 THEN 0 ELSE 1 END, sb.expiryDate, sb.id
+    """)
+    Page<StockBatch> listActive(@Param("pharmacyId") Long pharmacyId, Pageable pageable);
+
+    @Query("""
+        SELECT sb FROM StockBatch sb JOIN sb.product p
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(sb.batchNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(p.barcode) LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(p.scientificName) LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(p.activeIngredient) LIKE LOWER(CONCAT('%', :search, '%')))
+        ORDER BY CASE WHEN sb.quantityCurrent > 0 THEN 0 ELSE 1 END, sb.expiryDate, sb.id
+    """)
+    Page<StockBatch> searchActive(@Param("pharmacyId") Long pharmacyId, @Param("search") String search,
+                                  Pageable pageable);
+
     List<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status);
 
     List<StockBatch> findByProductIdAndStatus(Long productId, BatchStatus status);
