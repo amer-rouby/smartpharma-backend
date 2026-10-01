@@ -65,7 +65,8 @@ e-receipts on a sale at or above the threshold without both is refused with
   shelf value minus their share of the sale's discount (in proportion; the
   return that brings back the last items gets the exact remainder). The sale
   itself isn't changed: `sales_transactions.returned_amount` accumulates the
-  refunds and revenue queries use `total_amount - returned_amount`. After
+  refunds. Revenue reports subtract each refund on the day of the return,
+  and top-selling products are net of returned units. After
   commit (`SaleReturnedEvent`) a return receipt for just those items is
   issued: `einvoice_submissions.sale_return_id` set, receipt number
   `R<n>-<original>`, lines copied from the original receipt with the
@@ -182,9 +183,6 @@ Known gaps, not handled yet:
   it generates, or run `docs/db/2026-10-01-offline-alternatives-returns.sql`). Returns added `sale_returns`, `sale_return_items`,
   `sales_transactions.returned_amount` and
   `einvoice_submissions.sale_return_id`.
-- Returned amounts are netted out of the sale's own date in revenue
-  reports (like a cancelled sale), not booked on the day of the return; the
-  top-selling products figures still count returned units.
 - Batch signatures are sent empty: ETA's SDK states batch signature
   validation is not deployed yet.
 - `receiptType` `s` / version `1.2` and the UUID procedure follow the docs;
