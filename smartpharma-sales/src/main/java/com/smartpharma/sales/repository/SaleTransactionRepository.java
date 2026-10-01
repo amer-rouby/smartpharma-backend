@@ -274,12 +274,6 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
-    // [day, sales - refunds of that day, orders].
-    default List<Object[]> getDailySales(Long pharmacyId, LocalDateTime startDate, LocalDateTime endDate) {
-        return DailyNet.merge(getDailySalesOnly(pharmacyId, startDate, endDate),
-                getDailyRefunds(pharmacyId, startDate, endDate), true);
-    }
-
     @Query("""
         SELECT si.product.id, si.product.name,
                SUM(si.quantity) - COALESCE((SELECT SUM(ri.quantity) FROM SaleReturnItem ri
@@ -299,37 +293,4 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     List<Object[]> findTopSellingProducts(
             @Param("pharmacyId") Long pharmacyId,
             Pageable pageable);
-
-    @Query("""
-        SELECT CAST(st.transactionDate AS date) as saleDate, 
-               COALESCE(SUM(st.totalAmount), 0) as total
-        FROM SaleTransaction st
-        WHERE st.pharmacy.id = :pharmacyId
-          AND st.deletedAt IS NULL
-          AND CAST(st.transactionDate AS date) BETWEEN :startDate AND :endDate
-        GROUP BY CAST(st.transactionDate AS date)
-        ORDER BY saleDate
-    """)
-    List<Object[]> findDailySalesOnlyByPharmacyAndDateRange(
-            @Param("pharmacyId") Long pharmacyId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate);
-
-    @Query("""
-        SELECT CAST(r.createdAt AS date), COALESCE(SUM(r.refundAmount), 0)
-        FROM SaleReturn r
-        WHERE r.pharmacy.id = :pharmacyId
-          AND CAST(r.createdAt AS date) BETWEEN :startDate AND :endDate
-        GROUP BY CAST(r.createdAt AS date)
-    """)
-    List<Object[]> findDailyRefundsByPharmacyAndDateRange(
-            @Param("pharmacyId") Long pharmacyId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate);
-
-    // [day, sales - refunds of that day].
-    default List<Object[]> findDailyRevenueByPharmacyAndDateRange(Long pharmacyId, LocalDate startDate, LocalDate endDate) {
-        return DailyNet.merge(findDailySalesOnlyByPharmacyAndDateRange(pharmacyId, startDate, endDate),
-                findDailyRefundsByPharmacyAndDateRange(pharmacyId, startDate, endDate), false);
-    }
 }

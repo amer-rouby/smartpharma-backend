@@ -1,4 +1,4 @@
-package com.smartpharma.sales.repository;
+package com.smartpharma.sales.service.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;

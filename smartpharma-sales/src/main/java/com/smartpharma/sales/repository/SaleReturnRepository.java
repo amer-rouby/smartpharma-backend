@@ -6,7 +6,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -41,4 +43,13 @@ public interface SaleReturnRepository extends JpaRepository<SaleReturn, Long> {
         GROUP BY i.saleItem.id
     """)
     List<Object[]> sumReturnedQuantities(@Param("saleId") Long saleId);
+
+    // saleItemId -> quantity returned so far, for one sale.
+    default Map<Long, Integer> returnedQuantitiesBySaleItem(Long saleId) {
+        Map<Long, Integer> returned = new HashMap<>();
+        for (Object[] row : sumReturnedQuantities(saleId)) {
+            returned.put((Long) row[0], ((Number) row[1]).intValue());
+        }
+        return returned;
+    }
 }

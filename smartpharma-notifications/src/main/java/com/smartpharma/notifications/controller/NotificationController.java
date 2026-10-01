@@ -29,13 +29,12 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<NotificationResponse>>> getUserNotifications(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
@@ -48,11 +47,10 @@ public class NotificationController {
 
     @GetMapping("/unread-count")
     public ResponseEntity<ApiResponse<Long>> getUnreadCount(
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
@@ -65,11 +63,10 @@ public class NotificationController {
 
     @GetMapping("/unread")
     public ResponseEntity<ApiResponse<List<NotificationResponse>>> getUnreadNotifications(
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
@@ -99,11 +96,10 @@ public class NotificationController {
     @PostMapping("/read-all")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Integer>> markAllAsRead(
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader("Authorization") String authHeader) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Long userId = SecurityUtils.extractUserIdFromToken(authHeader, jwtService);
         if (userId == null) {
@@ -132,8 +128,8 @@ public class NotificationController {
 
     @PostMapping("/check-alerts")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<ApiResponse<Void>> checkAndCreateAlerts(@RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<Void>> checkAndCreateAlerts() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         notificationService.checkAndCreateLowStockAlerts(pharmacyId);
         notificationService.checkAndCreateExpiryAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Alerts checked successfully"));

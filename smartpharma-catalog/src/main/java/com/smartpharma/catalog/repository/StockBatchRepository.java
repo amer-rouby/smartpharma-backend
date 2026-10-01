@@ -22,15 +22,17 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
 
     Page<StockBatch> findByPharmacyIdAndStatus(Long pharmacyId, BatchStatus status, Pageable pageable);
 
-    // Batches with stock first (earliest expiry first), empty ones last.
-    @Query("""
-        SELECT sb FROM StockBatch sb WHERE sb.pharmacy.id = :pharmacyId AND sb.status = 'ACTIVE'
+    // Batches with stock first (earliest expiry first), empty ones last. The
+    // product is fetched with the batch: the list shows its name and barcode.
+    @Query(value = """
+        SELECT sb FROM StockBatch sb JOIN FETCH sb.product
+        WHERE sb.pharmacy.id = :pharmacyId AND sb.status = 'ACTIVE'
         ORDER BY CASE WHEN sb.quantityCurrent > 0 THEN 0 ELSE 1 END, sb.expiryDate, sb.id
-    """)
+    """, countQuery = "SELECT COUNT(sb) FROM StockBatch sb WHERE sb.pharmacy.id = :pharmacyId AND sb.status = 'ACTIVE'")
     Page<StockBatch> listActive(@Param("pharmacyId") Long pharmacyId, Pageable pageable);
 
-    @Query("""
-        SELECT sb FROM StockBatch sb JOIN sb.product p
+    @Query(value = """
+        SELECT sb FROM StockBatch sb JOIN FETCH sb.product p
         WHERE sb.pharmacy.id = :pharmacyId
         AND sb.status = 'ACTIVE'
         AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -39,6 +41,15 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
           OR LOWER(p.scientificName) LIKE LOWER(CONCAT('%', :search, '%'))
           OR LOWER(p.activeIngredient) LIKE LOWER(CONCAT('%', :search, '%')))
         ORDER BY CASE WHEN sb.quantityCurrent > 0 THEN 0 ELSE 1 END, sb.expiryDate, sb.id
+    """, countQuery = """
+        SELECT COUNT(sb) FROM StockBatch sb JOIN sb.product p
+        WHERE sb.pharmacy.id = :pharmacyId
+        AND sb.status = 'ACTIVE'
+        AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(sb.batchNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(p.barcode) LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(p.scientificName) LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(p.activeIngredient) LIKE LOWER(CONCAT('%', :search, '%')))
     """)
     Page<StockBatch> searchActive(@Param("pharmacyId") Long pharmacyId, @Param("search") String search,
                                   Pageable pageable);

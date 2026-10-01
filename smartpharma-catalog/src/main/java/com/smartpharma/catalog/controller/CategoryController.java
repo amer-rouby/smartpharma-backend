@@ -27,9 +27,8 @@ public class CategoryController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
-    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories - pharmacyId: {}", pharmacyId);
 
@@ -47,11 +46,10 @@ public class CategoryController {
     @GetMapping("/page")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<Page<CategoryResponse>>> getCategoriesPage(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String search) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/page - pharmacyId: {}, page: {}, size: {}, search: '{}'",
                 pharmacyId, page, size, search);
@@ -62,9 +60,8 @@ public class CategoryController {
 
     @GetMapping("/count")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
-    public ResponseEntity<ApiResponse<Map<String, Long>>> getCategoriesCount(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<Map<String, Long>>> getCategoriesCount() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/count - pharmacyId: {}", pharmacyId);
 
@@ -78,9 +75,8 @@ public class CategoryController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<CategoryResponse>> getCategory(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -105,9 +101,8 @@ public class CategoryController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable Long id,
-            @Valid @RequestBody CategoryRequest request,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @Valid @RequestBody CategoryRequest request) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         request.setPharmacyId(pharmacyId);
 
         log.info("PUT /api/categories/{} - pharmacyId: {}", id, pharmacyId);
@@ -119,9 +114,8 @@ public class CategoryController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("DELETE /api/categories/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -132,9 +126,8 @@ public class CategoryController {
     @GetMapping("/search")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> searchCategories(
-            @RequestParam Long pharmacyId,
             @RequestParam String query) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/search - pharmacyId: {}, query: '{}'", pharmacyId, query);
 
@@ -144,9 +137,8 @@ public class CategoryController {
 
     @GetMapping("/active")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
-    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getActiveCategories(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getActiveCategories() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/categories/active - pharmacyId: {}", pharmacyId);
 

@@ -25,10 +25,9 @@ public class StockAlertController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<StockAlertResponse>>> getAlerts(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting alerts for pharmacy: {}, page: {}, size: {}", pharmacyId, page, size);
 
         alertService.generateLowStockAlerts(pharmacyId);
@@ -40,9 +39,8 @@ public class StockAlertController {
 
     @GetMapping("/stats")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<AlertStatsResponse>> getAlertStats(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<AlertStatsResponse>> getAlertStats() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting alert stats for pharmacy: {}", pharmacyId);
 
         alertService.generateLowStockAlerts(pharmacyId);
@@ -54,9 +52,8 @@ public class StockAlertController {
 
     @GetMapping("/active")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<StockAlertResponse>>> getActiveAlerts(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<List<StockAlertResponse>>> getActiveAlerts() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Getting active alerts for pharmacy: {}", pharmacyId);
 
         alertService.generateLowStockAlerts(pharmacyId);
@@ -70,9 +67,8 @@ public class StockAlertController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> markAsRead(
             @PathVariable Long id,
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Marking alert {} as read by user {}", id, userId);
         alertService.markAsRead(id, pharmacyId, userId);
@@ -82,9 +78,8 @@ public class StockAlertController {
     @PostMapping("/read-all")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> markAllAsRead(
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Marking all alerts as read for pharmacy {} by user {}", pharmacyId, userId);
         alertService.markAllAsRead(pharmacyId, userId);
@@ -95,9 +90,8 @@ public class StockAlertController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> resolveAlert(
             @PathVariable Long id,
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("Resolving alert {} by user {}", id, userId);
         alertService.resolveAlert(id, pharmacyId, userId);
@@ -107,9 +101,8 @@ public class StockAlertController {
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteAlert(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Deleting alert {} for pharmacy {}", id, pharmacyId);
         alertService.deleteAlert(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Alert deleted"));
@@ -117,9 +110,8 @@ public class StockAlertController {
 
     @PostMapping("/generate/low-stock")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> generateLowStockAlerts(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<Void>> generateLowStockAlerts() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Generating low stock alerts for pharmacy {}", pharmacyId);
         alertService.generateLowStockAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Low stock alerts generated"));
@@ -127,9 +119,8 @@ public class StockAlertController {
 
     @PostMapping("/generate/expiry")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> generateExpiryAlerts(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<Void>> generateExpiryAlerts() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("Generating expiry alerts for pharmacy {}", pharmacyId);
         alertService.generateExpiryAlerts(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Expiry alerts generated"));

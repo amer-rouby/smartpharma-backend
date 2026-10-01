@@ -36,11 +36,10 @@ public class ReportExportController {
 
     @GetMapping("/expenses/excel")
     public ResponseEntity<byte[]> exportExpensesExcel(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size
     ) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Page<ExpenseResponse> expensesPage = expenseService.getExpenses(pharmacyId, PageRequest.of(page, size));
 
         List<Map<String, Object>> expenses = expensesPage.getContent().stream().map(exp -> {
@@ -63,11 +62,10 @@ public class ReportExportController {
 
     @GetMapping("/expenses/pdf")
     public ResponseEntity<byte[]> exportExpensesPdf(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size
     ) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Page<ExpenseResponse> expensesPage = expenseService.getExpenses(pharmacyId, PageRequest.of(page, size));
 
         List<Map<String, Object>> expenses = expensesPage.getContent().stream().map(exp -> {
@@ -90,11 +88,10 @@ public class ReportExportController {
 
     @GetMapping("/financial/excel")
     public ResponseEntity<byte[]> exportFinancialExcel(
-            @RequestParam Long pharmacyId,
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate
     ) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : LocalDate.now().minusDays(30).atStartOfDay();
         LocalDateTime end = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.now();
 
@@ -134,11 +131,10 @@ public class ReportExportController {
 
     @GetMapping("/sales/excel")
     public ResponseEntity<byte[]> exportSalesExcel(
-            @RequestParam Long pharmacyId,
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate
     ) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         SalesReportResponse report = reportService.getSalesReport(
                 ReportRequest.builder().pharmacyId(pharmacyId).startDate(startDate).endDate(endDate).build());
 
@@ -176,11 +172,10 @@ public class ReportExportController {
     // ✅ Sales Report Export - PDF
     @GetMapping("/sales/pdf")
     public ResponseEntity<byte[]> exportSalesPdf(
-            @RequestParam Long pharmacyId,
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate
     ) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         SalesReportResponse report = reportService.getSalesReport(
                 ReportRequest.builder().pharmacyId(pharmacyId).startDate(startDate).endDate(endDate).build());
 
@@ -217,8 +212,8 @@ public class ReportExportController {
 
     // ✅ Expiry Report Export - Excel
     @GetMapping("/expiry/excel")
-    public ResponseEntity<byte[]> exportExpiryExcel(@RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<byte[]> exportExpiryExcel() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         ExpiryReportResponse report = reportService.getExpiryReport(
                 ReportRequest.builder().pharmacyId(pharmacyId).build());
 
@@ -249,8 +244,8 @@ public class ReportExportController {
 
     // ✅ Expiry Report Export - PDF
     @GetMapping("/expiry/pdf")
-    public ResponseEntity<byte[]> exportExpiryPdf(@RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<byte[]> exportExpiryPdf() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         ExpiryReportResponse report = reportService.getExpiryReport(
                 ReportRequest.builder().pharmacyId(pharmacyId).build());
 

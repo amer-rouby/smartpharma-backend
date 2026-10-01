@@ -34,10 +34,9 @@ public class ProductController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts(
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts() {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/products - pharmacyId: {}", pharmacyId);
 
@@ -58,7 +57,6 @@ public class ProductController {
     @GetMapping("/page")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> getProductsPage(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String search,
@@ -66,7 +64,7 @@ public class ProductController {
             @RequestParam(defaultValue = "name") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDirection) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/products/page - pharmacyId: {}, page: {}, size: {}, search: '{}', category: '{}'",
                 pharmacyId, page, size, search, category);
@@ -78,10 +76,9 @@ public class ProductController {
 
     @GetMapping("/count")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
-    public ResponseEntity<ApiResponse<Map<String, Long>>> getProductsCount(
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<Map<String, Long>>> getProductsCount() {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/products/count - pharmacyId: {}", pharmacyId);
 
@@ -98,10 +95,9 @@ public class ProductController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<ProductResponse>> getProduct(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
+            @PathVariable Long id) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/products/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -114,10 +110,9 @@ public class ProductController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
-            @Valid @RequestBody ProductRequest request,
-            @RequestParam Long pharmacyId) {
+            @Valid @RequestBody ProductRequest request) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("POST /api/products - pharmacyId: {}, productName: {}",
                 pharmacyId, request.getName());
@@ -132,10 +127,9 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable Long id,
-            @Valid @RequestBody ProductRequest request,
-            @RequestParam Long pharmacyId) {
+            @Valid @RequestBody ProductRequest request) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("PUT /api/products/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -148,10 +142,9 @@ public class ProductController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
+            @PathVariable Long id) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("DELETE /api/products/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -164,10 +157,9 @@ public class ProductController {
     @GetMapping("/search")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'VIEWER')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> searchProducts(
-            @RequestParam Long pharmacyId,
             @RequestParam String query) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/products/search - pharmacyId: {}, query: '{}'", pharmacyId, query);
 
@@ -179,10 +171,9 @@ public class ProductController {
 
     @GetMapping("/low-stock")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStockProducts(
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStockProducts() {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/products/low-stock - pharmacyId: {}", pharmacyId);
 
