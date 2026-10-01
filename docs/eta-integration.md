@@ -179,7 +179,7 @@ Known gaps, not handled yet:
 - Production runs with `ddl-auto=validate`, which doesn't create the ETA
   tables/columns: the schema has to exist before deploying (e.g. start once
   against the production database with `ddl-auto=update`, or run the DDL
-  it generates). Returns added `sale_returns`, `sale_return_items`,
+  it generates, or run `docs/db/2026-10-01-offline-alternatives-returns.sql`). Returns added `sale_returns`, `sale_return_items`,
   `sales_transactions.returned_amount` and
   `einvoice_submissions.sale_return_id`.
 - Returned amounts are netted out of the sale's own date in revenue
