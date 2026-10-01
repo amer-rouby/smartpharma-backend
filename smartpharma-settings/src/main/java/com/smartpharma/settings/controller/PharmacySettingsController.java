@@ -26,10 +26,9 @@ public class PharmacySettingsController {
     // updatePharmacySettings() below is the sensitive operation and stays ADMIN-only.
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER', 'VIEWER')")
-    public ResponseEntity<ApiResponse<PharmacySettingsResponse>> getPharmacySettings(
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<PharmacySettingsResponse>> getPharmacySettings() {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/settings/pharmacy - pharmacyId: {}", pharmacyId);
 
@@ -40,10 +39,9 @@ public class PharmacySettingsController {
     @PutMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PharmacySettingsResponse>> updatePharmacySettings(
-            @RequestParam Long pharmacyId,
             @Valid @RequestBody PharmacySettingsRequest request) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("PUT /api/settings/pharmacy - pharmacyId: {}", pharmacyId);
 

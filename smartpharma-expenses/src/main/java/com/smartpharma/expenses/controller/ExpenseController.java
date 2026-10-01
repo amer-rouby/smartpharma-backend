@@ -39,13 +39,12 @@ public class ExpenseController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> getExpenses(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "expenseDate") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Sort sort = sortDir.equalsIgnoreCase("asc")
                 ? Sort.by(sortBy).ascending()
@@ -59,9 +58,8 @@ public class ExpenseController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ExpenseResponse>> getExpense(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         ExpenseResponse response = expenseService.getExpense(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -69,9 +67,8 @@ public class ExpenseController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ExpenseResponse>> updateExpense(
             @PathVariable Long id,
-            @RequestBody @Valid ExpenseRequest request,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @RequestBody @Valid ExpenseRequest request) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.getCurrentUserId();
         ExpenseResponse response = expenseService.updateExpense(id, request, pharmacyId, userId);
         return ResponseEntity.ok(ApiResponse.success(response, "Expense updated successfully"));
@@ -79,21 +76,19 @@ public class ExpenseController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteExpense(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         expenseService.deleteExpense(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(null, "Expense deleted successfully"));
     }
 
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> searchExpenses(
-            @RequestParam Long pharmacyId,
             @RequestParam String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Page<ExpenseResponse> results = expenseService.searchExpenses(
                 pharmacyId, query, PageRequest.of(page, size));
@@ -103,12 +98,11 @@ public class ExpenseController {
 
     @GetMapping("/category/{category}")
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> getExpensesByCategory(
-            @RequestParam Long pharmacyId,
             @PathVariable String category,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         Page<ExpenseResponse> results = expenseService.getExpensesByCategory(
                 pharmacyId, category, PageRequest.of(page, size));
@@ -118,11 +112,10 @@ public class ExpenseController {
 
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<ExpenseSummaryResponse>> getExpenseSummary(
-            @RequestParam Long pharmacyId,
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : LocalDate.now().minusDays(30).atStartOfDay();
         LocalDateTime end = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.now();

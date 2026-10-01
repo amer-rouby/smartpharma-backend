@@ -26,9 +26,8 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/users - pharmacyId: {}", pharmacyId);
 
@@ -38,9 +37,8 @@ public class UserController {
 
     @GetMapping("/count")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Map<String, Long>>> getUsersCount(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<Map<String, Long>>> getUsersCount() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/users/count - pharmacyId: {}", pharmacyId);
 
@@ -54,9 +52,8 @@ public class UserController {
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> getUser(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/users/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -81,9 +78,8 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable Long id,
-            @Valid @RequestBody UserRequest request,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @Valid @RequestBody UserRequest request) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         request.setPharmacyId(pharmacyId);
 
         log.info("PUT /api/users/{} - pharmacyId: {}", id, pharmacyId);
@@ -95,9 +91,8 @@ public class UserController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteUser(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("DELETE /api/users/{} - pharmacyId: {}", id, pharmacyId);
 
@@ -108,9 +103,8 @@ public class UserController {
     @GetMapping("/search")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> searchUsers(
-            @RequestParam Long pharmacyId,
             @RequestParam String query) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/users/search - pharmacyId: {}, query: '{}'", pharmacyId, query);
 
@@ -120,9 +114,8 @@ public class UserController {
 
     @GetMapping("/active")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getActiveUsers(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getActiveUsers() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/users/active - pharmacyId: {}", pharmacyId);
 

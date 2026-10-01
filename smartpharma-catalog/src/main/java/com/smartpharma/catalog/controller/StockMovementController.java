@@ -74,14 +74,13 @@ public class StockMovementController {
     @GetMapping("/date-range")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<StockMovementResponse>>> getMovementsByDateRange(
-            @RequestParam Long pharmacyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(required = false) StockMovement.MovementType movementType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("Getting movements for pharmacy: {} from {} to {} type {}", pharmacyId, startDate, endDate, movementType);
 
@@ -92,11 +91,10 @@ public class StockMovementController {
     @GetMapping("/stats")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockMovementStats>> getMovementStats(
-            @RequestParam Long pharmacyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("Getting movement stats for pharmacy: {} from {} to {}", pharmacyId, startDate, endDate);
 

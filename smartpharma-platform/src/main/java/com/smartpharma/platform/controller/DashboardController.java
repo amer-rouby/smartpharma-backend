@@ -23,10 +23,9 @@ public class DashboardController {
 
     @GetMapping("/stats")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
-    public ResponseEntity<ApiResponse<DashboardResponse>> getDashboardStats(
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<DashboardResponse>> getDashboardStats() {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/dashboard/stats - pharmacyId: {}", pharmacyId);
 
@@ -42,10 +41,9 @@ public class DashboardController {
     // globally with the correct status and translatable error code.
     @GetMapping("/smart-insights")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST', 'MANAGER')")
-    public ResponseEntity<ApiResponse<SmartInsightsDTO>> getSmartInsights(
-            @RequestParam(required = false) Long pharmacyId) {
-        Long resolvedPharmacyId = SecurityUtils.getCurrentPharmacyId();
-        SmartInsightsDTO insights = dashboardService.getSmartInsights(resolvedPharmacyId);
+    public ResponseEntity<ApiResponse<SmartInsightsDTO>> getSmartInsights() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        SmartInsightsDTO insights = dashboardService.getSmartInsights(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(insights, "Smart insights retrieved successfully"));
     }
 }

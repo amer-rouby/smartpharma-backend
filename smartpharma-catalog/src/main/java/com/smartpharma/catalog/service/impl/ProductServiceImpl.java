@@ -12,6 +12,7 @@ import com.smartpharma.catalog.repository.ProductRepository;
 import com.smartpharma.catalog.repository.StockBatchRepository;
 import com.smartpharma.catalog.service.ProductService;
 import com.smartpharma.common.exception.LocalizedException;
+import com.smartpharma.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -79,7 +80,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public ProductResponse getProduct(Long id, Long pharmacyId) {
         Product product = productRepository.findByIdAndPharmacyId(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PRODUCT_NOT_FOUND", "Product not found: " + id));
         return mapToResponse(product);
     }
 
@@ -87,11 +88,12 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     public ProductResponse createProduct(ProductRequest request, Long pharmacyId) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Pharmacy not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PHARMACY_NOT_FOUND", "Pharmacy not found: " + pharmacyId));
 
         if (request.getBarcode() != null && !request.getBarcode().trim().isEmpty()) {
             if (productRepository.findByPharmacyIdAndBarcode(pharmacyId, request.getBarcode().trim()).isPresent()) {
-                throw new RuntimeException("Barcode already exists");
+                throw new LocalizedException(HttpStatus.CONFLICT, "PRODUCT_BARCODE_EXISTS",
+                        "Barcode already exists: " + request.getBarcode().trim(), Map.of("barcode", request.getBarcode().trim()));
             }
         }
 
@@ -154,7 +156,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     public ProductResponse updateProduct(Long id, ProductRequest request, Long pharmacyId) {
         Product product = productRepository.findByIdAndPharmacyId(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PRODUCT_NOT_FOUND", "Product not found: " + id));
         product.setName(request.getName());
         product.setScientificName(request.getScientificName());
         if (request.getActiveIngredient() != null) {
@@ -205,7 +207,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     public void deleteProduct(Long id, Long pharmacyId) {
         Product product = productRepository.findByIdAndPharmacyId(id, pharmacyId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("PRODUCT_NOT_FOUND", "Product not found: " + id));
 
         if (product.getDeletedAt() != null) {
             log.warn("Product already deleted: id={}", id);

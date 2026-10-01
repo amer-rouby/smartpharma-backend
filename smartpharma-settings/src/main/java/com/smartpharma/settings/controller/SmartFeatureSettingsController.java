@@ -24,10 +24,9 @@ public class SmartFeatureSettingsController {
     // the app need to know what's enabled, not just the settings screen itself.
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<SmartFeatureSettingsResponse>> getSettings(
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<SmartFeatureSettingsResponse>> getSettings() {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("GET /api/settings/smart-features - pharmacyId: {}", pharmacyId);
 
@@ -38,10 +37,9 @@ public class SmartFeatureSettingsController {
     @PutMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<SmartFeatureSettingsResponse>> updateSettings(
-            @RequestParam Long pharmacyId,
             @Valid @RequestBody SmartFeatureSettingsRequest request) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         log.info("PUT /api/settings/smart-features - pharmacyId: {}", pharmacyId);
 

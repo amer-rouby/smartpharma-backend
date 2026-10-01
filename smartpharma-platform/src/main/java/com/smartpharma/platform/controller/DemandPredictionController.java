@@ -37,10 +37,9 @@ public class DemandPredictionController {
     @PostMapping("/generate")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<Void>> generatePredictions(
-            @RequestParam Long pharmacyId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate forDate,
             @AuthenticationPrincipal UserDetails userDetails) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         try {
             Long userId = SecurityUtils.extractUserId(userDetails);
             if (userId == null) {
@@ -60,9 +59,8 @@ public class DemandPredictionController {
     @GetMapping("/upcoming")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<DemandPredictionResponse>>> getUpcomingPredictions(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "7") int daysAhead) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         try {
             log.info("Getting upcoming predictions for pharmacy: {}, days: {}", pharmacyId, daysAhead);
             List<DemandPredictionResponse> predictions = predictionService.getUpcomingPredictions(pharmacyId, daysAhead);
@@ -77,10 +75,9 @@ public class DemandPredictionController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<DemandPredictionResponse>>> getPredictions(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         try {
             log.info("Getting predictions for pharmacy: {}, page: {}, size: {}", pharmacyId, page, size);
             Page<DemandPredictionResponse> predictions = predictionService.getPredictions(pharmacyId, page, size);
@@ -94,9 +91,8 @@ public class DemandPredictionController {
 
     @GetMapping("/accuracy")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getAccuracyStats(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAccuracyStats() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         try {
             log.info("Getting accuracy stats for pharmacy: {}", pharmacyId);
             Map<String, Object> stats = predictionService.getAccuracyStats(pharmacyId);

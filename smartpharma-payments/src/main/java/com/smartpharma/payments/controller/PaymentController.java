@@ -107,13 +107,12 @@ public class PaymentController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<PaymentResponse>>> getPayments(
-            @RequestParam Long pharmacyId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String paymentMethod,
             @RequestParam(required = false) String search,
             Pageable pageable) {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         try {
             Page<PaymentResponse> payments = paymentService.getPaymentsByPharmacy(
@@ -128,10 +127,9 @@ public class PaymentController {
 
     @GetMapping("/stats")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getPaymentStats(
-            @RequestParam Long pharmacyId) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getPaymentStats() {
 
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
 
         try {
             Map<String, Object> stats = paymentService.getPaymentStats(pharmacyId);

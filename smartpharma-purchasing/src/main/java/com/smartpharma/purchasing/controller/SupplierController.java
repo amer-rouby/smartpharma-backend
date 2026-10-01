@@ -29,9 +29,8 @@ public class SupplierController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<SupplierResponse>>> getAllSuppliers(
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<List<SupplierResponse>>> getAllSuppliers() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/suppliers - pharmacyId: {}", pharmacyId);
         List<SupplierResponse> suppliers = supplierService.getAllSuppliers(pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(suppliers));
@@ -40,10 +39,9 @@ public class SupplierController {
     @GetMapping("/paginated")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<SupplierResponse>>> getSuppliersPaginated(
-            @RequestParam Long pharmacyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/suppliers/paginated - pharmacyId: {}, page: {}, size: {}", pharmacyId, page, size);
         Page<SupplierResponse> suppliers = supplierService.getSuppliersPaginated(pharmacyId, page, size);
         return ResponseEntity.ok(ApiResponse.success(suppliers));
@@ -52,9 +50,8 @@ public class SupplierController {
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<SupplierResponse>> getSupplier(
-            @PathVariable Long id,
-            @RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+            @PathVariable Long id) {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/suppliers/{} - pharmacyId: {}", id, pharmacyId);
         SupplierResponse supplier = supplierService.getSupplier(id, pharmacyId);
         return ResponseEntity.ok(ApiResponse.success(supplier));
@@ -64,9 +61,8 @@ public class SupplierController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<SupplierResponse>> createSupplier(
             @Valid @RequestBody SupplierRequest request,
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("POST /api/suppliers - pharmacyId: {}, userId: {}", pharmacyId, userId);
         SupplierResponse supplier = supplierService.createSupplier(request, pharmacyId, userId);
@@ -78,9 +74,8 @@ public class SupplierController {
     public ResponseEntity<ApiResponse<SupplierResponse>> updateSupplier(
             @PathVariable Long id,
             @Valid @RequestBody SupplierRequest request,
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("PUT /api/suppliers/{} - pharmacyId: {}, userId: {}", id, pharmacyId, userId);
         SupplierResponse supplier = supplierService.updateSupplier(id, request, pharmacyId, userId);
@@ -91,9 +86,8 @@ public class SupplierController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteSupplier(
             @PathVariable Long id,
-            @RequestParam Long pharmacyId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long userId = SecurityUtils.extractUserId(userDetails);
         log.info("DELETE /api/suppliers/{} - pharmacyId: {}, userId: {}", id, pharmacyId, userId);
         supplierService.deleteSupplier(id, pharmacyId, userId);
@@ -102,8 +96,8 @@ public class SupplierController {
 
     @GetMapping("/count")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Map<String, Long>>> countSuppliers(@RequestParam Long pharmacyId) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+    public ResponseEntity<ApiResponse<Map<String, Long>>> countSuppliers() {
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         Long count = supplierService.countSuppliers(pharmacyId);
         Map<String, Long> response = new HashMap<>();
         response.put("count", count);
@@ -113,9 +107,8 @@ public class SupplierController {
     @GetMapping("/search")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<SupplierResponse>>> searchSuppliers(
-            @RequestParam Long pharmacyId,
             @RequestParam String query) {
-        pharmacyId = SecurityUtils.getCurrentPharmacyId();
+        Long pharmacyId = SecurityUtils.getCurrentPharmacyId();
         log.info("GET /api/suppliers/search - pharmacyId: {}, query: {}", pharmacyId, query);
         List<SupplierResponse> suppliers = supplierService.searchSuppliers(pharmacyId, query);
         return ResponseEntity.ok(ApiResponse.success(suppliers));
