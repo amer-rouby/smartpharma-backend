@@ -233,14 +233,25 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     @Transactional
     public void deleteSale(Long id, Long pharmacyId) {
         log.info("Soft deleting sale | id: {} | pharmacyId: {}", id, pharmacyId);
-        SaleTransaction sale = saleTransactionRepository.findById(id)
+        // Locked and not already cancelled: cancelling twice would put the
+        // stock back twice.
+        SaleTransaction sale = saleTransactionRepository.lockByIdAndPharmacyId(id, pharmacyId)
                 .orElseThrow(() -> new ResourceNotFoundException("SALE_NOT_FOUND", "Sale not found: " + id));
-        validatePharmacyAccess(sale, pharmacyId);
         // Cancelling reverses the whole sale (and its ETA receipt); after a
         // partial return that would reverse the returned items twice.
         if (saleReturnRepository.existsBySaleId(id)) {
             throw new LocalizedException(HttpStatus.CONFLICT, "SALE_HAS_RETURNS",
                     "Sale " + id + " has returns - return the remaining items instead of cancelling it");
+        }
+        // The goods come back: each line into the batch it was sold from.
+        for (SaleItem item : sale.getItems()) {
+            StockBatch batch = item.getBatch();
+            if (batch == null) {
+                log.warn("Sale item {} has no batch - its stock isn't put back", item.getId());
+                continue;
+            }
+            batch.setQuantityCurrent(Optional.ofNullable(batch.getQuantityCurrent()).orElse(0) + item.getQuantity());
+            stockBatchRepository.save(batch);
         }
         sale.markAsDeleted();
         saleTransactionRepository.save(sale);
