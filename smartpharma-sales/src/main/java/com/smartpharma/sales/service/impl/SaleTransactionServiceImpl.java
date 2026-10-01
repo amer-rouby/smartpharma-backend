@@ -688,12 +688,9 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         if (sale == null) return null;
         // Only sales with returns pay for the extra query.
         boolean hasReturns = sale.getReturnedAmount() != null && sale.getReturnedAmount().signum() > 0;
-        Map<Long, Integer> returned = new HashMap<>();
-        if (hasReturns) {
-            for (Object[] row : saleReturnRepository.sumReturnedQuantities(sale.getId())) {
-                returned.put((Long) row[0], ((Number) row[1]).intValue());
-            }
-        }
+        Map<Long, Integer> returned = hasReturns
+                ? saleReturnRepository.returnedQuantitiesBySaleItem(sale.getId())
+                : Map.of();
         return SaleTransactionDTO.builder()
                 .id(sale.getId())
                 .invoiceNumber(sale.getInvoiceNumber())

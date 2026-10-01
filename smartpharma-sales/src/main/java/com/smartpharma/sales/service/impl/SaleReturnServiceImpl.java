@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +53,7 @@ public class SaleReturnServiceImpl implements SaleReturnService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User not found: " + userId));
 
-        Map<Long, Integer> alreadyReturned = returnedQuantities(saleId);
+        Map<Long, Integer> alreadyReturned = saleReturnRepository.returnedQuantitiesBySaleItem(saleId);
         Map<Long, Integer> requested = new LinkedHashMap<>();
         for (SaleReturnRequest.Item item : request.getItems()) {
             requested.merge(item.getSaleItemId(), item.getQuantity(), Integer::sum);
@@ -150,14 +149,6 @@ public class SaleReturnServiceImpl implements SaleReturnService {
             return BigDecimal.ZERO.setScale(2);
         }
         return discount.multiply(itemsTotal).divide(saleSubtotal, 2, RoundingMode.HALF_UP);
-    }
-
-    Map<Long, Integer> returnedQuantities(Long saleId) {
-        Map<Long, Integer> returned = new HashMap<>();
-        for (Object[] row : saleReturnRepository.sumReturnedQuantities(saleId)) {
-            returned.put((Long) row[0], ((Number) row[1]).intValue());
-        }
-        return returned;
     }
 
     // Back into the batch it was sold from, so expiry tracking stays right. An
