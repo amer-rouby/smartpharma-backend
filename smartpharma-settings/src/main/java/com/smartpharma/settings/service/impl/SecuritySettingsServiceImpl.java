@@ -1,5 +1,7 @@
 package com.smartpharma.settings.service.impl;
 
+import com.smartpharma.common.exception.LocalizedException;
+import org.springframework.http.HttpStatus;
 import com.smartpharma.settings.dto.request.SecuritySettingsRequest;
 import com.smartpharma.settings.dto.response.SecuritySettingsResponse;
 import com.smartpharma.settings.dto.response.TwoFactorSetupResponse;
@@ -132,13 +134,13 @@ public class SecuritySettingsServiceImpl implements SecuritySettingsService {
     @Transactional
     public SecuritySettingsResponse verifyAndEnableTwoFactor(Long userId, String code) {
         SecuritySettings settings = securitySettingsRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Call 2FA setup first"));
+                .orElseThrow(() -> new LocalizedException(HttpStatus.BAD_REQUEST, "TWO_FACTOR_SETUP_REQUIRED", "Call 2FA setup first"));
 
         if (settings.getTwoFactorSecret() == null) {
-            throw new RuntimeException("Call 2FA setup first");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "TWO_FACTOR_SETUP_REQUIRED", "Call 2FA setup first");
         }
         if (!totpService.verifyCode(settings.getTwoFactorSecret(), code)) {
-            throw new RuntimeException("Invalid verification code");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "TWO_FACTOR_INVALID_CODE", "Invalid verification code");
         }
 
         settings.setTwoFactorEnabled(true);
@@ -155,10 +157,10 @@ public class SecuritySettingsServiceImpl implements SecuritySettingsService {
                 .orElseThrow(() -> new RuntimeException("Security settings not found"));
 
         if (!Boolean.TRUE.equals(settings.getTwoFactorEnabled()) || settings.getTwoFactorSecret() == null) {
-            throw new RuntimeException("Two-factor authentication is not enabled");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "TWO_FACTOR_NOT_ENABLED", "Two-factor authentication is not enabled");
         }
         if (!totpService.verifyCode(settings.getTwoFactorSecret(), code)) {
-            throw new RuntimeException("Invalid verification code");
+            throw new LocalizedException(HttpStatus.BAD_REQUEST, "TWO_FACTOR_INVALID_CODE", "Invalid verification code");
         }
 
         settings.setTwoFactorEnabled(false);
