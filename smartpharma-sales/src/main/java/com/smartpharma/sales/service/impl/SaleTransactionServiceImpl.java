@@ -27,6 +27,7 @@ import com.smartpharma.sales.event.SaleCancelledEvent;
 import com.smartpharma.sales.event.SaleCompletedEvent;
 import com.smartpharma.sales.event.SaleCreatingEvent;
 import com.smartpharma.sales.service.SaleTransactionService;
+import com.smartpharma.sales.service.SalesRevenueService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -65,6 +66,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     private final StockBatchRepository stockBatchRepository;
     private final SaleItemRepository saleItemRepository;
     private final SaleReturnRepository saleReturnRepository;
+    private final SalesRevenueService salesRevenueService;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final PharmacySettingsRepository pharmacySettingsRepository;
@@ -661,7 +663,7 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
     }
 
     private Map<String, Long> fetchDailyOrders(Long pharmacyId, LocalDateTime start, LocalDateTime end) {
-        List<Object[]> data = saleTransactionRepository.getDailySales(pharmacyId, start, end);
+        List<Object[]> data = salesRevenueService.getDailySales(pharmacyId, start, end);
         return data.stream()
                 .collect(Collectors.toMap(
                         obj -> {

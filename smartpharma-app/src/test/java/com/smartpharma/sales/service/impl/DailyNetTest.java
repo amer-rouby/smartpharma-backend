@@ -1,4 +1,4 @@
-package com.smartpharma.sales.repository;
+package com.smartpharma.sales.service.impl;
 
 import org.junit.jupiter.api.Test;
 

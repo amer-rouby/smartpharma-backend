@@ -4,6 +4,7 @@ package com.smartpharma.platform.service.impl;
 import com.smartpharma.platform.dto.response.ExpiryReportResponse;
 import com.smartpharma.platform.dto.response.FinancialReportResponse;
 import com.smartpharma.platform.dto.response.StockReportResponse;
+import com.smartpharma.sales.service.SalesRevenueService;
 import com.smartpharma.sales.dto.response.SalesReportResponse;
 import com.smartpharma.platform.dto.request.ReportRequest;
 import com.smartpharma.expenses.entity.enums.ExpenseCategory;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 public class ReportServiceImpl implements ReportService {
 
     private final SaleTransactionRepository saleRepository;
+    private final SalesRevenueService salesRevenueService;
     private final ProductRepository productRepository;
     private final StockBatchRepository stockBatchRepository;
     private final ExpenseRepository expenseRepository;
@@ -80,7 +82,7 @@ public class ReportServiceImpl implements ReportService {
                         .build())
                 .collect(Collectors.toList());
 
-        List<Object[]> dailySalesData = saleRepository.getDailySales(
+        List<Object[]> dailySalesData = salesRevenueService.getDailySales(
                 pharmacyId, startDateTime, endDateTime);
 
         List<SalesReportResponse.DailySalesDTO> dailySales = dailySalesData.stream()
@@ -184,7 +186,7 @@ public class ReportServiceImpl implements ReportService {
                 netProfit.multiply(BigDecimal.valueOf(100)).divide(totalRevenue, 2, BigDecimal.ROUND_HALF_UP) :
                 BigDecimal.ZERO;
 
-        List<Object[]> dailySalesData = saleRepository.getDailySales(pharmacyId, startDateTime, endDateTime);
+        List<Object[]> dailySalesData = salesRevenueService.getDailySales(pharmacyId, startDateTime, endDateTime);
         List<Object[]> dailyExpensesData = expenseRepository.getDailyExpenses(pharmacyId, startDateTime, endDateTime);
 
         Map<String, FinancialReportResponse.MonthlyFinancialDTO> monthlyMap = new LinkedHashMap<>();
