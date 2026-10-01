@@ -333,16 +333,12 @@ public class StockBatchServiceImpl implements StockBatchService {
                 .collect(Collectors.toList());
     }
 
+    // Only expiry takes a batch out of ACTIVE. Sales and stock totals read
+    // ACTIVE batches only, so marking a batch LOW (or an emptied one EXPIRED)
+    // used to make its remaining units unsellable and invisible; low stock is
+    // a product-level alert, and an empty batch simply has 0 units, as after a sale.
     private void updateBatchStatus(StockBatch batch, Integer newQuantity) {
-        if (batch.isExpired()) {
-            batch.setStatus(StockBatch.BatchStatus.EXPIRED);
-        } else if (newQuantity <= 0) {
-            batch.setStatus(StockBatch.BatchStatus.EXPIRED);
-        } else if (newQuantity < batch.getProduct().getMinStockLevel()) {
-            batch.setStatus(StockBatch.BatchStatus.LOW);
-        } else {
-            batch.setStatus(StockBatch.BatchStatus.ACTIVE);
-        }
+        batch.setStatus(batch.isExpired() ? StockBatch.BatchStatus.EXPIRED : StockBatch.BatchStatus.ACTIVE);
     }
 
     private StockBatchResponse mapToResponse(StockBatch batch) {
