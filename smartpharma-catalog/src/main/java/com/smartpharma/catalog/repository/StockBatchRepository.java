@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -47,10 +48,18 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     """)
     List<StockBatch> findExpiringBatches(@Param("pharmacyId") Long pharmacyId, @Param("expiryDate") LocalDate expiryDate);
 
+    // Expired stock (still ACTIVE or already marked EXPIRED) waits on the shelf
+    // until it's discarded, so the expired lists/counts above read both.
+    // This marks the ones past their date, so sales and stock totals skip them.
+    @Modifying
+    @Query("UPDATE StockBatch sb SET sb.status = 'EXPIRED' WHERE sb.status = 'ACTIVE' AND sb.expiryDate < :today")
+    int markExpired(@Param("today") LocalDate today);
+
     @Query("""
     SELECT sb FROM StockBatch sb 
     WHERE sb.pharmacy.id = :pharmacyId 
-    AND sb.status = 'ACTIVE' 
+    AND sb.status IN ('ACTIVE', 'EXPIRED')
+    AND sb.quantityCurrent > 0
     AND sb.expiryDate < :expiryDate
     ORDER BY sb.expiryDate ASC
 """)
@@ -99,7 +108,8 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     @Query("""
         SELECT COUNT(sb) FROM StockBatch sb
         WHERE sb.pharmacy.id = :pharmacyId
-        AND sb.status = 'ACTIVE'
+        AND sb.status IN ('ACTIVE', 'EXPIRED')
+        AND sb.quantityCurrent > 0
         AND sb.expiryDate < CURRENT_DATE
     """)
     Long countExpiredBatches(@Param("pharmacyId") Long pharmacyId);
@@ -153,7 +163,8 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, Long> {
     FROM StockBatch sb
     JOIN Product p ON sb.product.id = p.id
     WHERE sb.pharmacy.id = :pharmacyId
-    AND sb.status = 'ACTIVE'
+    AND sb.status IN ('ACTIVE', 'EXPIRED')
+    AND sb.quantityCurrent > 0
     AND sb.expiryDate < :today
     GROUP BY p.id, p.name, sb.batchNumber, sb.expiryDate
     ORDER BY sb.expiryDate ASC
