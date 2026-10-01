@@ -149,9 +149,9 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         List<SaleItem> saleItems = new ArrayList<>();
         boolean requiresPrescription = false;
         for (SaleItemRequest itemRequest : request.getItems()) {
-            SaleItem saleItem = processSaleItem(itemRequest, sale, pharmacy.getId(), offlineSale);
-            saleItems.add(saleItem);
-            if (Boolean.TRUE.equals(saleItem.getProduct().getPrescriptionRequired())) {
+            List<SaleItem> lines = processSaleItem(itemRequest, sale, pharmacy.getId(), offlineSale);
+            saleItems.addAll(lines);
+            if (Boolean.TRUE.equals(lines.get(0).getProduct().getPrescriptionRequired())) {
                 requiresPrescription = true;
             }
         }
@@ -470,32 +470,77 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
         return Sort.by(direction, sortBy);
     }
 
-    private SaleItem processSaleItem(SaleItemRequest itemRequest, SaleTransaction sale,
-                                     Long pharmacyId, boolean offlineSale) {
+    // One sale line per batch the quantity is taken from, so returns and
+    // expiry tracking always know which batch each unit came out of.
+    private List<SaleItem> processSaleItem(SaleItemRequest itemRequest, SaleTransaction sale,
+                                           Long pharmacyId, boolean offlineSale) {
         // Scoped to the pharmacy: an id from another pharmacy is "not found",
         // never sold out of that pharmacy's stock.
         Product product = productRepository.findByIdAndPharmacyId(itemRequest.getProductId(), pharmacyId)
                 .orElseThrow(() -> new ResourceNotFoundException("PRODUCT_NOT_FOUND", "Product not found: " + itemRequest.getProductId()));
         BigDecimal unitPrice = resolveUnitPrice(product, itemRequest.getUnitPrice(), offlineSale);
 
-        StockBatch selectedBatch = selectStockBatch(product.getId(), itemRequest.getQuantity());
-        if (selectedBatch == null) {
-            throw new LocalizedException(HttpStatus.BAD_REQUEST, "INSUFFICIENT_STOCK",
-                    "Insufficient stock for product: " + product.getName(),
-                    Map.of("productName", product.getName()));
+        List<StockBatch> batches = stockBatchRepository.findByProductIdAndStatusActive(product.getId());
+        List<BatchTake> takes = allocateFefo(batches, itemRequest.getQuantity(), LocalDate.now());
+        if (takes == null) {
+            int sellable = sellableQuantity(batches, LocalDate.now());
+            boolean expiredWouldCover = totalQuantity(batches) >= itemRequest.getQuantity();
+            throw new LocalizedException(HttpStatus.BAD_REQUEST,
+                    expiredWouldCover ? "SALE_STOCK_EXPIRED" : "INSUFFICIENT_STOCK",
+                    "Only " + sellable + " unexpired unit(s) of " + product.getName() + " in stock",
+                    Map.of("productName", product.getName(), "available", sellable));
         }
 
-        SaleItem saleItem = SaleItem.builder()
-                .product(product)
-                .batch(selectedBatch)
-                .quantity(itemRequest.getQuantity())
-                .unitPrice(unitPrice)
-                .transaction(sale)
-                .build();
+        List<SaleItem> items = new ArrayList<>();
+        for (BatchTake take : takes) {
+            SaleItem saleItem = SaleItem.builder()
+                    .product(product)
+                    .batch(take.batch())
+                    .quantity(take.quantity())
+                    .unitPrice(unitPrice)
+                    .transaction(sale)
+                    .build();
+            saleItem.calculateTotalPrice();
+            deductStock(take.batch(), take.quantity());
+            items.add(saleItem);
+        }
+        return items;
+    }
 
-        saleItem.calculateTotalPrice();
-        deductStock(selectedBatch, itemRequest.getQuantity());
-        return saleItem;
+    record BatchTake(StockBatch batch, int quantity) {
+    }
+
+    /**
+     * Takes the quantity first-expiry-first-out across the product's batches,
+     * skipping expired ones - those are never sold. Null when the unexpired
+     * stock can't cover it.
+     */
+    static List<BatchTake> allocateFefo(List<StockBatch> batches, int quantity, LocalDate today) {
+        List<StockBatch> usable = batches == null ? List.of() : batches.stream()
+                .filter(b -> b.getExpiryDate() == null || !b.getExpiryDate().isBefore(today))
+                .filter(b -> b.getQuantityCurrent() != null && b.getQuantityCurrent() > 0)
+                .sorted(Comparator.comparing(StockBatch::getExpiryDate, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        List<BatchTake> takes = new ArrayList<>();
+        int remaining = quantity;
+        for (StockBatch batch : usable) {
+            if (remaining == 0) break;
+            int take = Math.min(remaining, batch.getQuantityCurrent());
+            takes.add(new BatchTake(batch, take));
+            remaining -= take;
+        }
+        return remaining == 0 ? takes : null;
+    }
+
+    private static int sellableQuantity(List<StockBatch> batches, LocalDate today) {
+        return batches.stream()
+                .filter(b -> b.getExpiryDate() == null || !b.getExpiryDate().isBefore(today))
+                .mapToInt(b -> Optional.ofNullable(b.getQuantityCurrent()).orElse(0))
+                .sum();
+    }
+
+    private static int totalQuantity(List<StockBatch> batches) {
+        return batches.stream().mapToInt(b -> Optional.ofNullable(b.getQuantityCurrent()).orElse(0)).sum();
     }
 
     /**
@@ -524,31 +569,6 @@ public class SaleTransactionServiceImpl implements SaleTransactionService {
                     product.getId(), price, requestedPrice);
         }
         return price;
-    }
-
-    private StockBatch selectStockBatch(Long productId, Integer requestedQuantity) {
-        List<StockBatch> activeBatches = stockBatchRepository.findByProductIdAndStatusActive(productId);
-        if (activeBatches == null || activeBatches.isEmpty()) {
-            return null;
-        }
-        activeBatches.sort(Comparator.comparing(StockBatch::getExpiryDate));
-
-        Integer remainingQuantity = requestedQuantity;
-        StockBatch selectedBatch = null;
-
-        for (StockBatch batch : activeBatches) {
-            Integer available = Optional.ofNullable(batch.getQuantityCurrent()).orElse(0);
-            if (available >= remainingQuantity) {
-                selectedBatch = batch;
-                break;
-            } else if (available > 0) {
-                remainingQuantity -= available;
-                if (selectedBatch == null) {
-                    selectedBatch = batch;
-                }
-            }
-        }
-        return selectedBatch;
     }
 
     private void deductStock(StockBatch batch, Integer quantity) {
